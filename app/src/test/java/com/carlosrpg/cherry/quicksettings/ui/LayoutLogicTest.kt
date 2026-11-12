@@ -25,29 +25,22 @@ class LayoutLogicTest {
     }
 
     @Test
-    fun `media drag angle picks volume or track`() {
-        fun guide(x: Float, y: Float, adjustable: Boolean = true, previous: Hud.Media? = null) =
-            mediaGuide(Offset(x, y), startVolume = 10, max = 15, adjustable = adjustable,
-                volumeStepPx = 16f, trackThresholdPx = 64f, previous = previous)
+    fun `media zones follow the zone map`() {
+        fun zone(x: Float, y: Float) = mediaZone(Offset(x, y), deadPx = 16f, bandHalfPx = 64f, sidePx = 56f)
 
-        // Steep, even well off vertical (about 63°): volume only.
-        val up = guide(25f, -50f)
-        assertThat(up.volume).isEqualTo(13)
-        assertThat(up.volumeDirection).isEqualTo(1)
-        assertThat(up.trackProgress).isEqualTo(0f)
-        // A true diagonal (45°) is volume now, not a skip.
-        val diagonal = guide(80f, 80f)
-        assertThat(diagonal.volume).isEqualTo(5)
-        assertThat(diagonal.trackArmed).isFalse()
-        // Shallow (about 14°) and past the threshold: the skip arms, volume stays put.
-        val skip = guide(-80f, 20f, previous = up)
-        assertThat(skip.trackDirection).isEqualTo(-1)
-        assertThat(skip.trackArmed).isTrue()
-        assertThat(skip.volume).isEqualTo(13)
-        assertThat(skip.volumeDirection).isEqualTo(0)
-        // Clamped at the top; fixed-volume builds never change it.
-        assertThat(guide(0f, -400f).volume).isEqualTo(15)
-        assertThat(guide(0f, -400f, adjustable = false).volume).isEqualTo(10)
+        // Dead band in the centre column.
+        assertThat(zone(0f, 0f)).isEqualTo(MediaZone.NONE)
+        assertThat(zone(30f, -10f)).isEqualTo(MediaZone.NONE)
+        // Slow volume just above / below the dead band, fast beyond the band, at any width.
+        assertThat(zone(10f, -30f)).isEqualTo(MediaZone.VOLUME_UP)
+        assertThat(zone(-20f, 40f)).isEqualTo(MediaZone.VOLUME_DOWN)
+        assertThat(zone(120f, -80f)).isEqualTo(MediaZone.VOLUME_UP_FAST)
+        assertThat(zone(-120f, 90f)).isEqualTo(MediaZone.VOLUME_DOWN_FAST)
+        // Sides inside the band are tracks, even a little off the centre line.
+        assertThat(zone(70f, -40f)).isEqualTo(MediaZone.NEXT)
+        assertThat(zone(-60f, 30f)).isEqualTo(MediaZone.PREVIOUS)
+        assertThat(MediaZone.VOLUME_UP_FAST.stepsPerSecond).isEqualTo(2)
+        assertThat(MediaZone.VOLUME_DOWN.stepsPerSecond).isEqualTo(1)
     }
 
     @Test

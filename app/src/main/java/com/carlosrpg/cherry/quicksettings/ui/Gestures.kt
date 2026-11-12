@@ -13,8 +13,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.RegenLevel
 import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.sign
 
 enum class Axis { HORIZONTAL, VERTICAL }
 
@@ -43,61 +41,54 @@ class DragSteps(private val lockPx: Float, private val stepPx: Float) {
 /** What the guide beside the drawer shows during a press-and-drag. */
 sealed interface Hud {
     /**
-     * The media control card. Both directions work in one gesture: [volume] follows vertical
-     * travel and is applied live; a track skip only arms ([trackProgress] reaches 1) and is
-     * applied on release. Directions are -1, 0 or 1.
+     * The media control card, laid out as the zone map: [zone] is where the finger is relative
+     * to the press point. Volume zones repeat while held; track zones fire on release.
      */
     data class Media(
+        val zone: MediaZone,
         val volume: Int,
         val max: Int,
         val adjustable: Boolean,
-        val volumeDirection: Int,
-        val trackDirection: Int,
-        val trackProgress: Float,
         /** Debug builds on fixed-volume systems: the number is the expected volume, not applied. */
         val simulated: Boolean = false,
-    ) : Hud {
-        val trackArmed: Boolean get() = trackDirection != 0 && trackProgress >= 1f
-    }
+    ) : Hud
     data class Mode(val current: BatteryMode?, val target: BatteryMode, val holdTarget: Int?) : Hud
     data class Regen(val current: RegenLevel?, val target: RegenLevel) : Hud
     /** Both axes at once: the marker follows the finger across the quadrant. */
     data class Climate(val temp: Int, val fan: Int) : Hud
 }
 
-/** Track skips only count within this angle of horizontal; every steeper drag adjusts volume. */
-const val TRACK_MAX_ANGLE_DEG = 20.0
+/**
+ * Where a media drag is, relative to the press point. Volume zones repeat [stepsPerSecond]
+ * steps in [direction] while the finger stays in them; track zones act on release.
+ */
+enum class MediaZone(val direction: Int, val stepsPerSecond: Int) {
+    NONE(0, 0),
+    VOLUME_UP(1, 1),
+    VOLUME_UP_FAST(1, 2),
+    VOLUME_DOWN(-1, 1),
+    VOLUME_DOWN_FAST(-1, 2),
+    NEXT(1, 0),
+    PREVIOUS(-1, 0);
+
+    val isVolume: Boolean get() = stepsPerSecond > 0
+    val isTrack: Boolean get() = this == NEXT || this == PREVIOUS
+}
 
 /**
- * The media card's state for a drag of [total] from the press point. The drag's angle picks
- * the control: within [TRACK_MAX_ANGLE_DEG] of horizontal it fills toward a track skip that arms
- * at [trackThresholdPx]; anything steeper moves the volume one step per [volumeStepPx] of
- * vertical travel (never when the volume isn't adjustable). In the track zone the volume stays
- * where [previous] left it, so a sideways drag never changes or undoes it.
+ * The zone map, relative to the press point. Beyond [bandHalfPx] above or below are the fast
+ * volume zones, across the whole width. Inside that band, beyond [sidePx] left or right are
+ * previous / next. In the centre column a dead band of ±[deadPx] does nothing; above it is slow
+ * volume up, below it slow volume down.
  */
-fun mediaGuide(
-    total: Offset,
-    startVolume: Int,
-    max: Int,
-    adjustable: Boolean,
-    volumeStepPx: Float,
-    trackThresholdPx: Float,
-    simulated: Boolean = false,
-    previous: Hud.Media? = null,
-): Hud.Media {
-    val angle = Math.toDegrees(atan2(abs(total.y).toDouble(), abs(total.x).toDouble()))
-    val trackZone = total.getDistance() > 0f && angle <= TRACK_MAX_ANGLE_DEG
-    val steps = if (adjustable && !trackZone) (-total.y / volumeStepPx).toInt() else 0
-    val volume = if (trackZone) previous?.volume ?: startVolume else (startVolume + steps).coerceIn(0, max)
-    return Hud.Media(
-        volume = volume,
-        max = max,
-        adjustable = adjustable,
-        volumeDirection = if (trackZone) 0 else steps.sign,
-        trackDirection = if (trackZone) total.x.sign.toInt() else 0,
-        trackProgress = if (trackZone) (abs(total.x) / trackThresholdPx).coerceIn(0f, 1f) else 0f,
-        simulated = simulated,
-    )
+fun mediaZone(total: Offset, deadPx: Float, bandHalfPx: Float, sidePx: Float): MediaZone = when {
+    total.y < -bandHalfPx -> MediaZone.VOLUME_UP_FAST
+    total.y > bandHalfPx -> MediaZone.VOLUME_DOWN_FAST
+    total.x >= sidePx -> MediaZone.NEXT
+    total.x <= -sidePx -> MediaZone.PREVIOUS
+    abs(total.y) < deadPx -> MediaZone.NONE
+    total.y < 0 -> MediaZone.VOLUME_UP
+    else -> MediaZone.VOLUME_DOWN
 }
 
 /** A tile that only reacts to a tap; drags pass through so the tile list can still scroll. */

@@ -38,6 +38,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -70,6 +71,7 @@ import com.carlosrpg.cherry.quicksettings.settings.WidgetType
 import com.carlosrpg.cherry.quicksettings.util.AppInfo
 import com.carlosrpg.cherry.quicksettings.voice.VoiceInput
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.math.sign
 
@@ -236,6 +238,9 @@ private fun SemiDrawer(
 }
 
 private val HUD_HEIGHT = 230.dp
+private const val MEDIA_DEAD_DP = 16
+private const val MEDIA_BAND_DP = 64
+private const val MEDIA_SIDE_DP = 56
 
 /** Icons are drawn for a left drawer; a right drawer points the other way. */
 private fun String.mirrorFor(side: Side): String = if (side == Side.LEFT) this else when (this) {
@@ -269,39 +274,51 @@ private fun SemiTile(
 ) {
     val density = LocalDensity.current
     val lockPx = with(density) { 24.dp.toPx() }
-    val volumeStepPx = with(density) { 16.dp.toPx() }
     val choiceStepPx = with(density) { 64.dp.toPx() }
     val climateStepPx = with(density) { 20.dp.toPx() }
+    // Media zones: ±16 dp dead band, slow volume to 64 dp, fast beyond; tracks from 56 dp sideways.
+    val mediaDeadPx = with(density) { MEDIA_DEAD_DP.dp.toPx() }
+    val mediaBandPx = with(density) { MEDIA_BAND_DP.dp.toPx() }
+    val mediaSidePx = with(density) { MEDIA_SIDE_DP.dp.toPx() }
     when (type) {
         WidgetType.MEDIA -> {
-            // One card for both directions, no axis lock: volume follows up/down live; a track
-            // skip arms past the threshold and fires only on release (dragging back cancels it).
-            var startVolume by remember { mutableIntStateOf(0) }
-            var guide by remember { mutableStateOf<Hud.Media?>(null) }
-            fun guideFor(total: Offset): Hud.Media {
+            // Zone map around the press point: volume zones step the volume on entry and then
+            // repeatedly (1/s, or 2/s in the outer zones) while held; track zones only skip when
+            // the finger lifts inside them.
+            var zone by remember { mutableStateOf<MediaZone?>(null) }
+            fun publish(z: MediaZone?) {
                 val now = actions.media.state.value
-                return mediaGuide(total, startVolume, now.maxVolume, now.volumeAdjustable, volumeStepPx, choiceStepPx, now.volumeSimulated, guide)
+                setHud(z?.let { Hud.Media(it, now.volume, now.maxVolume, now.volumeAdjustable, now.volumeSimulated) })
+            }
+            LaunchedEffect(zone) {
+                val z = zone ?: return@LaunchedEffect
+                if (!z.isVolume || !actions.media.state.value.volumeAdjustable) return@LaunchedEffect
+                while (true) {
+                    actions.media.setVolume(actions.media.state.value.volume + z.direction)
+                    publish(z)
+                    delay(1000L / z.stepsPerSecond)
+                }
             }
             MediaTile(media, Modifier.tapOrDrag(
                 onTap = actions.media::playPause,
-                onDragStart = {
-                    startVolume = actions.media.state.value.volume
-                    guide = guideFor(Offset.Zero).also(setHud)
-                },
+                onDragStart = { zone = MediaZone.NONE; publish(MediaZone.NONE) },
                 onDrag = { total ->
-                    val next = guideFor(total)
-                    if (next.adjustable && next.volume != actions.media.state.value.volume) actions.media.setVolume(next.volume)
-                    if (next != guide) {
-                        guide = next
-                        setHud(next)
+                    val next = mediaZone(total, mediaDeadPx, mediaBandPx, mediaSidePx)
+                    if (next != zone) {
+                        zone = next
+                        publish(next)
                     }
                 },
                 onRelease = {
-                    guide?.takeIf { it.trackArmed }?.let { if (it.trackDirection > 0) actions.media.next() else actions.media.previous() }
-                    guide = null
-                    setHud(null)
+                    when (zone) {
+                        MediaZone.NEXT -> actions.media.next()
+                        MediaZone.PREVIOUS -> actions.media.previous()
+                        else -> Unit
+                    }
+                    zone = null
+                    publish(null)
                 },
-                onCancel = { guide = null; setHud(null) },
+                onCancel = { zone = null; publish(null) },
             ))
         }
         WidgetType.CAR_MODE -> {
@@ -446,70 +463,77 @@ private fun GuideHud(hud: Hud, modifier: Modifier = Modifier) {
 }
 
 /**
- * The media control card: volume in the centre with + above and − below (lit in the direction
- * being dragged), previous/next on the sides filling toward the skip threshold and turning solid
- * white once armed.
+ * The media control card, drawn as the zone map it responds to: fast volume up across the top,
+ * fast volume down across the bottom, previous / next on the sides, and in the middle slow
+ * volume up above the volume and slow volume down below it. The zone under the finger is lit.
  */
 @Composable
 private fun MediaGuide(hud: Hud.Media) {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-        VolumeHint(Icons.Plus, active = hud.volumeDirection > 0, enabled = hud.adjustable)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            TrackHint(Icons.Prev, if (hud.trackDirection < 0) hud.trackProgress else 0f)
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (hud.adjustable) {
-                    QsText("${hud.volume}", 44.sp, weight = FontWeight.Bold)
-                    val fraction = if (hud.max > 0) hud.volume / hud.max.toFloat() else 0f
-                    Box(Modifier.width(72.dp).height(5.dp).clip(RoundedCornerShape(3.dp)).background(Color(0x26FFFFFF))) {
-                        Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Qs.Text))
-                    }
-                } else {
-                    QsIcon(Icons.Volume, Qs.Dim, 34.dp)
-                }
-                val caption = when {
-                    hud.trackArmed -> stringResource(if (hud.trackDirection > 0) R.string.hud_release_next else R.string.hud_release_previous)
-                    hud.simulated -> stringResource(R.string.hud_volume_simulated)
-                    hud.adjustable -> stringResource(R.string.hud_media_volume)
-                    else -> stringResource(R.string.use_car_volume)
-                }
-                androidx.compose.material3.Text(
-                    caption, color = if (hud.trackArmed) Qs.Text else Qs.Muted, fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold, maxLines = 2,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-            }
-            TrackHint(Icons.Next, if (hud.trackDirection > 0) hud.trackProgress else 0f)
+    val z = hud.zone
+    val gap = 6.dp
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
+        ZoneCell(z == MediaZone.VOLUME_UP_FAST, hud.adjustable, Modifier.fillMaxWidth().height(34.dp)) {
+            ZoneIcons(Icons.Plus, 2, z == MediaZone.VOLUME_UP_FAST, hud.adjustable)
         }
-        VolumeHint(Icons.Minus, active = hud.volumeDirection < 0, enabled = hud.adjustable)
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+            ZoneCell(z == MediaZone.PREVIOUS, true, Modifier.width(58.dp).fillMaxHeight()) {
+                QsIcon(Icons.Prev, if (z == MediaZone.PREVIOUS) Color(0xFF0B1018) else Qs.Text, 22.dp, filled = true)
+            }
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                ZoneCell(z == MediaZone.VOLUME_UP, hud.adjustable, Modifier.fillMaxWidth().weight(1f)) {
+                    ZoneIcons(Icons.Plus, 1, z == MediaZone.VOLUME_UP, hud.adjustable)
+                }
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (hud.adjustable) QsText("${hud.volume}", 26.sp, weight = FontWeight.Bold)
+                    else QsIcon(Icons.Volume, Qs.Dim, 22.dp)
+                    val caption = when (z) {
+                        MediaZone.NEXT -> stringResource(R.string.hud_release_next)
+                        MediaZone.PREVIOUS -> stringResource(R.string.hud_release_previous)
+                        else -> when {
+                            !hud.adjustable -> stringResource(R.string.use_car_volume)
+                            hud.simulated -> stringResource(R.string.hud_volume_simulated)
+                            else -> stringResource(R.string.hud_media_volume)
+                        }
+                    }
+                    androidx.compose.material3.Text(
+                        caption, color = if (z.isTrack) Qs.Text else Qs.Muted, fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold, maxLines = 2,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
+                ZoneCell(z == MediaZone.VOLUME_DOWN, hud.adjustable, Modifier.fillMaxWidth().weight(1f)) {
+                    ZoneIcons(Icons.Minus, 1, z == MediaZone.VOLUME_DOWN, hud.adjustable)
+                }
+            }
+            ZoneCell(z == MediaZone.NEXT, true, Modifier.width(58.dp).fillMaxHeight()) {
+                QsIcon(Icons.Next, if (z == MediaZone.NEXT) Color(0xFF0B1018) else Qs.Text, 22.dp, filled = true)
+            }
+        }
+        ZoneCell(z == MediaZone.VOLUME_DOWN_FAST, hud.adjustable, Modifier.fillMaxWidth().height(34.dp)) {
+            ZoneIcons(Icons.Minus, 2, z == MediaZone.VOLUME_DOWN_FAST, hud.adjustable)
+        }
     }
 }
 
 @Composable
-private fun VolumeHint(icon: String, active: Boolean, enabled: Boolean) {
-    val shape = RoundedCornerShape(18.dp)
+private fun ZoneCell(active: Boolean, enabled: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
     Box(
-        Modifier.size(36.dp).clip(shape)
-            .background(if (active) Color.White else Color.Transparent)
-            .border(1.dp, if (active) Color.White else Qs.Hairline, shape),
+        modifier.clip(shape)
+            .background(if (active) Color.White else Color(0x0FFFFFFF))
+            .border(1.dp, if (active) Color.White else Qs.Hairline, shape)
+            .alpha(if (enabled) 1f else 0.4f),
         contentAlignment = Alignment.Center,
-    ) {
-        QsIcon(icon, when { active -> Color(0xFF0B1018); enabled -> Qs.Text; else -> Color(0x406B7686) }, 18.dp)
-    }
+    ) { content() }
 }
 
-/** [progress] 0..1 toward the skip threshold; at 1 the skip is armed and fires on release. */
+/** [count] copies of a +/− glyph: one for the slow zone, two for the fast one. */
 @Composable
-private fun TrackHint(icon: String, progress: Float) {
-    val armed = progress >= 1f
-    val size = if (armed) 64.dp else 56.dp
-    val shape = RoundedCornerShape(size / 2)
-    Box(
-        Modifier.size(size).clip(shape)
-            .background(if (armed) Color.White else Color.White.copy(alpha = 0.22f * progress))
-            .border(1.dp, if (armed) Color.White else Qs.Hairline, shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        QsIcon(icon, if (armed) Color(0xFF0B1018) else Qs.Text.copy(alpha = 0.45f + 0.55f * progress), 22.dp, filled = true)
+private fun ZoneIcons(icon: String, count: Int, active: Boolean, enabled: Boolean) {
+    Row(horizontalArrangement = Arrangement.spacedBy((-4).dp)) {
+        repeat(count) {
+            QsIcon(icon, if (active) Color(0xFF0B1018) else if (enabled) Qs.Text else Qs.Dim, 18.dp, strokeWidth = 2.4f)
+        }
     }
 }
 
