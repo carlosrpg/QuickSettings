@@ -1,9 +1,13 @@
 # QuickSettings
 
 A widget drawer that floats over every app on the Jaecoo 7 head unit (Android Automotive 11).
-Closed, it is a 6 dp hint on the screen edge. Swipe inward from the edge to open it semi-open:
-small square widgets you read at a glance. Open it fully for larger cards and full controls.
+Closed, it is a 6 dp hint on the screen edge. Touch it to open the drawer semi-open: small
+square widgets you read at a glance. Open it fully for larger cards and full controls.
 English and Brazilian Portuguese.
+
+The car's own back gesture takes any swipe that starts within 30 px of the left or right screen
+edge, so the handle opens on touch. "Touch the edge handle to open" in settings (on by default)
+switches to swipe-only.
 
 Style: **Night Glass**, the approved styleguide.
 
@@ -11,24 +15,39 @@ Style: **Night Glass**, the approved styleguide.
 
 | Widget | Semi-open | Open |
 |---|---|---|
-| Media | Album art, play/pause. Press and drag left/right: previous/next | Source app (tap to open it), title, progress, transport, voice search sent to the app that owns the session |
+| Media | Album art, play/pause. Press and drag: up/down volume, left/right previous/next | Source (an app, tap to open it, or one of the car's own: Bluetooth, USB, CarPlay, Android Auto, …), title, progress, transport, volume, voice search sent to the app that owns the session |
 | Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | A large quadrant: touch anywhere to place the marker and drag it; values update live and are set on release |
 | Car mode | Battery-mode glyph and regen bars. Press and drag: up/down battery mode, left/right regen | Initial / Smart / Forced, hold-target slider when Forced, Low / Medium / High regen |
 | Autonomy | Battery ring (outer) and fuel ring (inner), electric km | Electric and fuel range, km and %, total |
 | Navigation | Next manoeuvre and distance; with no route, a tap starts a voice destination search | Nav app (tap to open it), next turn, street, ETA, voice destination |
 | Assist | Emergency braking, auto hold, lane keeping (read only) | Same, with On/Off |
 
-Media volume: Android Automotive uses fixed volume, and the car's volume groups need a
-privileged permission, so the app hides its volume controls there and points to the car's own.
+Media volume: up, down and mute go through `AudioManager.adjustVolume`, the call the
+steering-wheel keys end in. The car's audio service moves whichever source is playing by one step
+and shows its own volume bar. The level itself can't be read by an app on the car, so there the
+drawer shows only + and − (the number appears on a phone-style system and, simulated, in debug
+builds).
 
 ## How it gets its data
 
-- **Car**: CarInfo items through [jconfig-carbus](https://github.com/carlosrpg/jconfig-carbus), bundled as a
-  prebuilt AAR in `app/libs/` (no vendor classes in it; the head unit supplies those at runtime).
-  CarInfo has no subscribe, and values also change from the stock settings, voice and buttons, so
-  the app **polls**: every 1.5 s while the drawer is visible, and again right after each write.
-- **Media**: the active `MediaSession`, found through the notification listener.
+- **Car**: CarInfo items through [jconfig-carbus](https://github.com/carlosrpg/jconfig-carbus), bundled as two
+  prebuilt AARs in `app/libs/`: `carbus` (the Kotlin layer) and `vdbus-client` (the vendor client
+  classes it talks through). Both must ship: the head unit has no copy of the vendor client that
+  an app can load. CarInfo has no subscribe, and values also change from the stock settings, voice
+  and buttons, so the app **polls**: every 1.5 s while the drawer is visible, and again right
+  after each write.
+- **Media**, from two feeds that never overlap:
+  - Apps installed on the head unit: the active `MediaSession`, found through the notification
+    listener.
+  - The car's own sources (Bluetooth audio, USB, CarPlay, Android Auto, the built-in online
+    apps): the vendor media service, through jconfig-carbus. These never publish a media
+    session. Radio and DAB show only their name for now.
+
+  An app that is playing wins; otherwise the car's current source is shown.
 - **Navigation**: the navigation app's turn-by-turn notification (title, text, arrow).
+
+The **Status** panel at the bottom of the settings screen shows, live, whether the car-data
+link, the car-media link and notification access are up.
 
 Nothing writes to the car on its own. Every write comes from a tap, a slider release or a
 drag release. Regen and battery mode aren't gated on speed: the stock settings app doesn't gate
@@ -38,19 +57,30 @@ them either.
 
 1. Download the signed APK from the latest [release](../../releases) and copy it to a USB stick.
 2. Install it on the car with a file manager.
-3. Open QuickSettings once. Android shows a one-time "built for an older version of Android"
-   notice, then a permissions review screen: tap **Continue**. That grants the overlay and the
-   microphone.
-4. From a PC connected over adb, type the command below. The car has no settings page for it.
+3. Open QuickSettings. Its settings screen lists what is still missing and updates by itself
+   as each grant lands.
+4. From a PC connected over adb, type the two commands below. The car has no settings page for
+   either.
+5. Tap **Grant** next to Microphone and allow it (voice search only).
 
-**Notification access** (media and navigation). Required:
+**Draw over other apps** (the drawer itself). Required:
+
+```
+adb shell appops set com.carlosrpg.cherry.quicksettings SYSTEM_ALERT_WINDOW allow
+```
+
+**Notification access** (media apps and navigation). Required:
 
 ```
 adb shell cmd notification allow_listener com.carlosrpg.cherry.quicksettings/.nav.QsNotificationListener
 ```
 
-**Tap pass-through** (optional; lets taps in the edge swipe zone reach the app behind). The first
-command appends to the existing list, so the car's own accessibility services stay on:
+The app targets the head unit's own Android version (API 30), so there is no "built for an older
+version" notice; the cost is that the overlay is no longer granted at install.
+
+**Tap pass-through** (optional, and only with "Touch the edge handle to open" turned off; lets
+taps in the edge swipe zone reach the app behind). The first command appends to the existing
+list, so the car's own accessibility services stay on:
 
 ```
 adb shell 'settings --user current put secure enabled_accessibility_services "$(settings --user current get secure enabled_accessibility_services):com.carlosrpg.cherry.quicksettings/.overlay.TapRelayService"'
@@ -76,7 +106,7 @@ ones. Builds are copied to `app/build/renamedApks/<variant>/QuickSettings-<versi
 Release signing reads `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS` and
 `RELEASE_KEY_PASSWORD` from Gradle properties, `local.properties` or the environment.
 
-To update the bundled library from a jconfig-carbus checkout:
+To update the two bundled AARs from a jconfig-carbus checkout:
 
 ```bash
 scripts/update-carbus.sh ../jconfig-carbus

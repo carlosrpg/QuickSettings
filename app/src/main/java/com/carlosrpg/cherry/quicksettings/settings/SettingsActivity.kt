@@ -1,6 +1,7 @@
 package com.carlosrpg.cherry.quicksettings.settings
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -36,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -66,6 +68,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.carlosrpg.cherry.quicksettings.BuildConfig
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.app
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
@@ -80,6 +83,7 @@ import com.carlosrpg.cherry.quicksettings.ui.QsIcon
 import com.carlosrpg.cherry.quicksettings.ui.QsSlider
 import com.carlosrpg.cherry.quicksettings.ui.QsText
 import com.carlosrpg.cherry.quicksettings.ui.Segmented
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 class SettingsActivity : ComponentActivity() {
@@ -106,6 +110,19 @@ class SettingsActivity : ComponentActivity() {
             owner.lifecycle.addObserver(observer)
             onDispose { owner.lifecycle.removeObserver(observer) }
         }
+        // Grants also arrive over adb while this screen stays open, so re-check on a timer too.
+        LaunchedEffect(Unit) {
+            var couldDraw = OverlayService.canDraw(this@SettingsActivity)
+            while (true) {
+                delay(STATUS_REFRESH_MS)
+                app.media.refresh()
+                refresh++
+                // Start the drawer the moment the overlay grant lands.
+                val canDraw = OverlayService.canDraw(this@SettingsActivity)
+                if (canDraw && !couldDraw) OverlayService.start(this@SettingsActivity)
+                couldDraw = canDraw
+            }
+        }
         val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         Column(
             Modifier.fillMaxSize().background(Color(0xFF0B1018)).verticalScroll(rememberScrollState()).padding(horizontal = 32.dp, vertical = 28.dp),
@@ -115,8 +132,8 @@ class SettingsActivity : ComponentActivity() {
                 GlassButton(Icons.ChevronLeft, stringResource(R.string.back), ::finish)
                 QsText(stringResource(R.string.app_name), 26.sp, weight = FontWeight.Bold)
             }
-            // Re-checked on every resume: grants happen in system settings or over adb.
-            key(refresh) { Permissions() }
+            // Re-checked on every resume and every tick: grants happen in system settings or over adb.
+            key(refresh) { Permissions(config.tapToOpen) }
             if (wide) {
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     Box(Modifier.weight(0.42f)) { PositionPanel(config) }
@@ -126,6 +143,7 @@ class SettingsActivity : ComponentActivity() {
                 PositionPanel(config)
                 WidgetsPanel(config)
             }
+            key(refresh) { Status() }
         }
     }
 
@@ -153,6 +171,14 @@ class SettingsActivity : ComponentActivity() {
             onChange = { position = it },
             onFinished = { store.update { it.copy(edgePosition = position) } },
         )
+        val tapLabel = stringResource(R.string.tap_to_open)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                QsText(tapLabel, 16.sp, weight = FontWeight.SemiBold)
+                Text(stringResource(R.string.tap_to_open_hint), color = Qs.Muted, fontSize = 13.sp)
+            }
+            Toggle(config.tapToOpen, tapLabel) { store.update { it.copy(tapToOpen = !it.tapToOpen) } }
+        }
     }
 
     /** The screen in miniature with the drawer where it will sit, as in the styleguide. */
@@ -209,18 +235,19 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun Permissions() {
+    private fun Permissions(tapToOpen: Boolean) {
         val overlay = OverlayService.canDraw(this)
         val notifications = hasNotificationAccess()
         val mic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val tapRelay = TapRelayService.instance != null
+        // The relay only matters in swipe-only mode; with tap to open a touch opens the drawer.
+        val tapRelay = tapToOpen || TapRelayService.instance != null
         // Nothing to ask for: keep the screen about the drawer.
         if (overlay && notifications && mic && tapRelay) return
         Panel {
             CardLabel(stringResource(R.string.permissions))
-            // Overlay and mic need no adb: the overlay is granted at install (targetSdk 22) and the
-            // mic on the first-launch review screen. The other two have no settings page on the car.
-            PermissionRow(R.string.perm_overlay, R.string.perm_overlay_why, overlay, null) {
+            // The car has no settings page for the overlay, notification access or accessibility,
+            // so those rows carry their adb command. The microphone is the normal prompt.
+            PermissionRow(R.string.perm_overlay, R.string.perm_overlay_why, overlay, ADB_OVERLAY) {
                 open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             }
             PermissionRow(R.string.perm_notif, R.string.perm_notif_why, notifications, ADB_NOTIFICATIONS) {
@@ -229,17 +256,52 @@ class SettingsActivity : ComponentActivity() {
             PermissionRow(R.string.perm_mic, R.string.perm_mic_why, mic, null) {
                 micPermission.launch(Manifest.permission.RECORD_AUDIO)
             }
-            PermissionRow(R.string.perm_tap, R.string.perm_tap_why, tapRelay, ADB_TAP_RELAY) {
+            if (!tapToOpen) PermissionRow(R.string.perm_tap, R.string.perm_tap_why, tapRelay, ADB_TAP_RELAY) {
                 open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
     }
 
-    private fun hasNotificationAccess(): Boolean {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners").orEmpty()
-        val me = ComponentName(this, QsNotificationListener::class.java)
-        return flat.split(':').any { ComponentName.unflattenFromString(it) == me }
+    /**
+     * Which links are up, live. Nothing here can be tried off the car, so after a test on the
+     * car this panel says which part failed.
+     */
+    @Composable
+    private fun Status() = Panel {
+        CardLabel(stringResource(R.string.status))
+        val connected = stringResource(R.string.status_connected)
+        val notConnected = stringResource(R.string.status_not_connected)
+        val simulated = stringResource(R.string.status_simulated)
+        val carOk = app.car.isConnected()
+        StatusRow(R.string.status_car, carOk, if (BuildConfig.USE_MOCK) simulated else if (carOk) connected else notConnected)
+        val mediaOk = app.media.carMediaConnected
+        StatusRow(
+            R.string.status_car_media, mediaOk,
+            when {
+                BuildConfig.USE_MOCK -> simulated
+                !mediaOk -> notConnected
+                else -> app.media.carSourceLabel ?: stringResource(R.string.status_no_source)
+            },
+        )
+        val sessions = app.media.state.collectAsState().value.hasAccess
+        StatusRow(
+            R.string.status_media_apps, sessions,
+            stringResource(if (sessions) R.string.status_access_granted else R.string.status_no_access),
+        )
+        QsText(stringResource(R.string.status_version, BuildConfig.VERSION_NAME), 12.sp, Qs.Muted)
     }
+
+    @Composable
+    private fun StatusRow(@StringRes title: Int, ok: Boolean, value: String) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(if (ok) Qs.Energy else Qs.EnergyLow))
+            QsText(stringResource(title), 16.sp, weight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            QsText(value, 14.sp, Qs.TextSoft)
+        }
+    }
+
+    private fun hasNotificationAccess(): Boolean = getSystemService(NotificationManager::class.java)
+        .isNotificationListenerAccessGranted(ComponentName(this, QsNotificationListener::class.java))
 
     /** Car builds often hide these settings pages; the adb command under the row is the fallback. */
     private fun open(intent: Intent) {
@@ -398,7 +460,12 @@ fun WidgetType.subtitleRes(): Int = when (this) {
     WidgetType.ASSIST -> R.string.widget_assist_sub
 }
 
+private const val STATUS_REFRESH_MS = 1_500L
+
 /** Typed by hand on a PC with adb; kept identical to the README. */
+const val ADB_OVERLAY =
+    "adb shell appops set com.carlosrpg.cherry.quicksettings SYSTEM_ALERT_WINDOW allow"
+
 const val ADB_NOTIFICATIONS =
     "adb shell cmd notification allow_listener com.carlosrpg.cherry.quicksettings/.nav.QsNotificationListener"
 

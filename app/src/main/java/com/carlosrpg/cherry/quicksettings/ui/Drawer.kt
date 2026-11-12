@@ -290,13 +290,13 @@ private fun SemiTile(
             var zone by remember { mutableStateOf<MediaZone?>(null) }
             fun publish(z: MediaZone?) {
                 val now = actions.media.state.value
-                setHud(z?.let { Hud.Media(it, now.volume, now.maxVolume, now.volumeAdjustable, now.volumeSimulated) })
+                setHud(z?.let { Hud.Media(it, now.volume, now.maxVolume, now.volumeKnown, now.volumeSimulated) })
             }
             LaunchedEffect(zone) {
                 val z = zone ?: return@LaunchedEffect
-                if (!z.isVolume || !actions.media.state.value.volumeAdjustable) return@LaunchedEffect
+                if (!z.isVolume) return@LaunchedEffect
                 while (true) {
-                    actions.media.setVolume(actions.media.state.value.volume + z.direction)
+                    actions.media.volumeStep(z.direction)
                     publish(z)
                     delay(1000L / z.stepsPerSecond)
                 }
@@ -475,23 +475,19 @@ private fun MediaGuide(hud: Hud.Media) {
     val up = z == MediaZone.VOLUME_UP || z == MediaZone.VOLUME_UP_FAST
     val down = z == MediaZone.VOLUME_DOWN || z == MediaZone.VOLUME_DOWN_FAST
     Box(Modifier.fillMaxSize()) {
-        Indicator(up, hud.adjustable, Modifier.align(Alignment.TopCenter)) {
-            QsIcon(Icons.Plus, if (hud.adjustable) Qs.Text else Qs.Dim, 22.dp, strokeWidth = 2.6f)
+        Indicator(up, true, Modifier.align(Alignment.TopCenter)) {
+            QsIcon(Icons.Plus, Qs.Text, 22.dp, strokeWidth = 2.6f)
         }
         Indicator(z == MediaZone.PREVIOUS, true, Modifier.align(Alignment.CenterStart)) {
             QsIcon(Icons.Prev, Qs.Text, 24.dp, filled = true)
         }
         Column(Modifier.align(Alignment.Center).width(150.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (hud.adjustable) QsText("${hud.volume}", 40.sp, weight = FontWeight.Bold)
-            else QsIcon(Icons.Volume, Qs.Dim, 30.dp)
+            if (hud.levelKnown) QsText("${hud.volume}", 40.sp, weight = FontWeight.Bold)
+            else QsIcon(Icons.Volume, Qs.Text, 30.dp)
             val caption = when (z) {
                 MediaZone.NEXT -> stringResource(R.string.hud_release_next)
                 MediaZone.PREVIOUS -> stringResource(R.string.hud_release_previous)
-                else -> when {
-                    !hud.adjustable -> stringResource(R.string.use_car_volume)
-                    hud.simulated -> stringResource(R.string.hud_volume_simulated)
-                    else -> stringResource(R.string.hud_media_volume)
-                }
+                else -> stringResource(if (hud.simulated) R.string.hud_volume_simulated else R.string.hud_media_volume)
             }
             androidx.compose.material3.Text(
                 caption, color = if (z.isTrack) Qs.Text else Qs.Muted, fontSize = 11.sp,
@@ -502,8 +498,8 @@ private fun MediaGuide(hud: Hud.Media) {
         Indicator(z == MediaZone.NEXT, true, Modifier.align(Alignment.CenterEnd)) {
             QsIcon(Icons.Next, Qs.Text, 24.dp, filled = true)
         }
-        Indicator(down, hud.adjustable, Modifier.align(Alignment.BottomCenter)) {
-            QsIcon(Icons.Minus, if (hud.adjustable) Qs.Text else Qs.Dim, 22.dp, strokeWidth = 2.6f)
+        Indicator(down, true, Modifier.align(Alignment.BottomCenter)) {
+            QsIcon(Icons.Minus, Qs.Text, 22.dp, strokeWidth = 2.6f)
         }
     }
 }

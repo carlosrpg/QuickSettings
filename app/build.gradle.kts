@@ -25,11 +25,11 @@ android {
     defaultConfig {
         applicationId = "com.carlosrpg.cherry.quicksettings"
         minSdk = 30
-        // Deliberately pre-23: the overlay permission (protection level includes "pre23") and
-        // the microphone are then granted at install, so the car needs no adb grants for them.
-        // Cost: a one-time permission review and an "older version of Android" notice on first
-        // launch. Set this to 30 to drop both, and grant the overlay with appops instead.
-        targetSdk = 22
+        // The head unit's own version (Android Automotive 11), so it shows no "built for an older
+        // version" notice. The overlay is then not granted at install, and the car has no settings
+        // page for it: it is granted over adb (the settings screen shows the command). The
+        // microphone is the normal runtime prompt.
+        targetSdk = 30
         // Same scheme as AABrowser-Motion. CI passes -PappVersionName=X.Y.Z[-suffix]; local builds
         // mirror it (next patch after the latest vX.Y.Z tag, "-dev") so they install over CI builds.
         // Both are signed with the same key, and a lower versionCode would be rejected as a downgrade.
@@ -78,7 +78,7 @@ android {
         unitTests.all { it.useJUnitPlatform() }
     }
     lint {
-        // The head unit runs Android 11; the app deliberately targets it.
+        // The head unit runs Android 11 and the app is sideloaded: it targets that, not the latest.
         disable += "ExpiredTargetSdkVersion"
         disable += "OldTargetApi"
     }
@@ -104,8 +104,11 @@ android {
 }
 
 dependencies {
-    // jconfig-carbus, prebuilt: scripts/update-carbus.sh rebuilds it from a sibling checkout.
+    // jconfig-carbus, prebuilt: scripts/update-carbus.sh rebuilds both from a sibling checkout.
     implementation(files("libs/carbus-0.2.0.aar"))
+    // The vendor client classes carbus reflects over. The car has no copy an app can load, so
+    // without this every car read fails (CarBundleTest guards it).
+    implementation(files("libs/vdbus-client-0.2.0.aar"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)

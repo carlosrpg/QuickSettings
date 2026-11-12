@@ -121,7 +121,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     // --- edge window -------------------------------------------------------------------
 
     private fun addEdge() {
-        val view = EdgeTouchView(this, config.side, onOpen = { show(DrawerMode.SEMI) }, onTap = ::relayTap)
+        val view = EdgeTouchView(this, config.side, config.tapToOpen, onOpen = { show(DrawerMode.SEMI) }, onTap = ::relayTap)
         edgeView = view
         wm.addView(view, edgeParams())
     }
@@ -129,14 +129,17 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private fun updateEdge() {
         val view = edgeView ?: return
         view.side = config.side
+        view.tapOpens = config.tapToOpen
         view.visibility = if (mode == null) View.VISIBLE else View.GONE
         wm.updateViewLayout(view, edgeParams())
         view.invalidate()
     }
 
     private fun edgeParams(touchable: Boolean = true) = WindowManager.LayoutParams(
-        px(EDGE_WIDTH_DP),
-        (usable().height() * EDGE_HEIGHT_FRACTION).toInt(),
+        // Tap to open: a handle-sized target, so it covers little of the app underneath.
+        // Swipe only: a long, narrow zone.
+        px(if (config.tapToOpen) EDGE_TAP_WIDTH_DP else EDGE_WIDTH_DP),
+        if (config.tapToOpen) px(EDGE_TAP_HEIGHT_DP) else (usable().height() * EDGE_HEIGHT_FRACTION).toInt(),
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -298,6 +301,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val NOTIFICATION_ID = 1
         private const val EDGE_WIDTH_DP = 36
         private const val EDGE_HEIGHT_FRACTION = 0.5f
+        private const val EDGE_TAP_WIDTH_DP = 48
+        private const val EDGE_TAP_HEIGHT_DP = 144
         private const val DRAWER_MARGIN_DP = 16
         private const val SEMI_MAX_FRACTION = 0.8f
         private const val SEMI_IDLE_MS = 8_000L

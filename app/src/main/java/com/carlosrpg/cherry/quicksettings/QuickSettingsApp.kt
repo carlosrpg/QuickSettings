@@ -3,6 +3,9 @@ package com.carlosrpg.cherry.quicksettings
 import android.app.Application
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.CarInfoProxy
+import app.jconfig.carbus.media.CarMedia
+import app.jconfig.carbus.media.VdbusCarMedia
+import app.jconfig.carbus.mock.MockCarMedia
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
 import com.carlosrpg.cherry.quicksettings.car.seededMockBus
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
@@ -23,7 +26,11 @@ class QuickSettingsApp : Application() {
         val bus: CarBus = if (BuildConfig.USE_MOCK) seededMockBus() else CarInfoProxy
         bus.init(this) // must run on the main thread or the proxy never connects
         car = CarRepository(bus, scope)
-        media = MediaRepository(this, scope)
+        // The head unit's own sources (Bluetooth, CarPlay, Android Auto, ...) never publish an
+        // Android media session; they come from the vendor media service.
+        val carMedia: CarMedia = if (BuildConfig.USE_MOCK) MockCarMedia() else VdbusCarMedia.create(this)
+        carMedia.bind()
+        media = MediaRepository(this, scope, carMedia)
         settings = SettingsStore(this)
     }
 }

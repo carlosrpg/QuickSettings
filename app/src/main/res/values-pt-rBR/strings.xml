@@ -55,7 +55,16 @@
     <string name="unmute">Reativar o som</string>
     <string name="volume_down">Diminuir o volume</string>
     <string name="volume_up">Aumentar o volume</string>
-    <string name="use_car_volume">Use os controles de volume do carro</string>
+    <string name="source_bluetooth">Bluetooth</string>
+    <string name="source_usb">USB</string>
+    <string name="source_carplay">CarPlay</string>
+    <string name="source_android_auto">Android Auto</string>
+    <string name="source_hicar">HiCar</string>
+    <string name="source_carlife">CarLife</string>
+    <string name="source_online">Online</string>
+    <string name="source_video">Vídeo</string>
+    <string name="source_radio">Rádio</string>
+    <string name="source_dab">Rádio DAB</string>
 
     <string name="navigation">Navegação</string>
     <string name="where_to">Para onde?</string>
@@ -96,6 +105,17 @@
     <string name="perm_tap_why">Deixa os toques na zona de deslize da borda chegarem ao app de trás.</string>
     <string name="grant">Permitir</string>
     <string name="grant_desc">Permitir %1$s</string>
+    <string name="status">Status</string>
+    <string name="status_car">Dados do carro</string>
+    <string name="status_car_media">Fontes de mídia do carro</string>
+    <string name="status_media_apps">Apps de mídia</string>
+    <string name="status_connected">conectado</string>
+    <string name="status_not_connected">não conectado</string>
+    <string name="status_no_source">conectado, sem fonte</string>
+    <string name="status_simulated">simulado</string>
+    <string name="status_access_granted">acesso concedido</string>
+    <string name="status_no_access">sem acesso às notificações</string>
+    <string name="status_version">Versão %1$s</string>
     <string name="drawer_position">Posição da gaveta</string>
     <string name="side">Lado</string>
     <string name="side_left">Esquerda</string>
@@ -104,6 +124,8 @@
     <string name="position_top">topo</string>
     <string name="position_middle">meio</string>
     <string name="position_bottom">base</string>
+    <string name="tap_to_open">Tocar na alça da borda para abrir</string>
+    <string name="tap_to_open_hint">Desligado: abre só deslizando a partir da alça. O gesto de voltar do próprio carro captura deslizes que começam bem na borda da tela.</string>
     <string name="widgets">Widgets</string>
     <string name="state_semi">Compacta</string>
     <string name="state_open">Aberta</string>

@@ -61,7 +61,16 @@
     <string name="unmute">Unmute</string>
     <string name="volume_down">Volume down</string>
     <string name="volume_up">Volume up</string>
-    <string name="use_car_volume">Use the car\'s volume controls</string>
+    <string name="source_bluetooth">Bluetooth</string>
+    <string name="source_usb">USB</string>
+    <string name="source_carplay">CarPlay</string>
+    <string name="source_android_auto">Android Auto</string>
+    <string name="source_hicar">HiCar</string>
+    <string name="source_carlife">CarLife</string>
+    <string name="source_online">Online</string>
+    <string name="source_video">Video</string>
+    <string name="source_radio">Radio</string>
+    <string name="source_dab">DAB radio</string>
 
     <!-- Navigation -->
     <string name="navigation">Navigation</string>
@@ -107,6 +116,17 @@
     <string name="perm_tap_why">Lets taps in the edge swipe zone reach the app behind.</string>
     <string name="grant">Grant</string>
     <string name="grant_desc">Grant %1$s</string>
+    <string name="status">Status</string>
+    <string name="status_car">Car data</string>
+    <string name="status_car_media">Car media sources</string>
+    <string name="status_media_apps">Media apps</string>
+    <string name="status_connected">connected</string>
+    <string name="status_not_connected">not connected</string>
+    <string name="status_no_source">connected, no source</string>
+    <string name="status_simulated">simulated</string>
+    <string name="status_access_granted">access granted</string>
+    <string name="status_no_access">no notification access</string>
+    <string name="status_version">Version %1$s</string>
     <string name="drawer_position">Drawer position</string>
     <string name="side">Side</string>
     <string name="side_left">Left</string>
@@ -115,6 +135,8 @@
     <string name="position_top">top</string>
     <string name="position_middle">middle</string>
     <string name="position_bottom">bottom</string>
+    <string name="tap_to_open">Touch the edge handle to open</string>
+    <string name="tap_to_open_hint">Off: open only by swiping in from the handle. The car\'s own back gesture takes swipes that start at the very edge of the screen.</string>
     <string name="widgets">Widgets</string>
     <string name="state_semi">Semi-open</string>
     <string name="state_open">Open</string>

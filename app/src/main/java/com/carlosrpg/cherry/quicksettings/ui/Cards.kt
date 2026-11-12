@@ -177,6 +177,9 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
                 Box(Modifier.weight(1f)) {
                     if (media.packageName != null) {
                         OpenAppChip(media.appIcon, Color(0xFFE2557A), appName, actions::openMediaApp)
+                    } else if (media.appLabel != null) {
+                        // One of the car's own sources: it has a name but no app to open.
+                        QsText(appName, 15.sp, Qs.TextSoft, FontWeight.SemiBold)
                     }
                 }
                 GlassButton(
@@ -213,13 +216,6 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
         Gap(10.dp)
         GlassButton(Icons.Next, stringResource(R.string.next_track), actions.media::next, shape = RoundedCornerShape(28.dp), filledIcon = true)
         Box(Modifier.weight(1f))
-        if (!media.volumeAdjustable) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                QsIcon(Icons.Volume, Qs.Dim, 20.dp)
-                QsText(stringResource(R.string.use_car_volume), 13.sp, Qs.Muted)
-            }
-            return@Row
-        }
         GlassButton(
             if (media.muted) Icons.Mute else Icons.Volume,
             stringResource(if (media.muted) R.string.unmute else R.string.mute), actions.media::toggleMute,
@@ -227,13 +223,18 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
         Gap(8.dp)
         GlassButton(Icons.Minus, stringResource(R.string.volume_down), { actions.media.volumeStep(-1) })
         Gap(8.dp)
-        val volFraction = if (media.maxVolume > 0) media.volume / media.maxVolume.toFloat() else 0f
-        Box(Modifier.width(90.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0x26FFFFFF))) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(if (media.muted) 0f else volFraction).background(Qs.Text))
+        // On the car the level can't be read; its own volume bar pops up on every step instead.
+        if (media.volumeKnown) {
+            val volFraction = if (media.maxVolume > 0) media.volume / media.maxVolume.toFloat() else 0f
+            Box(Modifier.width(90.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0x26FFFFFF))) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(if (media.muted) 0f else volFraction).background(Qs.Text))
+            }
+            Gap(8.dp)
         }
-        Gap(8.dp)
         GlassButton(Icons.Plus, stringResource(R.string.volume_up), { actions.media.volumeStep(1) })
-        QsText("${media.volume}", 15.sp, weight = FontWeight.Bold, modifier = Modifier.width(30.dp).padding(start = 6.dp))
+        if (media.volumeKnown) {
+            QsText("${media.volume}", 15.sp, weight = FontWeight.Bold, modifier = Modifier.width(30.dp).padding(start = 6.dp))
+        }
     }
 }
 

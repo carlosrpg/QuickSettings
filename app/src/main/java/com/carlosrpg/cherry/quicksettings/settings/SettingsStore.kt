@@ -13,12 +13,14 @@ enum class Side { LEFT, RIGHT }
  * @property edgePosition where along the edge the drawer sits, 0 = top, 1 = bottom.
  * @property semi widgets of the semi-open drawer, in order.
  * @property open widgets of the open drawer, in order.
+ * @property tapToOpen touching the edge handle opens the drawer; off = swipe only.
  */
 data class QsConfig(
     val side: Side = Side.LEFT,
     val edgePosition: Float = 0.5f,
     val semi: List<WidgetType> = WidgetType.entries,
     val open: List<WidgetType> = DEFAULT_OPEN,
+    val tapToOpen: Boolean = true,
 )
 
 /** The approved open layout: media + nav + assist, then climate + car mode + range. */
@@ -40,6 +42,7 @@ class SettingsStore(context: Context) {
             .putFloat(KEY_EDGE, next.edgePosition)
             .putString(KEY_SEMI, encode(next.semi))
             .putString(KEY_OPEN, encode(next.open))
+            .putBoolean(KEY_TAP_OPEN, next.tapToOpen)
             .apply()
     }
 
@@ -49,6 +52,7 @@ class SettingsStore(context: Context) {
         edgePosition = prefs.getFloat(KEY_EDGE, 0.5f),
         semi = decode(prefs.getString(KEY_SEMI, null)) ?: WidgetType.entries,
         open = decode(prefs.getString(KEY_OPEN, null)) ?: DEFAULT_OPEN,
+        tapToOpen = prefs.getBoolean(KEY_TAP_OPEN, true),
     )
 
     companion object {
@@ -56,6 +60,7 @@ class SettingsStore(context: Context) {
         private const val KEY_EDGE = "edge_position"
         private const val KEY_SEMI = "semi_widgets"
         private const val KEY_OPEN = "open_widgets"
+        private const val KEY_TAP_OPEN = "tap_to_open"
 
         internal fun encode(list: List<WidgetType>) = list.joinToString(",") { it.name }
 

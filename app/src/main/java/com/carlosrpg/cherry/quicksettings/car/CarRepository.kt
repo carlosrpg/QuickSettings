@@ -59,6 +59,9 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     private val mutex = Mutex()
     private var pollJob: Job? = null
 
+    /** Whether the car's own service is bound. Until it is, every value stays empty. */
+    fun isConnected(): Boolean = bus.isServiceConnected()
+
     /** Polls while something is on screen; call [stopPolling] when the drawer closes. */
     fun startPolling(intervalMs: Long = POLL_MS) {
         if (pollJob?.isActive == true) return

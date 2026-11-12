@@ -48,8 +48,9 @@ sealed interface Hud {
         val zone: MediaZone,
         val volume: Int,
         val max: Int,
-        val adjustable: Boolean,
-        /** Debug builds on fixed-volume systems: the number is the expected volume, not applied. */
+        /** False on the car: the level can't be read there, so only + and - are shown. */
+        val levelKnown: Boolean,
+        /** Debug builds on fixed-volume systems: the number is the expected volume. */
         val simulated: Boolean = false,
     ) : Hud
     data class Mode(val current: BatteryMode?, val target: BatteryMode, val holdTarget: Int?) : Hud
