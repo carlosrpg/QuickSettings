@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">QuickSettings</string>
+    <string name="overlay_channel">Drawer</string>
+    <string name="overlay_running">Quick drawer is ready</string>
+    <string name="tap_relay_label">QuickSettings tap pass-through</string>
+    <string name="tap_relay_description">Replays taps that land in the drawer\'s edge swipe zone onto the app behind it. It does not read screen content.</string>
+</resources>

@@ -1,0 +1,141 @@
+name: Build and release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_STORE_FILE: /tmp/quicksettings-release.keystore
+      RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # settings.gradle.kts builds against ./jconfig-carbus when it exists.
+      - name: Check out jconfig-carbus
+        uses: actions/checkout@v5
+        with:
+          repository: carlosrpg/jconfig-carbus
+          token: ${{ secrets.CARBUS_REPO_TOKEN }}
+          path: jconfig-carbus
+
+      # Main builds bump only PATCH of the latest vX.Y.Z tag. Push a vX.Y.Z tag to set major/minor.
+      - name: Compute semantic version
+        run: |
+          if [[ "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            LAST_TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${LAST_TAG#v}"
+          else
+            LAST_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+            IFS=. read -r MAJOR MINOR PATCH <<< "${LAST_TAG:-v0.1.0}"
+            VERSION="${MAJOR#v}.$MINOR.$((PATCH + 1))"
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VERSION="$VERSION-pr.${{ github.event.pull_request.number }}.${{ github.run_number }}"
+          fi
+          echo "Building version $VERSION (previous tag: ${LAST_TAG:-none})"
+          {
+            echo "APP_VERSION=$VERSION"
+            echo "ORG_GRADLE_PROJECT_appVersionName=$VERSION"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Android SDK
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "platforms;android-37.0" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore release keystore
+        if: github.event_name != 'pull_request'
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$RELEASE_KEYSTORE_BASE64"
+          test -n "$RELEASE_STORE_PASSWORD"
+          test -n "$RELEASE_KEY_ALIAS"
+          test -n "$RELEASE_KEY_PASSWORD"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RELEASE_STORE_FILE"
+
+      # Pull requests never see the real key: they sign with a throwaway one.
+      - name: Create pull request signing key
+        if: github.event_name == 'pull_request'
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$RELEASE_STORE_FILE" -storetype PKCS12 \
+            -storepass ci-validation -keypass ci-validation -alias ci-validation \
+            -keyalg RSA -keysize 2048 -validity 1 -dname "CN=CI Validation, O=QuickSettings"
+          {
+            echo "RELEASE_STORE_PASSWORD=ci-validation"
+            echo "RELEASE_KEY_ALIAS=ci-validation"
+            echo "RELEASE_KEY_PASSWORD=ci-validation"
+          } >> "$GITHUB_ENV"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Unit tests and lint
+        run: ./gradlew app:testDebugUnitTest app:lintDebug --stacktrace
+
+      # Release talks to the head unit's CarInfo proxy; debug keeps the emulator mock.
+      - name: Build signed release APK
+        run: |
+          ./gradlew app:assembleRelease -Pqs.mock=false --stacktrace
+          mkdir -p release-apks
+          cp app/build/outputs/apk/release/*.apk "release-apks/QuickSettings-$APP_VERSION.apk"
+
+      - name: Verify APK signature
+        run: |
+          for apk in release-apks/*.apk; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+          done
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuickSettings-${{ env.APP_VERSION }}
+          path: release-apks/*.apk
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v${{ env.APP_VERSION }}
+        run: >-
+          gh release create "$RELEASE_TAG"
+          release-apks/*.apk
+          --target "$GITHUB_SHA"
+          --title "QuickSettings $RELEASE_TAG"
+          --generate-notes
