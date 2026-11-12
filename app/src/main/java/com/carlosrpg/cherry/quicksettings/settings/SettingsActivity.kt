@@ -329,7 +329,7 @@ class SettingsActivity : ComponentActivity() {
         val shape = RoundedCornerShape(12.dp)
         val (background, icon, tint) = when (type) {
             WidgetType.MEDIA -> Triple<Any, String?, Color>(ArtPlaceholder, null, Color.White)
-            WidgetType.CLIMATE -> Triple<Any, String?, Color>(Qs.TempGradient, Icons.ClimateFan, Color.White)
+            WidgetType.CLIMATE -> Triple<Any, String?, Color>(Qs.TempGradient, Icons.AirConditioner, Color.White)
             WidgetType.CAR_MODE -> Triple<Any, String?, Color>(Qs.Mode.copy(alpha = 0.18f), Icons.BatteryBolt, Qs.Mode)
             WidgetType.AUTONOMY -> Triple<Any, String?, Color>(Qs.Energy.copy(alpha = 0.18f), Icons.Battery, Qs.Energy)
             WidgetType.NAVIGATION -> Triple<Any, String?, Color>(Qs.Route.copy(alpha = 0.18f), Icons.TurnRight, Qs.Route)
@@ -344,7 +344,8 @@ class SettingsActivity : ComponentActivity() {
             Modifier.size(40.dp).clip(shape).then(bg).then(if (on) Modifier else Modifier.background(Color(0x990B1018))),
             contentAlignment = Alignment.Center,
         ) {
-            if (icon != null) QsIcon(icon, tint, 22.dp)
+            if (icon == Icons.AirConditioner) QsIcon(icon, tint, 22.dp, filled = true, viewport = Icons.AirConditionerViewport)
+            else if (icon != null) QsIcon(icon, tint, 22.dp)
         }
     }
 

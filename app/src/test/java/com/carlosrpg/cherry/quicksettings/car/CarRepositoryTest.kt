@@ -6,6 +6,7 @@ import app.jconfig.carbus.carinfo.RegenLevel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 
@@ -26,6 +27,18 @@ class CarRepositoryTest {
         assertThat(s.outsideTempC).isEqualTo(14)
         assertThat(s.autoHold).isTrue()
         assertThat(s.laneKeep).isFalse()
+    }
+
+    @Test
+    fun `temperature and fan writes read back`() = runBlocking {
+        val repo = CarRepository(seededMockBus(), scope)
+        repo.refresh()
+        repo.setCabinTemp(26)
+        repo.setFan(7)
+        delay(CarRepository.WRITE_SETTLE_MS + 200)
+        repo.refresh()
+        assertThat(repo.state.value.cabinTempC).isEqualTo(26)
+        assertThat(repo.state.value.fanLevel).isEqualTo(7)
     }
 
     @Test

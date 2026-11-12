@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.jconfig.carbus.carinfo.BatteryMode
+import app.jconfig.carbus.carinfo.CabinTempSpec
+import app.jconfig.carbus.carinfo.FanSpec
 import app.jconfig.carbus.carinfo.RegenLevel
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
@@ -248,6 +250,7 @@ private fun SemiTile(
     val lockPx = with(density) { 24.dp.toPx() }
     val volumeStepPx = with(density) { 16.dp.toPx() }
     val choiceStepPx = with(density) { 64.dp.toPx() }
+    val climateStepPx = with(density) { 20.dp.toPx() }
     when (type) {
         WidgetType.MEDIA -> {
             val g = remember { GestureMemo() }
@@ -320,7 +323,41 @@ private fun SemiTile(
                 onCancel = { setHud(null) },
             ))
         }
-        WidgetType.CLIMATE -> ClimateTile(car, Modifier.tap(actions.toOpen))
+        WidgetType.CLIMATE -> {
+            // Press and drag moves the marker: up/down = temperature, left/right = fan, both at
+            // once like the quadrant itself. Written once, on release.
+            var startTemp by remember { mutableIntStateOf(0) }
+            var startFan by remember { mutableIntStateOf(0) }
+            var target by remember { mutableStateOf<Hud.Climate?>(null) }
+            ClimateTile(car, Modifier.tapOrDrag(
+                onTap = actions.toOpen,
+                onDragStart = {
+                    val now = actions.car.state.value
+                    startTemp = now.cabinTempC ?: CabinTempSpec.MIN
+                    startFan = now.fanLevel ?: FanSpec.MIN
+                    target = Hud.Climate(startTemp, startFan).also(setHud)
+                },
+                onDrag = { total ->
+                    val next = Hud.Climate(
+                        temp = (startTemp - (total.y / climateStepPx).roundToInt()).coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX),
+                        fan = (startFan + (total.x / climateStepPx).roundToInt()).coerceIn(FanSpec.MIN, FanSpec.MAX),
+                    )
+                    if (next != target) {
+                        target = next
+                        setHud(next)
+                    }
+                },
+                onRelease = {
+                    target?.let { t ->
+                        if (t.temp != startTemp) actions.car.setCabinTemp(t.temp)
+                        if (t.fan != startFan) actions.car.setFan(t.fan)
+                    }
+                    target = null
+                    setHud(null)
+                },
+                onCancel = { target = null; setHud(null) },
+            ))
+        }
         WidgetType.AUTONOMY -> AutonomyTile(car, Modifier.tap(actions.toOpen))
         WidgetType.NAVIGATION -> NavTile(nav, Modifier.tap { if (nav == null) actions.voiceNav() else actions.toOpen() })
         WidgetType.ASSIST -> AssistTile(car, Modifier.tap(actions.toOpen))
@@ -336,6 +373,19 @@ private fun GuideHud(hud: Hud, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         when (hud) {
+            is Hud.Climate -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                ClimateQuadrant(hud.temp, hud.fan, QuadrantStyle.Guide, Modifier.clip(RoundedCornerShape(18.dp)))
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        QsIcon(Icons.Thermometer, Qs.tempColor(hud.temp), 18.dp)
+                        QsText("${hud.temp}°", 22.sp, weight = FontWeight.Bold)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        QsIcon(Icons.Wind, Qs.Text, 18.dp)
+                        QsText("${hud.fan}", 22.sp, weight = FontWeight.Bold)
+                    }
+                }
+            }
             Hud.VolumeUnavailable -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 QsIcon(Icons.Volume, Qs.Dim, 40.dp)
                 QsText(stringResource(R.string.hud_volume_unavailable), 16.sp, weight = FontWeight.SemiBold)

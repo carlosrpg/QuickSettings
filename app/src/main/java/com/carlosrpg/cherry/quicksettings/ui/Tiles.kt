@@ -112,37 +112,10 @@ fun ClimateTile(car: CarState, modifier: Modifier = Modifier) {
     val temp = car.cabinTempC
     val fan = car.fanLevel
     val description = stringResource(R.string.desc_climate, temp?.toString() ?: "--", fan?.toString() ?: "--")
-    TileFrame(description, modifier, background = Qs.TempGradient) {
-        // Low fan dims the colour; full fan shows it at full strength.
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xC70A0E14), Color(0x0D0A0E14)))))
-        // Climate mark behind the plot, so the square reads as "climate" before any number.
-        QsIcon(Icons.ClimateFan, Color(0x38FFFFFF), 54.dp, strokeWidth = 1.6f, modifier = Modifier.align(Alignment.Center).offset(x = 5.dp, y = (-3).dp))
-        val plotLeft = 20.dp
-        val plotBottom = 16.dp
-        // Axis marks: temperature up the left, wind along the bottom.
-        QsIcon(Icons.Thermometer, Qs.Text, 12.dp, modifier = Modifier.offset(x = 4.dp, y = 3.dp))
-        QsIcon(Icons.Wind, Qs.Text, 12.dp, modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-4).dp, y = (-2).dp))
-        Box(Modifier.offset(x = plotLeft).padding(top = 10.dp, bottom = plotBottom).width(1.dp).fillMaxHeight().background(Color(0x66FFFFFF)))
-        Box(Modifier.align(Alignment.BottomStart).padding(start = plotLeft, end = 10.dp, bottom = plotBottom).fillMaxWidth().height(1.dp).background(Color(0x66FFFFFF)))
-        if (temp != null && fan != null) {
-            val plotW = Qs.TileSize - plotLeft - 10.dp
-            val plotH = Qs.TileSize - 10.dp - plotBottom
-            val x = plotLeft + plotW * (fan / 10f).coerceIn(0f, 1f)
-            val y = 10.dp + plotH * (1f - ((temp - 16) / 14f).coerceIn(0f, 1f))
-            Box(
-                Modifier.offset(x = x - 8.dp, y = y - 8.dp).size(16.dp).clip(CircleShape)
-                    .background(Color.White).border(4.dp, Color(0x40FFFFFF), CircleShape)
-            )
-            // Numbers ride their axes but stay clear of the axis icons.
-            SmallNumber("$temp", Modifier.offset(x = 3.dp, y = maxOf(y - 7.dp, 17.dp)))
-            SmallNumber("$fan", Modifier.align(Alignment.BottomStart).offset(x = minOf(x - 3.dp, 70.dp), y = (-1).dp))
-        }
+    TileFrame(description, modifier) {
+        ClimateQuadrant(temp, fan, QuadrantStyle.Tile)
     }
 }
-
-@Composable
-private fun SmallNumber(text: String, modifier: Modifier) =
-    Text(text, modifier, color = Qs.Text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
 
 fun BatteryMode?.icon(): String = when (this) {
     BatteryMode.SMART -> Icons.BatteryBolt

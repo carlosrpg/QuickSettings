@@ -12,7 +12,7 @@ Style: **Night Glass**, the approved styleguide.
 | Widget | Semi-open | Open |
 |---|---|---|
 | Media | Album art, play/pause. Press and drag left/right: previous/next | Source app (tap to open it), title, progress, transport, voice search sent to the app that owns the session |
-| Climate | Temperature × fan quadrant | ± temperature on the vertical axis, ± fan on the horizontal one |
+| Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | A large quadrant: touch anywhere to place the marker and drag it; values update live and are set on release |
 | Car mode | Battery-mode glyph and regen bars. Press and drag: up/down battery mode, left/right regen | Initial / Smart / Forced, hold-target slider when Forced, Low / Medium / High regen |
 | Autonomy | Battery ring (outer) and fuel ring (inner), electric km | Electric and fuel range, km and %, total |
 | Navigation | Next manoeuvre and distance; with no route, a tap starts a voice destination search | Nav app (tap to open it), next turn, street, ETA, voice destination |

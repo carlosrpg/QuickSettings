@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -309,38 +310,28 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
     }
     val temp = car.cabinTempC
     val fan = car.fanLevel
-    Column(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(Modifier.height(140.dp), verticalArrangement = Arrangement.SpaceBetween, horizontalAlignment = Alignment.CenterHorizontally) {
-                GlassButton(Icons.Plus, stringResource(R.string.warmer), { actions.car.stepCabinTemp(1) }, tint = Color(0xFFFF9A5C))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    QsIcon(Icons.Thermometer, Qs.Muted, 16.dp)
-                    QsText(temp?.let { "$it°" } ?: "--", 16.sp, weight = FontWeight.Bold)
-                }
-                GlassButton(Icons.Minus, stringResource(R.string.cooler), { actions.car.stepCabinTemp(-1) }, tint = Color(0xFF6EA0FF))
-            }
-            Box(Modifier.size(140.dp).clip(RoundedCornerShape(16.dp)).background(Qs.TempGradient)) {
-                Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xC70A0E14), Color(0x0D0A0E14)))))
-                QsIcon(Icons.ClimateFan, Color(0x33FFFFFF), 84.dp, strokeWidth = 1.4f, modifier = Modifier.align(Alignment.Center))
-                QsIcon(Icons.Thermometer, Qs.Text, 16.dp, modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
-                QsIcon(Icons.Wind, Qs.Text, 16.dp, modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp))
-                if (temp != null && fan != null) {
-                    val x = 140.dp * (fan / 10f).coerceIn(0f, 1f)
-                    val y = 140.dp * (1f - ((temp - 16) / 14f).coerceIn(0f, 1f))
-                    Box(Modifier.offset(y = y).width(x).height(1.dp).background(Color(0x8CFFFFFF)))
-                    Box(Modifier.offset(x = x, y = y).width(1.dp).fillMaxHeight().background(Color(0x8CFFFFFF)))
-                    Box(Modifier.offset(x = x - 10.dp, y = y - 10.dp).size(20.dp).clip(CircleShape).background(Color.White).border(5.dp, Color(0x40FFFFFF), CircleShape))
-                }
-            }
-        }
-        Row(Modifier.padding(start = 66.dp, top = 10.dp).width(140.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            GlassButton(Icons.Minus, stringResource(R.string.less_fan), { actions.car.stepFan(-1) })
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                QsIcon(Icons.Wind, Qs.Muted, 16.dp)
-                QsText(fan?.toString() ?: "--", 16.sp, weight = FontWeight.Bold)
-            }
-            GlassButton(Icons.Plus, stringResource(R.string.more_fan), { actions.car.stepFan(1) })
-        }
+    // The quadrant is the control: touch anywhere to place the marker and drag it. Values update
+    // live under the finger; the car gets them once, on release.
+    var picked by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val description = stringResource(R.string.desc_climate, (picked?.first ?: temp)?.toString() ?: "--", (picked?.second ?: fan)?.toString() ?: "--")
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+        val style = QuadrantStyle.scaled(minOf(maxWidth, maxHeight))
+        ClimateQuadrant(
+            picked?.first ?: temp, picked?.second ?: fan, style,
+            Modifier.clip(RoundedCornerShape(18.dp))
+                .semantics { contentDescription = description }
+                .quadrantPicker(
+                    style,
+                    onMove = { t, f -> picked = t to f },
+                    onEnd = {
+                        picked?.let { (t, f) ->
+                            actions.car.setCabinTemp(t)
+                            actions.car.setFan(f)
+                        }
+                        picked = null
+                    },
+                ),
+        )
     }
 }
 

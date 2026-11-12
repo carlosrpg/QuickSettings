@@ -125,23 +125,33 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     )
 
     fun stepCabinTemp(delta: Int) {
-        val current = state.value.cabinTempC ?: return
-        val target = (current + delta).coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX)
-        if (target != current) write(HVAC, CabinTempSpec.ITEM_WRITE, CabinTempSpec.toRaw(target))
+        state.value.cabinTempC?.let { setCabinTemp(it + delta) }
     }
 
     fun stepFan(delta: Int) {
-        val current = state.value.fanLevel ?: return
-        val target = (current + delta).coerceIn(FanSpec.MIN, FanSpec.MAX)
-        if (target != current) write(HVAC, FanSpec.ITEM_WRITE, target)
+        state.value.fanLevel?.let { setFan(it + delta) }
+    }
+
+    /** Writes only when the clamped value differs from what the car last reported. */
+    fun setCabinTemp(celsius: Int) {
+        val target = celsius.coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX)
+        if (target != state.value.cabinTempC) write(HVAC, CabinTempSpec.ITEM_WRITE, CabinTempSpec.toRaw(target))
+    }
+
+    fun setFan(level: Int) {
+        val target = level.coerceIn(FanSpec.MIN, FanSpec.MAX)
+        if (target != state.value.fanLevel) write(HVAC, FanSpec.ITEM_WRITE, target)
     }
 
     private fun write(module: Int, id: Int, value: Int) {
         scope.launch(Dispatchers.IO) {
-            try {
-                bus.sendItemValue(module, id, value)
-            } catch (e: LinkageError) {
-                // Vendor class mismatch on the device; the next poll shows the real state.
+            // One bus call at a time: two writes racing each other (or a poll) can be lost.
+            mutex.withLock {
+                try {
+                    bus.sendItemValue(module, id, value)
+                } catch (e: LinkageError) {
+                    // Vendor class mismatch on the device; the next poll shows the real state.
+                }
             }
             delay(WRITE_SETTLE_MS)
             refresh()

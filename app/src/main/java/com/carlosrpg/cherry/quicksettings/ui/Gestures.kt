@@ -46,6 +46,8 @@ sealed interface Hud {
     data class Track(val direction: Int, val armed: Boolean) : Hud
     data class Mode(val current: BatteryMode?, val target: BatteryMode, val holdTarget: Int?) : Hud
     data class Regen(val current: RegenLevel?, val target: RegenLevel) : Hud
+    /** Both axes at once: the marker follows the finger across the quadrant. */
+    data class Climate(val temp: Int, val fan: Int) : Hud
 }
 
 /** A tile that only reacts to a tap; drags pass through so the tile list can still scroll. */
