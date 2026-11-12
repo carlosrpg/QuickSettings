@@ -36,29 +36,28 @@ them either.
 
 ## Install on the car
 
-Download the signed APK from the latest [release](../../releases), then:
+1. Download the signed APK from the latest [release](../../releases) and copy it to a USB stick.
+2. Install it on the car with a file manager.
+3. Open QuickSettings once. Android shows a one-time "built for an older version of Android"
+   notice, then a permissions review screen: tap **Continue**. That grants the overlay and the
+   microphone.
+4. From a PC connected over adb, type the command below. The car has no settings page for it.
 
-```powershell
-.\scripts\Install-OnCar.ps1 -Apk .\QuickSettings-<version>.apk
+**Notification access** (media and navigation). Required:
+
+```
+adb shell cmd notification allow_listener com.carlosrpg.cherry.quicksettings/.nav.QsNotificationListener
 ```
 
-The head unit's adbd drops any command line containing the word "install", so the script pushes
-the APK plus `scripts/qs-setup.sh` and runs the install on the device. It also turns on
-notification access. Add `-TapPassThrough` to enable the optional tap relay too.
+**Tap pass-through** (optional; lets taps in the edge swipe zone reach the app behind). The first
+command appends to the existing list, so the car's own accessibility services stay on:
 
-### Permissions
+```
+adb shell 'settings --user current put secure enabled_accessibility_services "$(settings --user current get secure enabled_accessibility_services):com.carlosrpg.cherry.quicksettings/.overlay.TapRelayService"'
+adb shell settings --user current put secure accessibility_enabled 1
+```
 
-| Permission | How it's granted |
-|---|---|
-| Draw over other apps | At install (the app targets API 22, where this permission is granted to the app) |
-| Microphone (voice search) | At install; Android shows a one-time review screen on first launch, so tap **Continue** |
-| Notification access (media + navigation) | The install script, or the app's **Grant** button, which opens the car's notification-access page |
-| Tap pass-through (optional) | `-TapPassThrough`, or `adb shell settings --user current put secure enabled_accessibility_services com.carlosrpg.cherry.quicksettings/com.carlosrpg.cherry.quicksettings.overlay.TapRelayService` |
-
-On first launch Android also shows a one-time "built for an older version of Android" notice;
-that's the cost of the install-time grants. Setting `targetSdk = 30` in `app/build.gradle.kts`
-removes it, and then the overlay needs
-`adb shell appops set com.carlosrpg.cherry.quicksettings SYSTEM_ALERT_WINDOW allow`.
+Until a permission is granted, the app's settings screen lists it with the same command.
 
 ## Build
 

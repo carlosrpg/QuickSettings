@@ -56,6 +56,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -216,22 +218,20 @@ class SettingsActivity : ComponentActivity() {
         if (overlay && notifications && mic && tapRelay) return
         Panel {
             CardLabel(stringResource(R.string.permissions))
-            PermissionRow(
-                R.string.perm_overlay, R.string.perm_overlay_why, overlay,
-                "adb shell appops set $packageName SYSTEM_ALERT_WINDOW allow",
-            ) { open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) }
-            PermissionRow(
-                R.string.perm_notif, R.string.perm_notif_why, notifications,
-                "adb shell cmd notification allow_listener $packageName/${QsNotificationListener::class.java.name}",
-            ) { open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
-            PermissionRow(
-                R.string.perm_mic, R.string.perm_mic_why, mic,
-                "adb shell pm grant --user current $packageName android.permission.RECORD_AUDIO",
-            ) { micPermission.launch(Manifest.permission.RECORD_AUDIO) }
-            PermissionRow(
-                R.string.perm_tap, R.string.perm_tap_why, tapRelay,
-                "adb shell settings put secure enabled_accessibility_services $packageName/${TapRelayService::class.java.name}",
-            ) { open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            // Overlay and mic need no adb: the overlay is granted at install (targetSdk 22) and the
+            // mic on the first-launch review screen. The other two have no settings page on the car.
+            PermissionRow(R.string.perm_overlay, R.string.perm_overlay_why, overlay, null) {
+                open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            }
+            PermissionRow(R.string.perm_notif, R.string.perm_notif_why, notifications, ADB_NOTIFICATIONS) {
+                open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+            PermissionRow(R.string.perm_mic, R.string.perm_mic_why, mic, null) {
+                micPermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            PermissionRow(R.string.perm_tap, R.string.perm_tap_why, tapRelay, ADB_TAP_RELAY) {
+                open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
         }
     }
 
@@ -241,7 +241,7 @@ class SettingsActivity : ComponentActivity() {
         return flat.split(':').any { ComponentName.unflattenFromString(it) == me }
     }
 
-    /** Car builds often hide these settings pages; the adb line under each row is the fallback. */
+    /** Car builds often hide these settings pages; the adb command under the row is the fallback. */
     private fun open(intent: Intent) {
         try {
             startActivity(intent)
@@ -251,13 +251,17 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun PermissionRow(@StringRes title: Int, @StringRes why: Int, granted: Boolean, adb: String, grant: () -> Unit) {
+    private fun PermissionRow(@StringRes title: Int, @StringRes why: Int, granted: Boolean, adb: String?, grant: () -> Unit) {
         val name = stringResource(title)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(if (granted) Qs.Energy else Qs.EnergyLow))
             Column(Modifier.weight(1f)) {
                 QsText(name, 16.sp, weight = FontWeight.SemiBold)
-                QsText(if (granted) stringResource(why) else "${stringResource(why)}  ·  $adb", 12.sp, Qs.Muted)
+                QsText(stringResource(why), 12.sp, Qs.Muted)
+                // The full command, wrapped, so it can be typed from the screen.
+                if (!granted && adb != null) {
+                    Text(adb, color = Qs.TextSoft, fontSize = 13.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 6.dp))
+                }
             }
             if (!granted) GlassButton(null, stringResource(R.string.grant_desc, name), grant, label = stringResource(R.string.grant))
         }
@@ -390,3 +394,14 @@ fun WidgetType.subtitleRes(): Int = when (this) {
     WidgetType.NAVIGATION -> R.string.widget_navigation_sub
     WidgetType.ASSIST -> R.string.widget_assist_sub
 }
+
+/** Typed by hand on a PC with adb; kept identical to the README. */
+const val ADB_NOTIFICATIONS =
+    "adb shell cmd notification allow_listener com.carlosrpg.cherry.quicksettings/.nav.QsNotificationListener"
+
+/** Appends to the list instead of replacing it: the car's own accessibility services must stay on. */
+const val ADB_TAP_RELAY =
+    "adb shell 'settings --user current put secure enabled_accessibility_services " +
+        "\"$(settings --user current get secure enabled_accessibility_services):" +
+        "com.carlosrpg.cherry.quicksettings/.overlay.TapRelayService\"'\n" +
+        "adb shell settings --user current put secure accessibility_enabled 1"
