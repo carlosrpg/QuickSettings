@@ -118,7 +118,7 @@
     <string name="widgets">Widgets</string>
     <string name="state_semi">Semi-open</string>
     <string name="state_open">Open</string>
-    <string name="widgets_hint">Hold the handle and drag to reorder. Each state keeps its own list.</string>
+    <string name="widgets_hint">Drag the handle to reorder. Each state keeps its own list.</string>
     <string name="reorder">Reorder %1$s</string>
     <string name="show_widget">Show %1$s</string>
 

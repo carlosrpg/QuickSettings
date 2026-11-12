@@ -15,7 +15,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -296,11 +296,11 @@ class SettingsActivity : ComponentActivity() {
                         Box(
                             Modifier.size(56.dp).semantics { contentDescription = reorderDescription }
                                 .then(if (!on) Modifier else Modifier.pointerInput(type, enabled) {
-                                    detectDragGesturesAfterLongPress(
+                                    detectVerticalDragGestures(
                                         onDragStart = { dragging = type; dragOffset = 0f },
-                                        onDrag = { change, amount ->
+                                        onVerticalDrag = { change, amount ->
                                             change.consume()
-                                            dragOffset += amount.y
+                                            dragOffset += amount
                                             val from = order.indexOf(type)
                                             val shift = (dragOffset / rowHeightPx).roundToInt()
                                             val to = (from + shift).coerceIn(0, order.lastIndex)

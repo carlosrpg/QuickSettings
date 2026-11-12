@@ -107,7 +107,7 @@
     <string name="widgets">Widgets</string>
     <string name="state_semi">Compacta</string>
     <string name="state_open">Aberta</string>
-    <string name="widgets_hint">Segure a alça e arraste para reordenar. Cada estado tem sua própria lista.</string>
+    <string name="widgets_hint">Arraste a alça para reordenar. Cada estado tem sua própria lista.</string>
     <string name="reorder">Reordenar %1$s</string>
     <string name="show_widget">Mostrar %1$s</string>
 
