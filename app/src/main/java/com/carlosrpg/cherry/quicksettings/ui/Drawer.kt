@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -239,8 +240,9 @@ private fun SemiDrawer(
 
 private val HUD_HEIGHT = 230.dp
 private const val MEDIA_DEAD_DP = 16
-private const val MEDIA_BAND_DP = 64
-private const val MEDIA_SIDE_DP = 56
+// Slow zone 16–100 dp: wide enough to land in on purpose; fast beyond.
+private const val MEDIA_BAND_DP = 100
+private const val MEDIA_SIDE_DP = 64
 
 /** Icons are drawn for a left drawer; a right drawer points the other way. */
 private fun String.mirrorFor(side: Side): String = if (side == Side.LEFT) this else when (this) {
@@ -276,7 +278,7 @@ private fun SemiTile(
     val lockPx = with(density) { 24.dp.toPx() }
     val choiceStepPx = with(density) { 64.dp.toPx() }
     val climateStepPx = with(density) { 20.dp.toPx() }
-    // Media zones: ±16 dp dead band, slow volume to 64 dp, fast beyond; tracks from 56 dp sideways.
+    // Media zones: ±16 dp dead band, slow volume to 100 dp, fast beyond; tracks from 64 dp sideways.
     val mediaDeadPx = with(density) { MEDIA_DEAD_DP.dp.toPx() }
     val mediaBandPx = with(density) { MEDIA_BAND_DP.dp.toPx() }
     val mediaSidePx = with(density) { MEDIA_SIDE_DP.dp.toPx() }
@@ -463,77 +465,67 @@ private fun GuideHud(hud: Hud, modifier: Modifier = Modifier) {
 }
 
 /**
- * The media control card, drawn as the zone map it responds to: fast volume up across the top,
- * fast volume down across the bottom, previous / next on the sides, and in the middle slow
- * volume up above the volume and slow volume down below it. The zone under the finger is lit.
+ * The media control card: plain indicators around the volume, + above, − below, previous and
+ * next on the sides, laid out like the zones they answer to. The indicator for the zone under
+ * the finger gets a border; in the fast volume zones the glyph doubles (++ / −−).
  */
 @Composable
 private fun MediaGuide(hud: Hud.Media) {
     val z = hud.zone
-    val gap = 6.dp
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
-        ZoneCell(z == MediaZone.VOLUME_UP_FAST, hud.adjustable, Modifier.fillMaxWidth().height(34.dp)) {
-            ZoneIcons(Icons.Plus, 2, z == MediaZone.VOLUME_UP_FAST, hud.adjustable)
+    val up = z == MediaZone.VOLUME_UP || z == MediaZone.VOLUME_UP_FAST
+    val down = z == MediaZone.VOLUME_DOWN || z == MediaZone.VOLUME_DOWN_FAST
+    Box(Modifier.fillMaxSize()) {
+        Indicator(up, hud.adjustable, Modifier.align(Alignment.TopCenter)) {
+            Glyphs(Icons.Plus, if (z == MediaZone.VOLUME_UP_FAST) 2 else 1, hud.adjustable)
         }
-        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(gap)) {
-            ZoneCell(z == MediaZone.PREVIOUS, true, Modifier.width(58.dp).fillMaxHeight()) {
-                QsIcon(Icons.Prev, if (z == MediaZone.PREVIOUS) Color(0xFF0B1018) else Qs.Text, 22.dp, filled = true)
-            }
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                ZoneCell(z == MediaZone.VOLUME_UP, hud.adjustable, Modifier.fillMaxWidth().weight(1f)) {
-                    ZoneIcons(Icons.Plus, 1, z == MediaZone.VOLUME_UP, hud.adjustable)
-                }
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (hud.adjustable) QsText("${hud.volume}", 26.sp, weight = FontWeight.Bold)
-                    else QsIcon(Icons.Volume, Qs.Dim, 22.dp)
-                    val caption = when (z) {
-                        MediaZone.NEXT -> stringResource(R.string.hud_release_next)
-                        MediaZone.PREVIOUS -> stringResource(R.string.hud_release_previous)
-                        else -> when {
-                            !hud.adjustable -> stringResource(R.string.use_car_volume)
-                            hud.simulated -> stringResource(R.string.hud_volume_simulated)
-                            else -> stringResource(R.string.hud_media_volume)
-                        }
-                    }
-                    androidx.compose.material3.Text(
-                        caption, color = if (z.isTrack) Qs.Text else Qs.Muted, fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold, maxLines = 2,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                }
-                ZoneCell(z == MediaZone.VOLUME_DOWN, hud.adjustable, Modifier.fillMaxWidth().weight(1f)) {
-                    ZoneIcons(Icons.Minus, 1, z == MediaZone.VOLUME_DOWN, hud.adjustable)
-                }
-            }
-            ZoneCell(z == MediaZone.NEXT, true, Modifier.width(58.dp).fillMaxHeight()) {
-                QsIcon(Icons.Next, if (z == MediaZone.NEXT) Color(0xFF0B1018) else Qs.Text, 22.dp, filled = true)
-            }
+        Indicator(z == MediaZone.PREVIOUS, true, Modifier.align(Alignment.CenterStart)) {
+            QsIcon(Icons.Prev, Qs.Text, 24.dp, filled = true)
         }
-        ZoneCell(z == MediaZone.VOLUME_DOWN_FAST, hud.adjustable, Modifier.fillMaxWidth().height(34.dp)) {
-            ZoneIcons(Icons.Minus, 2, z == MediaZone.VOLUME_DOWN_FAST, hud.adjustable)
+        Column(Modifier.align(Alignment.Center).width(150.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (hud.adjustable) QsText("${hud.volume}", 40.sp, weight = FontWeight.Bold)
+            else QsIcon(Icons.Volume, Qs.Dim, 30.dp)
+            val caption = when (z) {
+                MediaZone.NEXT -> stringResource(R.string.hud_release_next)
+                MediaZone.PREVIOUS -> stringResource(R.string.hud_release_previous)
+                else -> when {
+                    !hud.adjustable -> stringResource(R.string.use_car_volume)
+                    hud.simulated -> stringResource(R.string.hud_volume_simulated)
+                    else -> stringResource(R.string.hud_media_volume)
+                }
+            }
+            androidx.compose.material3.Text(
+                caption, color = if (z.isTrack) Qs.Text else Qs.Muted, fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold, maxLines = 2,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
+        Indicator(z == MediaZone.NEXT, true, Modifier.align(Alignment.CenterEnd)) {
+            QsIcon(Icons.Next, Qs.Text, 24.dp, filled = true)
+        }
+        Indicator(down, hud.adjustable, Modifier.align(Alignment.BottomCenter)) {
+            Glyphs(Icons.Minus, if (z == MediaZone.VOLUME_DOWN_FAST) 2 else 1, hud.adjustable)
         }
     }
 }
 
+/** A bare glyph; the active one gets a white border. */
 @Composable
-private fun ZoneCell(active: Boolean, enabled: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
+private fun Indicator(active: Boolean, enabled: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
     Box(
-        modifier.clip(shape)
-            .background(if (active) Color.White else Color(0x0FFFFFFF))
-            .border(1.dp, if (active) Color.White else Qs.Hairline, shape)
-            .alpha(if (enabled) 1f else 0.4f),
+        modifier.height(44.dp).widthIn(min = 44.dp).clip(shape)
+            .border(2.dp, if (active) Color.White else Color.Transparent, shape)
+            .padding(horizontal = 10.dp)
+            .alpha(if (enabled) 1f else 0.35f),
         contentAlignment = Alignment.Center,
     ) { content() }
 }
 
-/** [count] copies of a +/− glyph: one for the slow zone, two for the fast one. */
+/** One glyph for the slow zone, two for the fast one. */
 @Composable
-private fun ZoneIcons(icon: String, count: Int, active: Boolean, enabled: Boolean) {
-    Row(horizontalArrangement = Arrangement.spacedBy((-4).dp)) {
-        repeat(count) {
-            QsIcon(icon, if (active) Color(0xFF0B1018) else if (enabled) Qs.Text else Qs.Dim, 18.dp, strokeWidth = 2.4f)
-        }
+private fun Glyphs(icon: String, count: Int, enabled: Boolean) {
+    Row(horizontalArrangement = Arrangement.spacedBy((-2).dp)) {
+        repeat(count) { QsIcon(icon, if (enabled) Qs.Text else Qs.Dim, 22.dp, strokeWidth = 2.6f) }
     }
 }
 
