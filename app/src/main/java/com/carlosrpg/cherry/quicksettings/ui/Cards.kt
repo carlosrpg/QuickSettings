@@ -259,8 +259,10 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
         // The next manoeuvre takes all the room the card has; the ETA line only claims space
         // when the nav app actually sends one.
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.CenterStart) {
-            val arrow = minOf(maxHeight * 0.8f, maxWidth * 0.36f).coerceIn(56.dp, 160.dp)
-            val distanceSize = (arrow.value * 0.42f).sp
+            // The text needs the width more than the arrow does: nav apps put the distance and
+            // the street in one title ("0 ft - toward Main St"), so it gets two lines.
+            val arrow = minOf(maxHeight * 0.8f, maxWidth * 0.26f).coerceIn(56.dp, 140.dp)
+            val distanceSize = (arrow.value * 0.3f).coerceIn(20f, 36f).sp
             val instructionSize = (arrow.value * 0.17f).coerceIn(14f, 24f).sp
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(arrow * 0.18f)) {
                 Box(
@@ -272,10 +274,10 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     nav.title?.let {
-                        Text(it, color = Qs.Text, fontSize = distanceSize, lineHeight = distanceSize, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(it, color = Qs.Text, fontSize = distanceSize, lineHeight = distanceSize * 1.1f, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     nav.text?.let {
-                        Text(it, color = Qs.TextSoft, fontSize = instructionSize, lineHeight = instructionSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        Text(it, color = Qs.TextSoft, fontSize = instructionSize, lineHeight = instructionSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -293,7 +295,8 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
 @Composable
 fun AssistCard(car: CarState, modifier: Modifier = Modifier) = QsCard(modifier) {
     CardLabel(stringResource(R.string.driver_assist))
-    Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Fills the card: the gap between the rows grows with it and never drops below 8 dp.
+    Column(Modifier.weight(1f).fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.SpaceBetween) {
         AssistRow(car.aeb, Icons.Brake, stringResource(R.string.assist_aeb))
         AssistRow(car.autoHold, Icons.AutoHold, stringResource(R.string.assist_auto_hold))
         AssistRow(car.laneKeep, Icons.Lane, stringResource(R.string.assist_lane))
