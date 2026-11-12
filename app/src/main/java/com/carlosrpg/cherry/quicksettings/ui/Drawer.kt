@@ -467,7 +467,7 @@ private fun GuideHud(hud: Hud, modifier: Modifier = Modifier) {
 /**
  * The media control card: plain indicators around the volume, + above, − below, previous and
  * next on the sides, laid out like the zones they answer to. The indicator for the zone under
- * the finger gets a border; in the fast volume zones the glyph doubles (++ / −−).
+ * the finger gets a border (slow and fast zones look the same; only the rate differs).
  */
 @Composable
 private fun MediaGuide(hud: Hud.Media) {
@@ -476,7 +476,7 @@ private fun MediaGuide(hud: Hud.Media) {
     val down = z == MediaZone.VOLUME_DOWN || z == MediaZone.VOLUME_DOWN_FAST
     Box(Modifier.fillMaxSize()) {
         Indicator(up, hud.adjustable, Modifier.align(Alignment.TopCenter)) {
-            Glyphs(Icons.Plus, if (z == MediaZone.VOLUME_UP_FAST) 2 else 1, hud.adjustable)
+            QsIcon(Icons.Plus, if (hud.adjustable) Qs.Text else Qs.Dim, 22.dp, strokeWidth = 2.6f)
         }
         Indicator(z == MediaZone.PREVIOUS, true, Modifier.align(Alignment.CenterStart)) {
             QsIcon(Icons.Prev, Qs.Text, 24.dp, filled = true)
@@ -503,7 +503,7 @@ private fun MediaGuide(hud: Hud.Media) {
             QsIcon(Icons.Next, Qs.Text, 24.dp, filled = true)
         }
         Indicator(down, hud.adjustable, Modifier.align(Alignment.BottomCenter)) {
-            Glyphs(Icons.Minus, if (z == MediaZone.VOLUME_DOWN_FAST) 2 else 1, hud.adjustable)
+            QsIcon(Icons.Minus, if (hud.adjustable) Qs.Text else Qs.Dim, 22.dp, strokeWidth = 2.6f)
         }
     }
 }
@@ -519,14 +519,6 @@ private fun Indicator(active: Boolean, enabled: Boolean, modifier: Modifier, con
             .alpha(if (enabled) 1f else 0.35f),
         contentAlignment = Alignment.Center,
     ) { content() }
-}
-
-/** One glyph for the slow zone, two for the fast one. */
-@Composable
-private fun Glyphs(icon: String, count: Int, enabled: Boolean) {
-    Row(horizontalArrangement = Arrangement.spacedBy((-2).dp)) {
-        repeat(count) { QsIcon(icon, if (enabled) Qs.Text else Qs.Dim, 22.dp, strokeWidth = 2.6f) }
-    }
 }
 
 /** Wide cards span two columns. */
