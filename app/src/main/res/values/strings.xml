@@ -1,8 +1,139 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">QuickSettings</string>
+    <string name="app_name" translatable="false">QuickSettings</string>
     <string name="overlay_channel">Drawer</string>
     <string name="overlay_running">Quick drawer is ready</string>
     <string name="tap_relay_label">QuickSettings tap pass-through</string>
     <string name="tap_relay_description">Replays taps that land in the drawer\'s edge swipe zone onto the app behind it. It does not read screen content.</string>
+
+    <!-- Drawer -->
+    <string name="quick_panel">Quick panel</string>
+    <string name="action_open_fully">Open drawer fully</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_close">Close drawer</string>
+    <string name="action_back_semi">Back to semi-open</string>
+
+    <!-- Gesture guide -->
+    <string name="hud_media_volume">media volume</string>
+    <string name="hud_volume_unavailable">Volume isn\'t available to apps</string>
+    <string name="hud_volume_use_car">Use the steering-wheel or screen controls</string>
+    <string name="hud_lift_to_skip">Lift to skip · drag back to cancel</string>
+    <string name="hud_keep_dragging">Keep dragging</string>
+    <string name="hud_current">current</string>
+    <string name="hud_hold_at">hold %1$d%%</string>
+    <string name="hud_now">%1$s · now</string>
+
+    <!-- Car values -->
+    <string name="mode_initial">Initial</string>
+    <string name="mode_smart">Smart</string>
+    <string name="mode_forced">Forced</string>
+    <string name="regen_low">Low</string>
+    <string name="regen_medium">Medium</string>
+    <string name="regen_high">High</string>
+    <string name="regeneration">Regeneration</string>
+    <string name="value_on">on</string>
+    <string name="value_off">off</string>
+    <string name="value_unknown">unknown</string>
+    <string name="pill_on">On</string>
+    <string name="pill_off">Off</string>
+
+    <!-- Tile descriptions (accessibility) -->
+    <string name="desc_media">Media</string>
+    <string name="desc_climate">Climate %1$s degrees, fan %2$s</string>
+    <string name="desc_mode">Battery mode %1$s, regeneration %2$s</string>
+    <string name="desc_autonomy">Battery %1$s percent, electric range %2$s kilometres</string>
+    <string name="desc_nav_idle">Navigation, tap to search a destination</string>
+    <string name="desc_nav">Navigation %1$s</string>
+    <string name="desc_assist">Emergency braking %1$s, auto hold %2$s, lane keeping %3$s</string>
+
+    <!-- Media -->
+    <string name="open_app">Open %1$s</string>
+    <string name="media_app">Media app</string>
+    <string name="voice_search_in">Voice search in %1$s</string>
+    <string name="search">Search</string>
+    <string name="listening">Listening</string>
+    <string name="nothing_playing">Nothing playing</string>
+    <string name="allow_notification_access">Allow notification access</string>
+    <string name="previous_track">Previous track</string>
+    <string name="next_track">Next track</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="mute">Mute</string>
+    <string name="unmute">Unmute</string>
+    <string name="volume_down">Volume down</string>
+    <string name="volume_up">Volume up</string>
+    <string name="use_car_volume">Use the car\'s volume controls</string>
+
+    <!-- Navigation -->
+    <string name="navigation">Navigation</string>
+    <string name="where_to">Where to?</string>
+    <string name="voice_destination">Voice search a destination</string>
+    <string name="tap_say_destination">Tap and say a destination</string>
+    <string name="listening_ellipsis">Listening…</string>
+
+    <!-- Assist -->
+    <string name="driver_assist">Driver assist</string>
+    <string name="assist_aeb">Emergency braking</string>
+    <string name="assist_auto_hold">Auto hold</string>
+    <string name="assist_lane">Lane keeping</string>
+
+    <!-- Climate -->
+    <string name="climate_driver">Climate · driver</string>
+    <string name="outside_temp">out %1$d°</string>
+    <string name="warmer">Warmer</string>
+    <string name="cooler">Cooler</string>
+    <string name="less_fan">Less fan</string>
+    <string name="more_fan">More fan</string>
+
+    <!-- Energy -->
+    <string name="battery_mode">Battery mode</string>
+    <string name="hold_battery_at">Hold battery at</string>
+    <string name="hold_target_desc">Battery hold target</string>
+    <string name="range">Range</string>
+    <string name="range_total">total %1$s</string>
+    <string name="range_electric">Electric</string>
+    <string name="range_fuel">Fuel</string>
+    <string name="range_limit">limit %1$d%%</string>
+    <string name="range_tank">tank</string>
+
+    <!-- Settings -->
+    <string name="back">Back</string>
+    <string name="permissions">Permissions</string>
+    <string name="perm_overlay">Draw over other apps</string>
+    <string name="perm_overlay_why">Needed for the drawer.</string>
+    <string name="perm_notif">Notification access</string>
+    <string name="perm_notif_why">Media sessions and navigation directions.</string>
+    <string name="perm_mic">Microphone</string>
+    <string name="perm_mic_why">Voice search for media and destinations.</string>
+    <string name="perm_tap">Tap pass-through (optional)</string>
+    <string name="perm_tap_why">Lets taps in the edge swipe zone reach the app behind.</string>
+    <string name="grant">Grant</string>
+    <string name="grant_desc">Grant %1$s</string>
+    <string name="drawer_position">Drawer position</string>
+    <string name="side">Side</string>
+    <string name="side_left">Left</string>
+    <string name="side_right">Right</string>
+    <string name="position_on_edge">Position on edge</string>
+    <string name="position_top">top</string>
+    <string name="position_middle">middle</string>
+    <string name="position_bottom">bottom</string>
+    <string name="widgets">Widgets</string>
+    <string name="state_semi">Semi-open</string>
+    <string name="state_open">Open</string>
+    <string name="widgets_hint">Hold the handle and drag to reorder. Each state keeps its own list.</string>
+    <string name="reorder">Reorder %1$s</string>
+    <string name="show_widget">Show %1$s</string>
+
+    <string name="widget_media">Media</string>
+    <string name="widget_media_sub">Art and play / pause; drag for track</string>
+    <string name="widget_climate">Climate</string>
+    <string name="widget_climate_sub">Temperature × fan quadrant</string>
+    <string name="widget_car_mode">Car mode</string>
+    <string name="widget_car_mode_sub">Battery mode and regeneration; drag to change</string>
+    <string name="widget_autonomy">Autonomy</string>
+    <string name="widget_autonomy_sub">Battery, fuel and range</string>
+    <string name="widget_navigation">Navigation</string>
+    <string name="widget_navigation_sub">Next turn, ETA, voice destination</string>
+    <string name="widget_assist">Assist</string>
+    <string name="widget_assist_sub">Emergency braking, auto hold, lane keeping</string>
 </resources>

@@ -23,8 +23,12 @@ android {
     defaultConfig {
         applicationId = "com.carlosrpg.cherry.quicksettings"
         minSdk = 30
-        targetSdk = 30
-        versionCode = 1
+        // Deliberately pre-23: the overlay permission (protection level includes "pre23") and
+        // the microphone are then granted at install, so the car needs no adb grants for them.
+        // Cost: a one-time permission review and an "older version of Android" notice on first
+        // launch. Set this to 30 to drop both, and grant the overlay with appops instead.
+        targetSdk = 22
+        versionCode = providers.gradleProperty("appVersionCode").map { it.toInt() }.getOrElse(1)
         versionName = providers.gradleProperty("appVersionName").getOrElse("0.1.0")
         buildConfigField("boolean", "USE_MOCK", useMock.toString())
     }
@@ -62,7 +66,8 @@ android {
 }
 
 dependencies {
-    implementation(libs.carbus)
+    // jconfig-carbus, prebuilt: scripts/update-carbus.sh rebuilds it from a sibling checkout.
+    implementation(files("libs/carbus-0.2.0.aar"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)

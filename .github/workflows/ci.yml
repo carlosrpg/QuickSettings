@@ -33,14 +33,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # settings.gradle.kts builds against ./jconfig-carbus when it exists.
-      - name: Check out jconfig-carbus
-        uses: actions/checkout@v5
-        with:
-          repository: carlosrpg/jconfig-carbus
-          token: ${{ secrets.CARBUS_REPO_TOKEN }}
-          path: jconfig-carbus
-
       # Main builds bump only PATCH of the latest vX.Y.Z tag. Push a vX.Y.Z tag to set major/minor.
       - name: Compute semantic version
         run: |
@@ -59,6 +51,7 @@ jobs:
           {
             echo "APP_VERSION=$VERSION"
             echo "ORG_GRADLE_PROJECT_appVersionName=$VERSION"
+            echo "ORG_GRADLE_PROJECT_appVersionCode=$(( ${{ github.run_number }} + 1 ))"
           } >> "$GITHUB_ENV"
 
       - name: Set up Java 21
@@ -72,7 +65,7 @@ jobs:
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null
-          "$SDKMANAGER" "platforms;android-37.0" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          "$SDKMANAGER" "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

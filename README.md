@@ -3,6 +3,7 @@
 A widget drawer that floats over every app on the Jaecoo 7 head unit (Android Automotive 11).
 Closed, it is a 6 dp hint on the screen edge. Swipe inward from the edge to open it semi-open:
 small square widgets you read at a glance. Open it fully for larger cards and full controls.
+English and Brazilian Portuguese.
 
 Style: **Night Glass**, the approved styleguide.
 
@@ -10,58 +11,76 @@ Style: **Night Glass**, the approved styleguide.
 
 | Widget | Semi-open | Open |
 |---|---|---|
-| Media | Album art, play/pause. Hold and drag: up/down volume, left/right previous/next | Source app (tap to open it), title, progress, transport, mute, volume, voice search sent to the app that owns the session |
+| Media | Album art, play/pause. Press and drag left/right: previous/next | Source app (tap to open it), title, progress, transport, voice search sent to the app that owns the session |
 | Climate | Temperature × fan quadrant | ± temperature on the vertical axis, ± fan on the horizontal one |
-| Car mode | Battery-mode glyph and regen bars. Hold and drag: up/down battery mode, left/right regen | Initial / Smart / Forced, hold-target slider when Forced, Low / Medium / High regen |
+| Car mode | Battery-mode glyph and regen bars. Press and drag: up/down battery mode, left/right regen | Initial / Smart / Forced, hold-target slider when Forced, Low / Medium / High regen |
 | Autonomy | Battery ring (outer) and fuel ring (inner), electric km | Electric and fuel range, km and %, total |
 | Navigation | Next manoeuvre and distance; with no route, a tap starts a voice destination search | Nav app (tap to open it), next turn, street, ETA, voice destination |
 | Assist | Emergency braking, auto hold, lane keeping (read only) | Same, with On/Off |
 
+Media volume: Android Automotive uses fixed volume, and the car's volume groups need a
+privileged permission, so the app hides its volume controls there and points to the car's own.
+
 ## How it gets its data
 
-- **Car**: CarInfo items through [jconfig-carbus](https://github.com/carlosrpg/jconfig-carbus). CarInfo has no
-  subscribe, and values also change from the stock settings, voice and buttons, so the app **polls**
-  (every 1.5 s while the drawer is visible, and once more right after each write). Ids and
-  encodings come from `jconfig-carbus/docs/carinfo-items.md`.
+- **Car**: CarInfo items through [jconfig-carbus](https://github.com/carlosrpg/jconfig-carbus), bundled as a
+  prebuilt AAR in `app/libs/` (no vendor classes in it; the head unit supplies those at runtime).
+  CarInfo has no subscribe, and values also change from the stock settings, voice and buttons, so
+  the app **polls**: every 1.5 s while the drawer is visible, and again right after each write.
 - **Media**: the active `MediaSession`, found through the notification listener.
-- **Navigation**: the navigation app's ongoing notification (title, text, large-icon arrow).
+- **Navigation**: the navigation app's turn-by-turn notification (title, text, arrow).
 
 Nothing writes to the car on its own. Every write comes from a tap, a slider release or a
-hold-drag release. Regen and battery mode aren't gated on speed: the stock settings app doesn't
-gate them either.
+drag release. Regen and battery mode aren't gated on speed: the stock settings app doesn't gate
+them either.
+
+## Install on the car
+
+Download the signed APK from the latest [release](../../releases), then:
+
+```powershell
+.\scripts\Install-OnCar.ps1 -Apk .\QuickSettings-<version>.apk
+```
+
+The head unit's adbd drops any command line containing the word "install", so the script pushes
+the APK plus `scripts/qs-setup.sh` and runs the install on the device. It also turns on
+notification access. Add `-TapPassThrough` to enable the optional tap relay too.
+
+### Permissions
+
+| Permission | How it's granted |
+|---|---|
+| Draw over other apps | At install (the app targets API 22, where this permission is granted to the app) |
+| Microphone (voice search) | At install; Android shows a one-time review screen on first launch, so tap **Continue** |
+| Notification access (media + navigation) | The install script, or the app's **Grant** button, which opens the car's notification-access page |
+| Tap pass-through (optional) | `-TapPassThrough`, or `adb shell settings --user current put secure enabled_accessibility_services com.carlosrpg.cherry.quicksettings/com.carlosrpg.cherry.quicksettings.overlay.TapRelayService` |
+
+On first launch Android also shows a one-time "built for an older version of Android" notice;
+that's the cost of the install-time grants. Setting `targetSdk = 30` in `app/build.gradle.kts`
+removes it, and then the overlay needs
+`adb shell appops set com.carlosrpg.cherry.quicksettings SYSTEM_ALERT_WINDOW allow`.
 
 ## Build
 
-Requires JDK 21 and the Android SDK (`local.properties` with `sdk.dir`). The build uses a
-`jconfig-carbus` checkout from `../jconfig-carbus` (or `./jconfig-carbus`) when one is present.
+Requires JDK 21 and the Android SDK (`local.properties` with `sdk.dir`).
 
 ```bash
-./gradlew app:testDebugUnitTest app:assembleDebug        # emulator build, in-memory car
-./gradlew app:assembleRelease -Pqs.mock=false            # head-unit build, signed
+./gradlew app:testDebugUnitTest app:lintDebug app:assembleDebug   # emulator build, in-memory car
+./gradlew app:assembleRelease -Pqs.mock=false                       # head-unit build, signed
 ```
 
 Release signing reads `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS` and
 `RELEASE_KEY_PASSWORD` from Gradle properties, `local.properties` or the environment.
 
-## Permissions
-
-Grant them on first run from the app's settings screen. Car builds often hide these pages, so
-use the adb fallbacks:
+To update the bundled library from a jconfig-carbus checkout:
 
 ```bash
-adb shell appops set com.carlosrpg.cherry.quicksettings SYSTEM_ALERT_WINDOW allow
-adb shell cmd notification allow_listener com.carlosrpg.cherry.quicksettings/com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
-adb shell pm grant --user current com.carlosrpg.cherry.quicksettings android.permission.RECORD_AUDIO
-# optional: replay taps that land in the edge swipe zone onto the app behind it
-adb shell settings put secure enabled_accessibility_services com.carlosrpg.cherry.quicksettings/com.carlosrpg.cherry.quicksettings.overlay.TapRelayService
+scripts/update-carbus.sh ../jconfig-carbus
 ```
-
-On Android Automotive the app runs as the driver user (10), hence `--user current`. The head unit's adbd drops any command line that contains `install`. Push the APK and install
-it from an on-device script.
 
 ## CI
 
 `.github/workflows/ci.yml` runs unit tests and lint and builds a signed release APK on every pull
 request (signed with a throwaway key) and on `main` (signed with the release key, then published
-as a GitHub release). Secrets: `CARBUS_REPO_TOKEN` (read access to jconfig-carbus),
-`RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`.
+as a GitHub release). Secrets: `RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`,
+`RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`.

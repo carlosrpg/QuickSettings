@@ -4,13 +4,11 @@ import android.app.Notification
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.carlosrpg.cherry.quicksettings.util.AppInfo
+import com.carlosrpg.cherry.quicksettings.util.AppInfo.toBitmap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -131,29 +129,15 @@ class QsNotificationListener : NotificationListenerService() {
         val extras = sbn.notification.extras
         return NavState(
             packageName = sbn.packageName,
-            appLabel = labelOf(sbn.packageName),
+            appLabel = AppInfo.label(this, sbn.packageName),
             title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
             text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
             subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
-            maneuver = sbn.notification.getLargeIcon()?.toBitmap(),
+            maneuver = sbn.notification.getLargeIcon()?.loadDrawable(this)?.toBitmap(MANEUVER_PX),
         )
     }
 
-    private fun Icon.toBitmap(): Bitmap? = loadDrawable(this@QsNotificationListener)?.toBitmap()
-
-    private fun Drawable.toBitmap(): Bitmap? {
-        if (this is BitmapDrawable && bitmap != null) return bitmap
-        val w = intrinsicWidth.takeIf { it > 0 } ?: return null
-        val h = intrinsicHeight.takeIf { it > 0 } ?: return null
-        return Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also {
-            setBounds(0, 0, w, h)
-            draw(Canvas(it))
-        }
-    }
-
-    private fun labelOf(pkg: String): String? = try {
-        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-    } catch (e: Exception) {
-        null
+    private companion object {
+        const val MANEUVER_PX = 128
     }
 }

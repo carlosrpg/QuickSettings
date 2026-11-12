@@ -4,21 +4,26 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +37,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -43,9 +49,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -55,13 +64,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.app
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import com.carlosrpg.cherry.quicksettings.overlay.TapRelayService
+import com.carlosrpg.cherry.quicksettings.ui.ArtPlaceholder
 import com.carlosrpg.cherry.quicksettings.ui.CardLabel
 import com.carlosrpg.cherry.quicksettings.ui.GlassButton
 import com.carlosrpg.cherry.quicksettings.ui.Icons
@@ -95,72 +105,135 @@ class SettingsActivity : ComponentActivity() {
             owner.lifecycle.addObserver(observer)
             onDispose { owner.lifecycle.removeObserver(observer) }
         }
+        val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         Column(
             Modifier.fillMaxSize().background(Color(0xFF0B1018)).verticalScroll(rememberScrollState()).padding(horizontal = 32.dp, vertical = 28.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                GlassButton(Icons.ChevronLeft, "Back", ::finish)
-                QsText("QuickSettings", 26.sp, weight = FontWeight.Bold)
+                GlassButton(Icons.ChevronLeft, stringResource(R.string.back), ::finish)
+                QsText(stringResource(R.string.app_name), 26.sp, weight = FontWeight.Bold)
             }
             // Re-checked on every resume: grants happen in system settings or over adb.
             key(refresh) { Permissions() }
-            Panel {
-                CardLabel("Drawer position")
-                QsText("Side", 14.sp, Qs.TextSoft, FontWeight.SemiBold)
-                Segmented(Side.entries, config.side, { if (it == Side.LEFT) "Left" else "Right" }, Qs.Text, { side -> store.update { it.copy(side = side) } })
-                var position by remember(config.edgePosition) { mutableFloatStateOf(config.edgePosition) }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    QsText("Position on edge", 14.sp, Qs.TextSoft, FontWeight.SemiBold)
-                    QsText(positionLabel(position), 14.sp, Qs.Muted)
+            if (wide) {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Box(Modifier.weight(0.42f)) { PositionPanel(config) }
+                    Box(Modifier.weight(0.58f)) { WidgetsPanel(config) }
                 }
-                Slider(
-                    value = position,
-                    onValueChange = { position = it },
-                    onValueChangeFinished = { store.update { it.copy(edgePosition = position) } },
-                    colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Qs.Route, inactiveTrackColor = Color(0x1FFFFFFF)),
-                    modifier = Modifier.height(56.dp).semantics { contentDescription = "Drawer position on edge" },
-                )
-            }
-            var tab by remember { mutableStateOf(0) }
-            Panel {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CardLabel("Widgets", Modifier.weight(1f))
-                    Segmented(listOf(0, 1), tab, { if (it == 0) "Semi-open" else "Open" }, Qs.Text, { tab = it }, Modifier.width(340.dp))
-                }
-                QsText("Hold the handle and drag to reorder. Each state keeps its own list.", 13.sp, Qs.Muted)
-                val list = if (tab == 0) config.semi else config.open
-                WidgetList(list) { updated -> store.update { if (tab == 0) it.copy(semi = updated) else it.copy(open = updated) } }
+            } else {
+                PositionPanel(config)
+                WidgetsPanel(config)
             }
         }
     }
 
-    private fun positionLabel(p: Float) = when {
-        p < 0.33f -> "top"
-        p > 0.67f -> "bottom"
-        else -> "middle"
+    @Composable
+    private fun PositionPanel(config: QsConfig) = Panel {
+        val store = app.settings
+        CardLabel(stringResource(R.string.drawer_position))
+        var position by remember(config.edgePosition) { mutableFloatStateOf(config.edgePosition) }
+        ScreenPreview(config.side, position)
+        QsText(stringResource(R.string.side), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
+        Segmented(
+            Side.entries, config.side,
+            { stringResource(if (it == Side.LEFT) R.string.side_left else R.string.side_right) },
+            Qs.Text, { side -> store.update { it.copy(side = side) } },
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            QsText(stringResource(R.string.position_on_edge), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
+            QsText(stringResource(positionLabel(position)), 14.sp, Qs.Muted)
+        }
+        val sliderDescription = stringResource(R.string.position_on_edge)
+        Slider(
+            value = position,
+            onValueChange = { position = it },
+            onValueChangeFinished = { store.update { it.copy(edgePosition = position) } },
+            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Qs.Route, inactiveTrackColor = Color(0x1FFFFFFF)),
+            modifier = Modifier.height(56.dp).semantics { contentDescription = sliderDescription },
+        )
+    }
+
+    /** The screen in miniature with the drawer where it will sit, as in the styleguide. */
+    @Composable
+    private fun ColumnScope.ScreenPreview(side: Side, position: Float) {
+        val screen = LocalConfiguration.current
+        val ratio = screen.screenWidthDp.toFloat() / screen.screenHeightDp.coerceAtLeast(1)
+        BoxWithConstraints(
+            Modifier.height(200.dp).aspectRatio(ratio).align(Alignment.CenterHorizontally)
+                .clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D141E))
+                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
+        ) {
+            Box(Modifier.align(Alignment.Center).fillMaxWidth().height(6.dp).background(Color(0xFF1A2431)))
+            Box(Modifier.align(Alignment.Center).offset(x = maxWidth * 0.1f).width(6.dp).fillMaxHeight().background(Color(0xFF1A2431)))
+            val drawerH = maxHeight * 0.55f
+            val drawerW = maxOf(maxWidth * 0.09f, 26.dp)
+            val y = (maxHeight - drawerH) * position.coerceIn(0f, 1f)
+            Column(
+                Modifier.align(if (side == Side.LEFT) Alignment.TopStart else Alignment.TopEnd)
+                    .offset(x = if (side == Side.LEFT) 6.dp else (-6).dp, y = y)
+                    .width(drawerW).height(drawerH).clip(RoundedCornerShape(10.dp))
+                    .background(Qs.Route.copy(alpha = 0.22f)).border(2.dp, Qs.Route, RoundedCornerShape(10.dp))
+                    .padding(4.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                repeat(5) { Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(4.dp)).background(Color(0x59FFFFFF))) }
+            }
+        }
     }
 
     @Composable
-    private fun Permissions() = Panel {
-        CardLabel("Permissions")
-        PermissionRow(
-            "Draw over other apps", "Needed for the drawer.", OverlayService.canDraw(this@SettingsActivity),
-            "adb shell appops set $packageName SYSTEM_ALERT_WINDOW allow",
-        ) { open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) }
-        PermissionRow(
-            "Notification access", "Media sessions and navigation directions.", hasNotificationAccess(),
-            "adb shell cmd notification allow_listener $packageName/${QsNotificationListener::class.java.name}",
-        ) { open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
-        PermissionRow(
-            "Microphone", "Voice search for media and destinations.",
-            checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
-            "adb shell pm grant --user current $packageName android.permission.RECORD_AUDIO",
-        ) { micPermission.launch(Manifest.permission.RECORD_AUDIO) }
-        PermissionRow(
-            "Tap pass-through (optional)", "Lets taps in the edge swipe zone reach the app behind.", TapRelayService.instance != null,
-            "adb shell settings put secure enabled_accessibility_services $packageName/${TapRelayService::class.java.name}",
-        ) { open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    private fun WidgetsPanel(config: QsConfig) = Panel {
+        val store = app.settings
+        var tab by remember { mutableIntStateOf(0) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CardLabel(stringResource(R.string.widgets), Modifier.weight(1f))
+            Segmented(
+                listOf(0, 1), tab, { stringResource(if (it == 0) R.string.state_semi else R.string.state_open) },
+                Qs.Text, { tab = it }, Modifier.width(340.dp),
+            )
+        }
+        QsText(stringResource(R.string.widgets_hint), 13.sp, Qs.Muted)
+        val list = if (tab == 0) config.semi else config.open
+        key(tab) {
+            WidgetList(list) { updated -> store.update { if (tab == 0) it.copy(semi = updated) else it.copy(open = updated) } }
+        }
+    }
+
+    @StringRes
+    private fun positionLabel(p: Float) = when {
+        p < 0.33f -> R.string.position_top
+        p > 0.67f -> R.string.position_bottom
+        else -> R.string.position_middle
+    }
+
+    @Composable
+    private fun Permissions() {
+        val overlay = OverlayService.canDraw(this)
+        val notifications = hasNotificationAccess()
+        val mic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val tapRelay = TapRelayService.instance != null
+        // Nothing to ask for: keep the screen about the drawer.
+        if (overlay && notifications && mic && tapRelay) return
+        Panel {
+            CardLabel(stringResource(R.string.permissions))
+            PermissionRow(
+                R.string.perm_overlay, R.string.perm_overlay_why, overlay,
+                "adb shell appops set $packageName SYSTEM_ALERT_WINDOW allow",
+            ) { open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) }
+            PermissionRow(
+                R.string.perm_notif, R.string.perm_notif_why, notifications,
+                "adb shell cmd notification allow_listener $packageName/${QsNotificationListener::class.java.name}",
+            ) { open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+            PermissionRow(
+                R.string.perm_mic, R.string.perm_mic_why, mic,
+                "adb shell pm grant --user current $packageName android.permission.RECORD_AUDIO",
+            ) { micPermission.launch(Manifest.permission.RECORD_AUDIO) }
+            PermissionRow(
+                R.string.perm_tap, R.string.perm_tap_why, tapRelay,
+                "adb shell settings put secure enabled_accessibility_services $packageName/${TapRelayService::class.java.name}",
+            ) { open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        }
     }
 
     private fun hasNotificationAccess(): Boolean {
@@ -179,14 +252,15 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun PermissionRow(title: String, why: String, granted: Boolean, adb: String, grant: () -> Unit) {
+    private fun PermissionRow(@StringRes title: Int, @StringRes why: Int, granted: Boolean, adb: String, grant: () -> Unit) {
+        val name = stringResource(title)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(if (granted) Qs.Energy else Qs.EnergyLow))
             Column(Modifier.weight(1f)) {
-                QsText(title, 16.sp, weight = FontWeight.SemiBold)
-                QsText(if (granted) why else "$why  ·  $adb", 12.sp, Qs.Muted)
+                QsText(name, 16.sp, weight = FontWeight.SemiBold)
+                QsText(if (granted) stringResource(why) else "${stringResource(why)}  ·  $adb", 12.sp, Qs.Muted)
             }
-            if (!granted) GlassButton(null, "Grant $title", grant, label = "Grant")
+            if (!granted) GlassButton(null, stringResource(R.string.grant_desc, name), grant, label = stringResource(R.string.grant))
         }
     }
 
@@ -201,6 +275,7 @@ class SettingsActivity : ComponentActivity() {
             all.forEach { type ->
                 val on = type in order
                 val isDragged = dragging == type
+                val title = stringResource(type.titleRes())
                 Row(
                     Modifier.fillMaxWidth().height(64.dp)
                         .zIndex(if (isDragged) 1f else 0f)
@@ -208,12 +283,13 @@ class SettingsActivity : ComponentActivity() {
                         .clip(RoundedCornerShape(16.dp))
                         .background(if (isDragged) Color(0x1AFFFFFF) else Color(0x0AFFFFFF))
                         .border(1.dp, Color(0x0FFFFFFF), RoundedCornerShape(16.dp))
-                        .padding(start = 6.dp, end = 12.dp),
+                        .padding(start = 4.dp, end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    val reorderDescription = stringResource(R.string.reorder, title)
                     Box(
-                        Modifier.size(56.dp).semantics { contentDescription = "Reorder ${type.title()}" }
+                        Modifier.size(56.dp).semantics { contentDescription = reorderDescription }
                             .then(if (!on) Modifier else Modifier.pointerInput(type) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { dragging = type; dragOffset = 0f },
@@ -234,15 +310,41 @@ class SettingsActivity : ComponentActivity() {
                             }),
                         contentAlignment = Alignment.Center,
                     ) { QsIcon(Icons.Drag, if (on) Qs.Muted else Color(0x336B7686), 22.dp, strokeWidth = 3f) }
+                    WidgetBadge(type, on)
                     Column(Modifier.weight(1f)) {
-                        QsText(type.title(), 16.sp, if (on) Qs.Text else Qs.Muted, FontWeight.SemiBold)
-                        QsText(type.subtitle(), 13.sp, Qs.Muted)
+                        QsText(title, 16.sp, if (on) Qs.Text else Qs.Muted, FontWeight.SemiBold)
+                        QsText(stringResource(type.subtitleRes()), 13.sp, Qs.Muted)
                     }
-                    Toggle(on, "Show ${type.title()}") {
+                    Toggle(on, stringResource(R.string.show_widget, title)) {
                         onChange(if (on) order - type else order + type)
                     }
                 }
             }
+        }
+    }
+
+    /** Mini version of each widget's identity, as the styleguide's settings rows show. */
+    @Composable
+    private fun WidgetBadge(type: WidgetType, on: Boolean) {
+        val shape = RoundedCornerShape(12.dp)
+        val (background, icon, tint) = when (type) {
+            WidgetType.MEDIA -> Triple<Any, String?, Color>(ArtPlaceholder, null, Color.White)
+            WidgetType.CLIMATE -> Triple<Any, String?, Color>(Qs.TempGradient, Icons.ClimateFan, Color.White)
+            WidgetType.CAR_MODE -> Triple<Any, String?, Color>(Qs.Mode.copy(alpha = 0.18f), Icons.BatteryBolt, Qs.Mode)
+            WidgetType.AUTONOMY -> Triple<Any, String?, Color>(Qs.Energy.copy(alpha = 0.18f), Icons.Battery, Qs.Energy)
+            WidgetType.NAVIGATION -> Triple<Any, String?, Color>(Qs.Route.copy(alpha = 0.18f), Icons.TurnRight, Qs.Route)
+            WidgetType.ASSIST -> Triple<Any, String?, Color>(Qs.Energy.copy(alpha = 0.18f), Icons.AutoHold, Qs.Energy)
+        }
+        val bg = when (background) {
+            is Brush -> Modifier.background(background)
+            is Color -> Modifier.background(background)
+            else -> Modifier
+        }
+        Box(
+            Modifier.size(40.dp).clip(shape).then(bg).then(if (on) Modifier else Modifier.background(Color(0x990B1018))),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (icon != null) QsIcon(icon, tint, 22.dp)
         }
     }
 
@@ -270,20 +372,22 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
-fun WidgetType.title(): String = when (this) {
-    WidgetType.MEDIA -> "Media"
-    WidgetType.CLIMATE -> "Climate"
-    WidgetType.CAR_MODE -> "Car mode"
-    WidgetType.AUTONOMY -> "Autonomy"
-    WidgetType.NAVIGATION -> "Navigation"
-    WidgetType.ASSIST -> "Assist"
+@StringRes
+fun WidgetType.titleRes(): Int = when (this) {
+    WidgetType.MEDIA -> R.string.widget_media
+    WidgetType.CLIMATE -> R.string.widget_climate
+    WidgetType.CAR_MODE -> R.string.widget_car_mode
+    WidgetType.AUTONOMY -> R.string.widget_autonomy
+    WidgetType.NAVIGATION -> R.string.widget_navigation
+    WidgetType.ASSIST -> R.string.widget_assist
 }
 
-fun WidgetType.subtitle(): String = when (this) {
-    WidgetType.MEDIA -> "Art, play / pause, hold for volume and track"
-    WidgetType.CLIMATE -> "Temperature × fan quadrant"
-    WidgetType.CAR_MODE -> "Battery mode and regeneration"
-    WidgetType.AUTONOMY -> "Battery and fuel, range"
-    WidgetType.NAVIGATION -> "Next turn, ETA, voice destination"
-    WidgetType.ASSIST -> "Emergency braking, auto hold, lane keeping"
+@StringRes
+fun WidgetType.subtitleRes(): Int = when (this) {
+    WidgetType.MEDIA -> R.string.widget_media_sub
+    WidgetType.CLIMATE -> R.string.widget_climate_sub
+    WidgetType.CAR_MODE -> R.string.widget_car_mode_sub
+    WidgetType.AUTONOMY -> R.string.widget_autonomy_sub
+    WidgetType.NAVIGATION -> R.string.widget_navigation_sub
+    WidgetType.ASSIST -> R.string.widget_assist_sub
 }

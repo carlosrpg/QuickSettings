@@ -1,11 +1,16 @@
 package com.carlosrpg.cherry.quicksettings.car
 
+import app.jconfig.carbus.carinfo.AssistIds
+import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.FanSpec
+import app.jconfig.carbus.carinfo.NewEnergyIds
 import app.jconfig.carbus.carinfo.OutsideTempSpec
-import com.carlosrpg.cherry.quicksettings.car.CarItems.BatteryMode
-import com.carlosrpg.cherry.quicksettings.car.CarItems.Regen
+import app.jconfig.carbus.carinfo.RangeCodec
+import app.jconfig.carbus.carinfo.RegenLevel
+import app.jconfig.carbus.carinfo.TelemetryIds
+import app.jconfig.carbus.carinfo.VDEventCarInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,7 +31,7 @@ data class CarState(
     val outsideTempC: Int? = null,
     val batteryMode: BatteryMode? = null,
     val holdTarget: Int? = null,
-    val regen: Regen? = null,
+    val regen: RegenLevel? = null,
     val batterySoc: Int? = null,
     val chargeLimit: Int? = null,
     val electricRangeKm: Int? = null,
@@ -37,10 +42,15 @@ data class CarState(
     val laneKeep: Boolean? = null,
 )
 
+private const val ENERGY = VDEventCarInfo.MODULE_NEW_ENERGY
+private const val READONLY = VDEventCarInfo.MODULE_READONLY_INFO
+private const val HVAC = VDEventCarInfo.MODULE_HVAC
+
 /**
  * Reads the car by polling: CarInfo has no subscribe, and values change from other places
  * (stock settings, voice, physical buttons), so every read is repeated on a timer and after
- * each write. Writes happen only from explicit user actions.
+ * each write. Writes happen only from explicit user actions. Ids and encodings all come from
+ * jconfig-carbus.
  */
 class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) {
     private val _state = MutableStateFlow(CarState())
@@ -65,61 +75,65 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         pollJob = null
     }
 
-    suspend fun refresh() = mutex.withLock { _state.value = read(_state.value) }
+    suspend fun refresh() = mutex.withLock {
+        // Before the vendor proxy connects every read returns 0, and 0 is a valid status for
+        // several items (regen 0 = high, battery mode 0 = initial): show nothing rather than that.
+        if (bus.isServiceConnected()) _state.value = read(_state.value)
+    }
 
     internal fun read(previous: CarState): CarState {
         fun int(module: Int, id: Int): Int? = bus.getItemValueOrNull(module, id)
-        fun array(module: Int, id: Int): IntArray = bus.getItemValues(module, id)
-        val ne = CarItems.NEW_ENERGY
-        val ro = CarItems.READONLY
-        val hvac = CarItems.HVAC
-        val set = CarItems.CAR_SETTING
+        fun percent(module: Int, id: Int): Int? = int(module, id)?.takeIf { it in 0..100 }
+        fun assist(id: Int) = AssistIds.isOn(id, int(AssistIds.MODULE, id))
         return CarState(
-            speedKmh = int(ro, CarItems.SPEED),
-            cabinTempC = int(hvac, CarItems.CABIN_TEMP_READ)
+            speedKmh = int(READONLY, TelemetryIds.ITEM_CAR_SPEED),
+            cabinTempC = int(HVAC, CabinTempSpec.ITEM_READ)
                 ?.let(CabinTempSpec::toCelsius)?.takeIf(CabinTempSpec::isValid),
-            fanLevel = int(hvac, CarItems.FAN_READ)?.takeIf { it in 0..FanSpec.MAX },
-            outsideTempC = int(hvac, CarItems.OUTSIDE_TEMP)?.takeIf { it > 0 }
+            fanLevel = int(HVAC, FanSpec.ITEM_READ)?.takeIf { it in 0..FanSpec.MAX },
+            outsideTempC = int(HVAC, OutsideTempSpec.ITEM_ID)?.takeIf { it > 0 }
                 ?.let(OutsideTempSpec::toCelsius),
-            // 255 / ignored statuses keep the last known value, as the stock UI does.
-            batteryMode = BatteryMode.fromStatus(int(ne, CarItems.BATTERY_MODE)) ?: previous.batteryMode,
-            holdTarget = int(ne, CarItems.HOLD_TARGET)
-                ?.takeIf { it in CarItems.HOLD_MIN..CarItems.HOLD_MAX } ?: previous.holdTarget,
-            regen = Regen.fromStatus(int(ne, CarItems.REGEN)) ?: previous.regen,
-            batterySoc = CarItems.percent(int(ne, CarItems.BATTERY_SOC)),
-            chargeLimit = CarItems.percent(int(ne, CarItems.CHARGE_LIMIT))?.takeIf { it > 0 },
-            electricRangeKm = CarItems.electricRangeKm(array(ne, CarItems.ELECTRIC_RANGE)),
-            fuelRangeKm = CarItems.fuelRangeKm(array(ro, CarItems.FUEL_RANGE)),
-            fuelPercent = CarItems.fuelPercent(
-                array(ro, CarItems.FUEL_PERCENT), int(ro, CarItems.FUEL_PERCENT)
+            // Unavailable / ignored statuses keep the last known value, as the stock UI does.
+            batteryMode = BatteryMode.fromStatus(int(ENERGY, NewEnergyIds.ITEM_SOC_MANAGER_TYPE))
+                ?: previous.batteryMode,
+            holdTarget = int(ENERGY, NewEnergyIds.ITEM_SOC_TARGET)
+                ?.takeIf { it in NewEnergyIds.SOC_TARGET_MIN..NewEnergyIds.SOC_TARGET_MAX }
+                ?: previous.holdTarget,
+            regen = RegenLevel.fromStatus(int(ENERGY, NewEnergyIds.ITEM_ENERGY_RECYCLE_LEVEL))
+                ?: previous.regen,
+            batterySoc = percent(ENERGY, TelemetryIds.ITEM_BATTERY_SOC),
+            chargeLimit = percent(ENERGY, NewEnergyIds.ITEM_CHARGING_STOP_SOC)?.takeIf { it > 0 },
+            electricRangeKm = RangeCodec.electricRangeKm(bus.getItemValues(ENERGY, NewEnergyIds.ITEM_ELECTRIC_RANGE)),
+            fuelRangeKm = RangeCodec.fuelRangeKm(bus.getItemValues(READONLY, TelemetryIds.ITEM_RANGE_KM)),
+            fuelPercent = RangeCodec.fuelPercent(
+                bus.getItemValues(READONLY, TelemetryIds.ITEM_FUEL_PERCENT),
+                int(READONLY, TelemetryIds.ITEM_FUEL_PERCENT),
             ),
-            aeb = int(set, CarItems.AEB)?.let { it == 1 },
-            autoHold = int(set, CarItems.AUTO_HOLD)?.let { it == 1 || it == 2 },
-            laneKeep = int(set, CarItems.LANE_KEEP)?.let { it == 1 },
+            aeb = assist(AssistIds.ITEM_AEB),
+            autoHold = assist(AssistIds.ITEM_AUTO_HOLD),
+            laneKeep = assist(AssistIds.ITEM_EMERGENCY_LANE_KEEPING),
         )
     }
 
     // Regen and battery mode are writable while driving; the stock settings does not gate them.
-    fun setRegen(regen: Regen) = write(CarItems.NEW_ENERGY, CarItems.REGEN, regen.command)
+    fun setRegen(regen: RegenLevel) = write(ENERGY, NewEnergyIds.ITEM_ENERGY_RECYCLE_LEVEL, regen.command)
 
-    fun setBatteryMode(mode: BatteryMode) =
-        write(CarItems.NEW_ENERGY, CarItems.BATTERY_MODE, mode.command)
+    fun setBatteryMode(mode: BatteryMode) = write(ENERGY, NewEnergyIds.ITEM_SOC_MANAGER_TYPE, mode.command)
 
     fun setHoldTarget(percent: Int) = write(
-        CarItems.NEW_ENERGY, CarItems.HOLD_TARGET,
-        percent.coerceIn(CarItems.HOLD_MIN, CarItems.HOLD_MAX)
+        ENERGY, NewEnergyIds.ITEM_SOC_TARGET,
+        percent.coerceIn(NewEnergyIds.SOC_TARGET_MIN, NewEnergyIds.SOC_TARGET_MAX),
     )
 
     fun stepCabinTemp(delta: Int) {
         val current = state.value.cabinTempC ?: return
         val target = (current + delta).coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX)
-        if (target != current) write(CarItems.HVAC, CarItems.CABIN_TEMP_WRITE, CabinTempSpec.toRaw(target))
+        if (target != current) write(HVAC, CabinTempSpec.ITEM_WRITE, CabinTempSpec.toRaw(target))
     }
 
     fun stepFan(delta: Int) {
         val current = state.value.fanLevel ?: return
         val target = (current + delta).coerceIn(FanSpec.MIN, FanSpec.MAX)
-        if (target != current) write(CarItems.HVAC, CarItems.FAN_WRITE, target)
+        if (target != current) write(HVAC, FanSpec.ITEM_WRITE, target)
     }
 
     private fun write(module: Int, id: Int, value: Int) {

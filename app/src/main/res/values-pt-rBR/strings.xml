@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="overlay_channel">Gaveta</string>
+    <string name="overlay_running">Gaveta rápida pronta</string>
+    <string name="tap_relay_label">Repasse de toques do QuickSettings</string>
+    <string name="tap_relay_description">Repete no app de trás os toques que caem na zona de deslize da borda da gaveta. Não lê o conteúdo da tela.</string>
+
+    <string name="quick_panel">Painel rápido</string>
+    <string name="action_open_fully">Abrir a gaveta por completo</string>
+    <string name="action_settings">Configurações</string>
+    <string name="action_close">Fechar a gaveta</string>
+    <string name="action_back_semi">Voltar à gaveta compacta</string>
+
+    <string name="hud_media_volume">volume da mídia</string>
+    <string name="hud_volume_unavailable">O volume não está disponível para apps</string>
+    <string name="hud_volume_use_car">Use os controles do volante ou da tela</string>
+    <string name="hud_lift_to_skip">Solte para pular · arraste de volta para cancelar</string>
+    <string name="hud_keep_dragging">Continue arrastando</string>
+    <string name="hud_current">atual</string>
+    <string name="hud_hold_at">manter %1$d%%</string>
+    <string name="hud_now">%1$s · atual</string>
+
+    <string name="mode_initial">Inicial</string>
+    <string name="mode_smart">Inteligente</string>
+    <string name="mode_forced">Forçada</string>
+    <string name="regen_low">Baixo</string>
+    <string name="regen_medium">Médio</string>
+    <string name="regen_high">Alta</string>
+    <string name="regeneration">Recuperação de energia</string>
+    <string name="value_on">ativado</string>
+    <string name="value_off">desativado</string>
+    <string name="value_unknown">desconhecido</string>
+    <string name="pill_on">Ativo</string>
+    <string name="pill_off">Inativo</string>
+
+    <string name="desc_media">Mídia</string>
+    <string name="desc_climate">Clima %1$s graus, ventilação %2$s</string>
+    <string name="desc_mode">Modo da bateria %1$s, recuperação de energia %2$s</string>
+    <string name="desc_autonomy">Bateria %1$s por cento, autonomia elétrica %2$s quilômetros</string>
+    <string name="desc_nav_idle">Navegação, toque para buscar um destino</string>
+    <string name="desc_nav">Navegação %1$s</string>
+    <string name="desc_assist">Frenagem de emergência %1$s, auto hold %2$s, permanência na faixa %3$s</string>
+
+    <string name="open_app">Abrir %1$s</string>
+    <string name="media_app">App de mídia</string>
+    <string name="voice_search_in">Busca por voz em %1$s</string>
+    <string name="search">Buscar</string>
+    <string name="listening">Ouvindo</string>
+    <string name="nothing_playing">Nada tocando</string>
+    <string name="allow_notification_access">Permita o acesso às notificações</string>
+    <string name="previous_track">Faixa anterior</string>
+    <string name="next_track">Próxima faixa</string>
+    <string name="play">Reproduzir</string>
+    <string name="pause">Pausar</string>
+    <string name="mute">Silenciar</string>
+    <string name="unmute">Reativar o som</string>
+    <string name="volume_down">Diminuir o volume</string>
+    <string name="volume_up">Aumentar o volume</string>
+    <string name="use_car_volume">Use os controles de volume do carro</string>
+
+    <string name="navigation">Navegação</string>
+    <string name="where_to">Para onde?</string>
+    <string name="voice_destination">Buscar destino por voz</string>
+    <string name="tap_say_destination">Toque e diga um destino</string>
+    <string name="listening_ellipsis">Ouvindo…</string>
+
+    <string name="driver_assist">Assistência ao motorista</string>
+    <string name="assist_aeb">Frenagem de emergência</string>
+    <string name="assist_auto_hold">Auto Hold</string>
+    <string name="assist_lane">Permanência na faixa</string>
+
+    <string name="climate_driver">Clima · motorista</string>
+    <string name="outside_temp">ext. %1$d°</string>
+    <string name="warmer">Mais quente</string>
+    <string name="cooler">Mais frio</string>
+    <string name="less_fan">Menos ventilação</string>
+    <string name="more_fan">Mais ventilação</string>
+
+    <string name="battery_mode">Modo da bateria</string>
+    <string name="hold_battery_at">Manter a bateria em</string>
+    <string name="hold_target_desc">Meta de retenção da bateria</string>
+    <string name="range">Autonomia</string>
+    <string name="range_total">total %1$s</string>
+    <string name="range_electric">Elétrica</string>
+    <string name="range_fuel">Combustível</string>
+    <string name="range_limit">limite %1$d%%</string>
+    <string name="range_tank">tanque</string>
+
+    <string name="back">Voltar</string>
+    <string name="permissions">Permissões</string>
+    <string name="perm_overlay">Sobrepor a outros apps</string>
+    <string name="perm_overlay_why">Necessário para a gaveta.</string>
+    <string name="perm_notif">Acesso às notificações</string>
+    <string name="perm_notif_why">Sessões de mídia e instruções de navegação.</string>
+    <string name="perm_mic">Microfone</string>
+    <string name="perm_mic_why">Busca por voz de mídia e destinos.</string>
+    <string name="perm_tap">Repasse de toques (opcional)</string>
+    <string name="perm_tap_why">Deixa os toques na zona de deslize da borda chegarem ao app de trás.</string>
+    <string name="grant">Permitir</string>
+    <string name="grant_desc">Permitir %1$s</string>
+    <string name="drawer_position">Posição da gaveta</string>
+    <string name="side">Lado</string>
+    <string name="side_left">Esquerda</string>
+    <string name="side_right">Direita</string>
+    <string name="position_on_edge">Posição na borda</string>
+    <string name="position_top">topo</string>
+    <string name="position_middle">meio</string>
+    <string name="position_bottom">base</string>
+    <string name="widgets">Widgets</string>
+    <string name="state_semi">Compacta</string>
+    <string name="state_open">Aberta</string>
+    <string name="widgets_hint">Segure a alça e arraste para reordenar. Cada estado tem sua própria lista.</string>
+    <string name="reorder">Reordenar %1$s</string>
+    <string name="show_widget">Mostrar %1$s</string>
+
+    <string name="widget_media">Mídia</string>
+    <string name="widget_media_sub">Capa e reproduzir / pausar; arraste para trocar a faixa</string>
+    <string name="widget_climate">Clima</string>
+    <string name="widget_climate_sub">Quadrante temperatura × ventilação</string>
+    <string name="widget_car_mode">Modo do carro</string>
+    <string name="widget_car_mode_sub">Modo da bateria e recuperação de energia; arraste para mudar</string>
+    <string name="widget_autonomy">Autonomia</string>
+    <string name="widget_autonomy_sub">Bateria, combustível e autonomia</string>
+    <string name="widget_navigation">Navegação</string>
+    <string name="widget_navigation_sub">Próxima manobra, chegada, destino por voz</string>
+    <string name="widget_assist">Assistência</string>
+    <string name="widget_assist_sub">Frenagem de emergência, auto hold, permanência na faixa</string>
+</resources>

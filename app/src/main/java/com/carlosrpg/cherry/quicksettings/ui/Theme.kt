@@ -93,7 +93,10 @@ object Icons {
     const val BatteryBolt = "$Battery M11 9l-2 3h3l-2 3"
     const val BatteryLock = "$Battery M7 12h6"
     const val Fuel = "M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3M7 8h4"
-    const val Fan = "M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"
+    const val Wind = "M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"
+    const val Thermometer = "M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0zM12 10v5.5"
+    /** Four-blade fan with a hub: the climate mark behind the quadrant. */
+    const val ClimateFan = "M12 12c0-3 1-7 4-7s2 4-4 7zM12 12c3 0 7 1 7 4s-4 2-7-4zM12 12c0 3-1 7-4 7s-2-4 4-7zM12 12c-3 0-7-1-7-4s4-2 7 4zM13.5 12a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0"
     const val Brake = "M17 12a5 5 0 1 1-10 0a5 5 0 1 1 10 0M5 7a8 8 0 0 0 0 10M19 7a8 8 0 0 1 0 10M12 10v2M12 14h.01"
     const val AutoHold = "M19 12a7 7 0 1 1-14 0a7 7 0 1 1 14 0M9.5 15l2.5-6 2.5 6M10.3 13h3.4"
     const val Lane = "M7 20L10 4M17 20L14 4M12 13v3"

@@ -11,6 +11,7 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Bundle
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
+import com.carlosrpg.cherry.quicksettings.util.AppInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,6 +25,7 @@ data class MediaState(
     /** Package that published the session: voice search and "open app" go to it. */
     val packageName: String? = null,
     val appLabel: String? = null,
+    val appIcon: Bitmap? = null,
     val title: String? = null,
     val artist: String? = null,
     val art: Bitmap? = null,
@@ -33,6 +35,11 @@ data class MediaState(
     val volume: Int = 0,
     val maxVolume: Int = 0,
     val muted: Boolean = false,
+    /**
+     * False on builds with fixed volume (Android Automotive): there the car's volume lives in
+     * CarAudioManager, which needs a privileged permission, and AudioManager calls do nothing.
+     */
+    val volumeAdjustable: Boolean = true,
     /** False until notification access is granted (needed to see other apps' sessions). */
     val hasAccess: Boolean = false,
 )
@@ -105,7 +112,8 @@ class MediaRepository(private val context: Context, private val scope: Coroutine
         val playback = c?.playbackState
         _state.value = MediaState(
             packageName = c?.packageName,
-            appLabel = c?.packageName?.let(::labelOf),
+            appLabel = c?.packageName?.let { AppInfo.label(context, it) },
+            appIcon = c?.packageName?.let { AppInfo.icon(context, it) },
             title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE)
                 ?: meta?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
             artist = meta?.getString(MediaMetadata.METADATA_KEY_ARTIST)
@@ -124,6 +132,7 @@ class MediaRepository(private val context: Context, private val scope: Coroutine
         volume = audio.getStreamVolume(AudioManager.STREAM_MUSIC),
         maxVolume = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
         muted = audio.isStreamMute(AudioManager.STREAM_MUSIC),
+        volumeAdjustable = !audio.isVolumeFixed,
     )
 
     fun playPause() {
@@ -138,8 +147,8 @@ class MediaRepository(private val context: Context, private val scope: Coroutine
     fun playFromSearch(query: String) =
         controller?.transportControls?.playFromSearch(query, Bundle())
 
-    // shortcut: media volume goes through AudioManager's music stream; on a car build with
-    // dynamic audio routing this may not move the car's media group. Verify on the head unit.
+    // Only meaningful where volume isn't fixed; on Android Automotive [MediaState.volumeAdjustable]
+    // is false and the UI hides these controls.
     fun volumeStep(direction: Int) {
         audio.adjustStreamVolume(
             AudioManager.STREAM_MUSIC,
@@ -165,13 +174,6 @@ class MediaRepository(private val context: Context, private val scope: Coroutine
         val intent = pkg?.let { context.packageManager.getLaunchIntentForPackage(it) } ?: return false
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         return true
-    }
-
-    private fun labelOf(pkg: String): String? = try {
-        val pm = context.packageManager
-        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
-    } catch (e: Exception) {
-        null
     }
 
     companion object {

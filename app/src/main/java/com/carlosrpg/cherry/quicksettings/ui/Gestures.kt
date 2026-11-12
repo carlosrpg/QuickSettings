@@ -1,5 +1,6 @@
 package com.carlosrpg.cherry.quicksettings.ui
 
+import android.os.SystemClock
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -9,7 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import com.carlosrpg.cherry.quicksettings.car.CarItems
+import app.jconfig.carbus.carinfo.BatteryMode
+import app.jconfig.carbus.carinfo.RegenLevel
 import kotlin.math.abs
 
 enum class Axis { HORIZONTAL, VERTICAL }
@@ -36,45 +38,72 @@ class DragSteps(private val lockPx: Float, private val stepPx: Float) {
     }
 }
 
-/** What the guide beside the drawer shows during a hold-and-drag. */
+/** What the guide beside the drawer shows during a press-and-drag. */
 sealed interface Hud {
     data class Volume(val value: Int, val max: Int) : Hud
+    data object VolumeUnavailable : Hud
     /** [direction] -1 = previous, 1 = next; [armed] once past the threshold. */
     data class Track(val direction: Int, val armed: Boolean) : Hud
-    data class Mode(val current: CarItems.BatteryMode?, val target: CarItems.BatteryMode, val holdTarget: Int?) : Hud
-    data class Regen(val current: CarItems.Regen?, val target: CarItems.Regen) : Hud
+    data class Mode(val current: BatteryMode?, val target: BatteryMode, val holdTarget: Int?) : Hud
+    data class Regen(val current: RegenLevel?, val target: RegenLevel) : Hud
+}
+
+/** A tile that only reacts to a tap; drags pass through so the tile list can still scroll. */
+fun Modifier.tap(onTap: () -> Unit): Modifier = composed {
+    val tap by rememberUpdatedState(onTap)
+    pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+            if ((up.position - down.position).getDistance() < viewConfiguration.touchSlop) tap()
+        }
+    }
 }
 
 /**
- * A quick tap calls [onTap]. Holding for [holdMs] starts a drag: [onDrag] gets the total offset
- * from the press point, [onRelease] the final one when the finger lifts, [onCancel] if the
- * gesture is taken away. Nothing happens on hold alone.
+ * A quick tap calls [onTap]. Moving past touch slop, or holding still for [holdMs], starts a
+ * drag: [onDragStart] once, then [onDrag] with the total offset from the press point,
+ * [onRelease] with the final one when the finger lifts, or [onCancel] if the gesture is lost.
+ * Once a drag starts its events are consumed, so a scrolling parent can't take them.
  */
-fun Modifier.tapOrHoldDrag(
+fun Modifier.tapOrDrag(
     holdMs: Long = 350,
     onTap: () -> Unit,
-    onHoldStart: () -> Unit = {},
-    onDrag: (Offset) -> Unit = {},
-    onRelease: (Offset) -> Unit = {},
-    onCancel: () -> Unit = {},
+    onDragStart: () -> Unit,
+    onDrag: (Offset) -> Unit,
+    onRelease: (Offset) -> Unit,
+    onCancel: () -> Unit,
 ): Modifier = composed {
     // The pointer loop outlives recompositions; always call the latest callbacks.
     val tap by rememberUpdatedState(onTap)
-    val holdStart by rememberUpdatedState(onHoldStart)
+    val start by rememberUpdatedState(onDragStart)
     val drag by rememberUpdatedState(onDrag)
     val release by rememberUpdatedState(onRelease)
     val cancel by rememberUpdatedState(onCancel)
     pointerInput(holdMs) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            var ended = false
-            val up = withTimeoutOrNull(holdMs) { waitForUpOrCancellation().also { ended = true } }
-            if (ended) {
-                if (up != null && (up.position - down.position).getDistance() < viewConfiguration.touchSlop) tap()
-                return@awaitEachGesture
+            val pressedAt = SystemClock.uptimeMillis()
+            val slop = viewConfiguration.touchSlop
+            // Phase 1: tap, drag past slop, or hold.
+            while (true) {
+                val left = holdMs - (SystemClock.uptimeMillis() - pressedAt)
+                if (left <= 0) break
+                val event = withTimeoutOrNull(left) { awaitPointerEvent() } ?: break
+                val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                if (change.isConsumed) return@awaitEachGesture
+                val moved = (change.position - down.position).getDistance()
+                if (!change.pressed) {
+                    if (moved < slop) tap()
+                    return@awaitEachGesture
+                }
+                if (moved > slop) {
+                    change.consume()
+                    break
+                }
             }
-            holdStart()
-            var total = Offset.Zero
+            // Phase 2: the drag.
+            start()
             while (true) {
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull { it.id == down.id }
@@ -82,7 +111,7 @@ fun Modifier.tapOrHoldDrag(
                     cancel()
                     break
                 }
-                total = change.position - down.position
+                val total = change.position - down.position
                 change.consume()
                 if (!change.pressed) {
                     release(total)
