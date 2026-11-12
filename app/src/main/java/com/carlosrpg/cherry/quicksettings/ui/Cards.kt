@@ -22,8 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -55,6 +54,7 @@ import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.car.CarState
 import com.carlosrpg.cherry.quicksettings.media.MediaState
 import com.carlosrpg.cherry.quicksettings.nav.NavState
+import kotlin.math.roundToInt
 
 @Composable
 fun QsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
@@ -339,27 +339,30 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
 fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
     CardLabel(stringResource(R.string.battery_mode))
     Segmented(BatteryMode.entries, car.batteryMode, { it.label() }, Qs.Mode, actions.car::setBatteryMode, Modifier.padding(top = 6.dp))
-    if (car.batteryMode == BatteryMode.FORCED) {
-        // Written once on release, not on every step.
-        var dragging by remember { mutableStateOf(false) }
-        var value by remember { mutableFloatStateOf((car.holdTarget ?: 50).toFloat()) }
-        if (!dragging) value = (car.holdTarget ?: 50).toFloat()
-        val sliderDescription = stringResource(R.string.hold_target_desc)
-        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            QsText(stringResource(R.string.hold_battery_at), 13.sp, Qs.TextSoft, FontWeight.SemiBold)
-            QsText("${value.toInt()}%", 15.sp, Qs.Mode, FontWeight.Bold)
+    // The hold target is always shown, so the card keeps one layout; it only works in Forced,
+    // so anywhere else it is greyed out and disabled. Written once on release, not per step.
+    val forced = car.batteryMode == BatteryMode.FORCED
+    var dragging by remember { mutableStateOf(false) }
+    var value by remember { mutableFloatStateOf((car.holdTarget ?: 50).toFloat()) }
+    if (!dragging) value = (car.holdTarget ?: 50).toFloat()
+    // Same inset as the segmented controls above and below, so all three line up.
+    Column(Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            QsText(stringResource(R.string.hold_battery_at), 13.sp, if (forced) Qs.TextSoft else Qs.Dim, FontWeight.SemiBold)
+            QsText("${value.toInt()}%", 15.sp, if (forced) Qs.Mode else Qs.Dim, FontWeight.Bold)
         }
-        Slider(
+        QsSlider(
             value = value,
-            onValueChange = { dragging = true; value = it },
-            onValueChangeFinished = { dragging = false; actions.car.setHoldTarget(value.toInt()) },
-            valueRange = NewEnergyIds.SOC_TARGET_MIN.toFloat()..NewEnergyIds.SOC_TARGET_MAX.toFloat(),
-            steps = (NewEnergyIds.SOC_TARGET_MAX - NewEnergyIds.SOC_TARGET_MIN) / 5 - 1,
-            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Qs.Mode, inactiveTrackColor = Color(0x1FFFFFFF)),
-            modifier = Modifier.height(40.dp).semantics { contentDescription = sliderDescription },
+            range = NewEnergyIds.SOC_TARGET_MIN.toFloat()..NewEnergyIds.SOC_TARGET_MAX.toFloat(),
+            description = stringResource(R.string.hold_target_desc),
+            onChange = { dragging = true; value = it },
+            onFinished = { dragging = false; actions.car.setHoldTarget(value.roundToInt()) },
+            accent = Qs.Mode,
+            step = 5f,
+            enabled = forced,
         )
     }
-    Box(Modifier.weight(1f)) // regen stays at the bottom whether or not the slider shows
+    Box(Modifier.weight(1f)) // regen stays at the bottom of the card
     CardLabel(stringResource(R.string.regeneration), Modifier.padding(top = 8.dp))
     Segmented(RegenLevel.entries, car.regen, { it.label() }, Qs.Energy, actions.car::setRegen, Modifier.padding(top = 6.dp))
 }

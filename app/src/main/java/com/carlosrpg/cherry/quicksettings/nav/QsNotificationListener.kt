@@ -45,7 +45,7 @@ object NavStore {
     }
 
     /** Nav app to talk to: the last one seen, else the first installed known one. */
-    fun navPackage(context: Context): String? = lastNavPackage
+    fun navPackage(context: Context): String? = state.value?.packageName ?: lastNavPackage
         ?: KNOWN_NAV_PACKAGES.firstOrNull { context.packageManager.getLaunchIntentForPackage(it) != null }
 
     fun openApp(context: Context): Boolean {
@@ -119,11 +119,13 @@ class QsNotificationListener : NotificationListenerService() {
         sbn.notification.category == Notification.CATEGORY_NAVIGATION ||
             (sbn.packageName in NavStore.KNOWN_NAV_PACKAGES && sbn.isOngoing)
 
-    // Google Maps posts "Driving with Google Maps" as CATEGORY_NAVIGATION with no text and no
-    // icon while idle; a real route carries an instruction and/or the manoeuvre arrow.
+    // Idle status notifications ("Driving with Google Maps", Waze's "Running. Tap to open.")
+    // carry no manoeuvre arrow. A route has the arrow, or is a navigation-category notification
+    // with an instruction in it.
     private fun hasRoute(sbn: StatusBarNotification): Boolean =
         sbn.notification.getLargeIcon() != null ||
-            !sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT).isNullOrBlank()
+            (sbn.notification.category == Notification.CATEGORY_NAVIGATION &&
+                !sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT).isNullOrBlank())
 
     private fun parse(sbn: StatusBarNotification): NavState {
         val extras = sbn.notification.extras

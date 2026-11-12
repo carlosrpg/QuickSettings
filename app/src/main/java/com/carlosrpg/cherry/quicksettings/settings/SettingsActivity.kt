@@ -34,8 +34,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -77,6 +75,7 @@ import com.carlosrpg.cherry.quicksettings.ui.GlassButton
 import com.carlosrpg.cherry.quicksettings.ui.Icons
 import com.carlosrpg.cherry.quicksettings.ui.Qs
 import com.carlosrpg.cherry.quicksettings.ui.QsIcon
+import com.carlosrpg.cherry.quicksettings.ui.QsSlider
 import com.carlosrpg.cherry.quicksettings.ui.QsText
 import com.carlosrpg.cherry.quicksettings.ui.Segmented
 import kotlin.math.roundToInt
@@ -145,12 +144,12 @@ class SettingsActivity : ComponentActivity() {
             QsText(stringResource(positionLabel(position)), 14.sp, Qs.Muted)
         }
         val sliderDescription = stringResource(R.string.position_on_edge)
-        Slider(
+        QsSlider(
             value = position,
-            onValueChange = { position = it },
-            onValueChangeFinished = { store.update { it.copy(edgePosition = position) } },
-            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Qs.Route, inactiveTrackColor = Color(0x1FFFFFFF)),
-            modifier = Modifier.height(56.dp).semantics { contentDescription = sliderDescription },
+            range = 0f..1f,
+            description = sliderDescription,
+            onChange = { position = it },
+            onFinished = { store.update { it.copy(edgePosition = position) } },
         )
     }
 
@@ -344,8 +343,7 @@ class SettingsActivity : ComponentActivity() {
             Modifier.size(40.dp).clip(shape).then(bg).then(if (on) Modifier else Modifier.background(Color(0x990B1018))),
             contentAlignment = Alignment.Center,
         ) {
-            if (icon == Icons.AirConditioner) QsIcon(icon, tint, 22.dp, filled = true, viewport = Icons.AirConditionerViewport)
-            else if (icon != null) QsIcon(icon, tint, 22.dp)
+            if (icon != null) QsIcon(icon, tint, 22.dp)
         }
     }
 

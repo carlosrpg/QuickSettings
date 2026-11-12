@@ -117,7 +117,7 @@ fun ClimateQuadrant(temp: Int?, fan: Int?, style: QuadrantStyle, modifier: Modif
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xC70A0E14), Color(0x0D0A0E14)))))
         // The climate mark, centred on the plot area.
         QsIcon(
-            Icons.AirConditioner, Color(0x2EFFFFFF), style.mark, filled = true, viewport = Icons.AirConditionerViewport,
+            Icons.AirConditioner, Color(0x40FFFFFF), style.mark, strokeWidth = 1.6f,
             modifier = Modifier.offset(x = inset + (plot - style.mark) / 2, y = far + (plot - style.mark) / 2),
         )
         // Axes.
