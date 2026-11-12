@@ -69,6 +69,11 @@ Requires JDK 21 and the Android SDK (`local.properties` with `sdk.dir`).
 ./gradlew app:assembleRelease -Pqs.mock=false                       # head-unit build, signed
 ```
 
+Versioning follows AABrowser-Motion: CI passes `-PappVersionName`; local builds take the next
+patch after the latest `vX.Y.Z` tag with `-dev` (e.g. `0.1.1-dev`), and versionCode is
+`major*1000000 + minor*1000 + patch`, so CI and local builds (same key) always install over older
+ones. Builds are copied to `app/build/renamedApks/<variant>/QuickSettings-<version>[_debug].apk`.
+
 Release signing reads `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS` and
 `RELEASE_KEY_PASSWORD` from Gradle properties, `local.properties` or the environment.
 

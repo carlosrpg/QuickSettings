@@ -51,7 +51,6 @@ jobs:
           {
             echo "APP_VERSION=$VERSION"
             echo "ORG_GRADLE_PROJECT_appVersionName=$VERSION"
-            echo "ORG_GRADLE_PROJECT_appVersionCode=$(( ${{ github.run_number }} + 1 ))"
           } >> "$GITHUB_ENV"
 
       - name: Set up Java 21
@@ -106,7 +105,7 @@ jobs:
         run: |
           ./gradlew app:assembleRelease -Pqs.mock=false --stacktrace
           mkdir -p release-apks
-          cp app/build/outputs/apk/release/*.apk "release-apks/QuickSettings-$APP_VERSION.apk"
+          cp app/build/renamedApks/release/*.apk release-apks/
 
       - name: Verify APK signature
         run: |
