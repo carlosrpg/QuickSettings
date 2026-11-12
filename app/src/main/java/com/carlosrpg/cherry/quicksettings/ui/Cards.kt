@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -359,8 +361,10 @@ fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = 
     var dragging by remember { mutableStateOf(false) }
     var value by remember { mutableFloatStateOf((car.holdTarget ?: 50).toFloat()) }
     if (!dragging) value = (car.holdTarget ?: 50).toFloat()
+    // Free height is shared evenly between the three blocks, so none of them drifts apart.
+    Spacer(Modifier.weight(1f).heightIn(min = 10.dp))
     // Same inset as the segmented controls above and below, so all three line up.
-    Column(Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp)) {
+    Column(Modifier.padding(horizontal = 4.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             QsText(stringResource(R.string.hold_battery_at), 13.sp, if (forced) Qs.TextSoft else Qs.Dim, FontWeight.SemiBold)
             QsText("${value.toInt()}%", 15.sp, if (forced) Qs.Mode else Qs.Dim, FontWeight.Bold)
@@ -376,8 +380,8 @@ fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = 
             enabled = forced,
         )
     }
-    Box(Modifier.weight(1f)) // regen stays at the bottom of the card
-    CardLabel(stringResource(R.string.regeneration), Modifier.padding(top = 8.dp))
+    Spacer(Modifier.weight(1f).heightIn(min = 10.dp))
+    CardLabel(stringResource(R.string.regeneration))
     Segmented(RegenLevel.entries, car.regen, { it.label() }, Qs.Energy, actions.car::setRegen, Modifier.padding(top = 6.dp))
 }
 

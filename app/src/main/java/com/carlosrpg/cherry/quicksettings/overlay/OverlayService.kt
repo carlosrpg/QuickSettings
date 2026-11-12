@@ -57,6 +57,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private var edgeView: EdgeTouchView? = null
     private var drawerView: ComposeView? = null
     private var mode by mutableStateOf<DrawerMode?>(null)
+    private var closing by mutableStateOf(false)
     private var config by mutableStateOf(QsConfig())
     private var lastSpeed = 0
 
@@ -162,6 +163,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     // --- drawer window -----------------------------------------------------------------
 
     private fun show(target: DrawerMode) {
+        handler.removeCallbacks(finishCloseFallback)
+        closing = false
         val wasClosed = mode == null
         mode = target
         if (drawerView == null) {
@@ -176,6 +179,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                         actions = actions,
                         portrait = isPortrait(),
                         maxSemiHeight = (resources.configuration.screenHeightDp * SEMI_MAX_FRACTION).dp,
+                        closing = closing,
+                        onClosed = ::finishClose,
                         onTouch = ::scheduleAutoClose,
                     )
                 }
@@ -193,9 +198,24 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         scheduleAutoClose()
     }
 
+    /** Slides the drawer back into the edge; [finishClose] removes the window when that ends. */
     private fun close() {
         handler.removeCallbacks(autoClose)
         voice.cancel()
+        if (drawerView == null) return finishClose()
+        if (closing) return
+        closing = true
+        // Animations follow the system animator scale; give the fallback the same stretch.
+        val scale = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        handler.postDelayed(finishCloseFallback, (CLOSE_FALLBACK_MS * maxOf(scale, 1f)).toLong())
+    }
+
+    private val finishCloseFallback = Runnable { finishClose() }
+
+    private fun finishClose() {
+        handler.removeCallbacks(finishCloseFallback)
+        if (mode == null && drawerView == null) return
+        closing = false
         mode = null
         removeDrawer()
         updateEdge()
@@ -219,7 +239,9 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         val margin = px(DRAWER_MARGIN_DP)
         val area = usable()
         return WindowManager.LayoutParams(
-            if (open) area.width() - 2 * margin else WindowManager.LayoutParams.WRAP_CONTENT,
+            // Flush with the edge (the near margin is padding inside the content), so the
+            // slide in and out runs all the way to the screen edge instead of being clipped.
+            if (open) area.width() - margin else WindowManager.LayoutParams.WRAP_CONTENT,
             if (open) area.height() - 2 * margin else WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             // Not focusable and not touch-modal: touches outside the drawer still reach the app.
@@ -231,7 +253,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             val sideInset = if (config.side == Side.LEFT) area.left else screenWidth() - area.right
             gravity = (if (open) Gravity.TOP else Gravity.CENTER_VERTICAL) or
                 if (config.side == Side.LEFT) Gravity.START else Gravity.END
-            x = sideInset + margin
+            x = sideInset
             // Semi-open centres on the area between the system bars.
             y = if (open) area.top + margin else (area.top - (screenHeight() - area.bottom)) / 2
             title = "QuickSettings drawer"
@@ -281,6 +303,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val SEMI_IDLE_MS = 8_000L
         private const val OPEN_IDLE_MS = 20_000L
         private const val RELAY_DELAY_MS = 60L
+        // The slide-out takes 220 ms; past this the window goes regardless.
+        private const val CLOSE_FALLBACK_MS = 600L
 
         fun canDraw(context: Context) = Settings.canDrawOverlays(context)
 

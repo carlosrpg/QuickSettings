@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +34,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +73,9 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 
 enum class DrawerMode { SEMI, OPEN }
+
+/** Gap between the drawer and the screen edge; the overlay window itself starts at the edge. */
+val DRAWER_EDGE_MARGIN = 16.dp
 
 /** Everything the drawer can do; the overlay service supplies the navigation callbacks. */
 class DrawerActions(
@@ -120,25 +126,39 @@ fun DrawerRoot(
     actions: DrawerActions,
     portrait: Boolean,
     maxSemiHeight: Dp,
+    closing: Boolean,
+    onClosed: () -> Unit,
     onTouch: () -> Unit,
 ) {
     val car by actions.car.state.collectAsState()
     val media by actions.media.state.collectAsState()
     val nav by NavStore.state.collectAsState()
     val listening by actions.voice.listening.collectAsState()
-    // Styleguide motion: a short spring in from the edge each time the state changes.
-    val appear = remember(mode) { Animatable(0f) }
-    LaunchedEffect(mode) {
-        appear.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow))
+    // Motion: each state slides in from the drawer's edge (semi → open included), and collapsing
+    // slides it back into the edge before the window goes away.
+    // A fresh animatable per mode starts at 0 in the very composition that switches mode, so the
+    // first frame of the new state is already offscreen (no flash of the end position).
+    val slide = remember(mode) { Animatable(0f) }
+    val closed by rememberUpdatedState(onClosed)
+    LaunchedEffect(mode, closing) {
+        if (closing) {
+            slide.animateTo(0f, tween(durationMillis = 260, easing = FastOutLinearInEasing))
+            closed()
+        } else {
+            slide.animateTo(1f, spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow))
+        }
     }
-    val slidePx = with(LocalDensity.current) { 40.dp.toPx() }
-    val fromSide = if (config.side == Side.LEFT) -1f else 1f
+    val left = config.side == Side.LEFT
     Box(
         Modifier
             .graphicsLayer {
-                alpha = appear.value.coerceIn(0f, 1f)
-                translationX = (1f - appear.value) * slidePx * fromSide
+                val p = slide.value
+                // Whole width including the edge margin: the drawer travels fully off screen.
+                translationX = (1f - p) * size.width * (if (left) -1f else 1f)
+                alpha = (0.4f + 0.6f * p).coerceIn(0f, 1f)
             }
+            // The window is flush with the screen edge; the gap to the edge lives inside it.
+            .padding(start = if (left) DRAWER_EDGE_MARGIN else 0.dp, end = if (left) 0.dp else DRAWER_EDGE_MARGIN)
             .onAnyTouch(onTouch)
     ) {
         when (mode) {
