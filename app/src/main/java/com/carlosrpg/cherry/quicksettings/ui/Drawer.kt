@@ -280,7 +280,7 @@ private fun SemiTile(
             var guide by remember { mutableStateOf<Hud.Media?>(null) }
             fun guideFor(total: Offset): Hud.Media {
                 val now = actions.media.state.value
-                return mediaGuide(total, startVolume, now.maxVolume, now.volumeAdjustable, volumeStepPx, choiceStepPx, now.volumeSimulated)
+                return mediaGuide(total, startVolume, now.maxVolume, now.volumeAdjustable, volumeStepPx, choiceStepPx, now.volumeSimulated, guide)
             }
             MediaTile(media, Modifier.tapOrDrag(
                 onTap = actions.media::playPause,

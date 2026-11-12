@@ -13,6 +13,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.RegenLevel
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.sign
 
 enum class Axis { HORIZONTAL, VERTICAL }
@@ -64,10 +65,15 @@ sealed interface Hud {
     data class Climate(val temp: Int, val fan: Int) : Hud
 }
 
+/** Track skips only count within this angle of horizontal; every steeper drag adjusts volume. */
+const val TRACK_MAX_ANGLE_DEG = 20.0
+
 /**
- * The media card's state for a drag of [total] from the press point: up raises the volume one
- * step per [volumeStepPx] (none when the volume isn't adjustable), and a horizontal drag
- * fills toward a track skip that arms at [trackThresholdPx].
+ * The media card's state for a drag of [total] from the press point. The drag's angle picks
+ * the control: within [TRACK_MAX_ANGLE_DEG] of horizontal it fills toward a track skip that arms
+ * at [trackThresholdPx]; anything steeper moves the volume one step per [volumeStepPx] of
+ * vertical travel (never when the volume isn't adjustable). In the track zone the volume stays
+ * where [previous] left it, so a sideways drag never changes or undoes it.
  */
 fun mediaGuide(
     total: Offset,
@@ -77,15 +83,19 @@ fun mediaGuide(
     volumeStepPx: Float,
     trackThresholdPx: Float,
     simulated: Boolean = false,
+    previous: Hud.Media? = null,
 ): Hud.Media {
-    val steps = if (adjustable) (-total.y / volumeStepPx).toInt() else 0
+    val angle = Math.toDegrees(atan2(abs(total.y).toDouble(), abs(total.x).toDouble()))
+    val trackZone = total.getDistance() > 0f && angle <= TRACK_MAX_ANGLE_DEG
+    val steps = if (adjustable && !trackZone) (-total.y / volumeStepPx).toInt() else 0
+    val volume = if (trackZone) previous?.volume ?: startVolume else (startVolume + steps).coerceIn(0, max)
     return Hud.Media(
-        volume = (startVolume + steps).coerceIn(0, max),
+        volume = volume,
         max = max,
         adjustable = adjustable,
-        volumeDirection = steps.sign,
-        trackDirection = if (abs(total.x) < 1f) 0 else total.x.sign.toInt(),
-        trackProgress = (abs(total.x) / trackThresholdPx).coerceIn(0f, 1f),
+        volumeDirection = if (trackZone) 0 else steps.sign,
+        trackDirection = if (trackZone) total.x.sign.toInt() else 0,
+        trackProgress = if (trackZone) (abs(total.x) / trackThresholdPx).coerceIn(0f, 1f) else 0f,
         simulated = simulated,
     )
 }

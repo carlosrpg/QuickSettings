@@ -25,24 +25,29 @@ class LayoutLogicTest {
     }
 
     @Test
-    fun `media volume follows vertical travel while a skip arms independently`() {
-        fun guide(x: Float, y: Float, adjustable: Boolean = true) =
-            mediaGuide(Offset(x, y), startVolume = 10, max = 15, adjustable = adjustable, volumeStepPx = 16f, trackThresholdPx = 64f)
+    fun `media drag angle picks volume or track`() {
+        fun guide(x: Float, y: Float, adjustable: Boolean = true, previous: Hud.Media? = null) =
+            mediaGuide(Offset(x, y), startVolume = 10, max = 15, adjustable = adjustable,
+                volumeStepPx = 16f, trackThresholdPx = 64f, previous = previous)
 
-        // Up three steps and a little sideways: volume rises, no skip armed.
-        val up = guide(20f, -50f)
+        // Steep, even well off vertical (about 63°): volume only.
+        val up = guide(25f, -50f)
         assertThat(up.volume).isEqualTo(13)
         assertThat(up.volumeDirection).isEqualTo(1)
-        assertThat(up.trackArmed).isFalse()
-        // Diagonal: both at once, the skip is armed but only applied on release by the caller.
-        val both = guide(-70f, 40f)
-        assertThat(both.volume).isEqualTo(8)
-        assertThat(both.trackDirection).isEqualTo(-1)
-        assertThat(both.trackArmed).isTrue()
+        assertThat(up.trackProgress).isEqualTo(0f)
+        // A true diagonal (45°) is volume now, not a skip.
+        val diagonal = guide(80f, 80f)
+        assertThat(diagonal.volume).isEqualTo(5)
+        assertThat(diagonal.trackArmed).isFalse()
+        // Shallow (about 14°) and past the threshold: the skip arms, volume stays put.
+        val skip = guide(-80f, 20f, previous = up)
+        assertThat(skip.trackDirection).isEqualTo(-1)
+        assertThat(skip.trackArmed).isTrue()
+        assertThat(skip.volume).isEqualTo(13)
+        assertThat(skip.volumeDirection).isEqualTo(0)
         // Clamped at the top; fixed-volume builds never change it.
         assertThat(guide(0f, -400f).volume).isEqualTo(15)
         assertThat(guide(0f, -400f, adjustable = false).volume).isEqualTo(10)
-        assertThat(guide(0f, -400f, adjustable = false).volumeDirection).isEqualTo(0)
     }
 
     @Test
