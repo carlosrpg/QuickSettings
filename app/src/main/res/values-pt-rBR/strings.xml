@@ -12,10 +12,9 @@
     <string name="action_back_semi">Voltar à gaveta compacta</string>
 
     <string name="hud_media_volume">volume da mídia</string>
-    <string name="hud_volume_unavailable">O volume não está disponível para apps</string>
-    <string name="hud_volume_use_car">Use os controles do volante ou da tela</string>
-    <string name="hud_lift_to_skip">Solte para pular · arraste de volta para cancelar</string>
-    <string name="hud_keep_dragging">Continue arrastando</string>
+    <string name="hud_volume_simulated">volume esperado · simulado</string>
+    <string name="hud_release_next">Solte: próxima faixa</string>
+    <string name="hud_release_previous">Solte: faixa anterior</string>
     <string name="hud_current">atual</string>
     <string name="hud_hold_at">manter %1$d%%</string>
     <string name="hud_now">%1$s · atual</string>

@@ -13,6 +13,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.RegenLevel
 import kotlin.math.abs
+import kotlin.math.sign
 
 enum class Axis { HORIZONTAL, VERTICAL }
 
@@ -40,14 +41,53 @@ class DragSteps(private val lockPx: Float, private val stepPx: Float) {
 
 /** What the guide beside the drawer shows during a press-and-drag. */
 sealed interface Hud {
-    data class Volume(val value: Int, val max: Int) : Hud
-    data object VolumeUnavailable : Hud
-    /** [direction] -1 = previous, 1 = next; [armed] once past the threshold. */
-    data class Track(val direction: Int, val armed: Boolean) : Hud
+    /**
+     * The media control card. Both directions work in one gesture: [volume] follows vertical
+     * travel and is applied live; a track skip only arms ([trackProgress] reaches 1) and is
+     * applied on release. Directions are -1, 0 or 1.
+     */
+    data class Media(
+        val volume: Int,
+        val max: Int,
+        val adjustable: Boolean,
+        val volumeDirection: Int,
+        val trackDirection: Int,
+        val trackProgress: Float,
+        /** Debug builds on fixed-volume systems: the number is the expected volume, not applied. */
+        val simulated: Boolean = false,
+    ) : Hud {
+        val trackArmed: Boolean get() = trackDirection != 0 && trackProgress >= 1f
+    }
     data class Mode(val current: BatteryMode?, val target: BatteryMode, val holdTarget: Int?) : Hud
     data class Regen(val current: RegenLevel?, val target: RegenLevel) : Hud
     /** Both axes at once: the marker follows the finger across the quadrant. */
     data class Climate(val temp: Int, val fan: Int) : Hud
+}
+
+/**
+ * The media card's state for a drag of [total] from the press point: up raises the volume one
+ * step per [volumeStepPx] (none when the volume isn't adjustable), and a horizontal drag
+ * fills toward a track skip that arms at [trackThresholdPx].
+ */
+fun mediaGuide(
+    total: Offset,
+    startVolume: Int,
+    max: Int,
+    adjustable: Boolean,
+    volumeStepPx: Float,
+    trackThresholdPx: Float,
+    simulated: Boolean = false,
+): Hud.Media {
+    val steps = if (adjustable) (-total.y / volumeStepPx).toInt() else 0
+    return Hud.Media(
+        volume = (startVolume + steps).coerceIn(0, max),
+        max = max,
+        adjustable = adjustable,
+        volumeDirection = steps.sign,
+        trackDirection = if (abs(total.x) < 1f) 0 else total.x.sign.toInt(),
+        trackProgress = (abs(total.x) / trackThresholdPx).coerceIn(0f, 1f),
+        simulated = simulated,
+    )
 }
 
 /** A tile that only reacts to a tap; drags pass through so the tile list can still scroll. */

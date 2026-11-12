@@ -10,6 +10,7 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Bundle
+import com.carlosrpg.cherry.quicksettings.BuildConfig
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
 import com.carlosrpg.cherry.quicksettings.util.AppInfo
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,8 @@ data class MediaState(
      * CarAudioManager, which needs a privileged permission, and AudioManager calls do nothing.
      */
     val volumeAdjustable: Boolean = true,
+    /** Debug builds on fixed-volume systems (the emulator): the volume is only simulated. */
+    val volumeSimulated: Boolean = false,
     /** False until notification access is granted (needed to see other apps' sessions). */
     val hasAccess: Boolean = false,
 )
@@ -128,11 +131,24 @@ class MediaRepository(private val context: Context, private val scope: Coroutine
         ).withVolume()
     }
 
-    private fun MediaState.withVolume() = copy(
-        volume = audio.getStreamVolume(AudioManager.STREAM_MUSIC),
-        maxVolume = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
-        muted = audio.isStreamMute(AudioManager.STREAM_MUSIC),
-        volumeAdjustable = !audio.isVolumeFixed,
+    // Testing aid: where volume is fixed (Android Automotive, the emulator) debug builds keep an
+    // expected volume so the controls can be exercised. Release builds never simulate.
+    private val simulateVolume = BuildConfig.DEBUG && audio.isVolumeFixed
+    private var simulatedVolume: Int? = null
+    private var simulatedMute = false
+
+    private fun MediaState.withVolume(): MediaState {
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        return withVolume(max)
+    }
+
+    private fun MediaState.withVolume(max: Int) = copy(
+        // Simulated volume starts mid-range so both directions can be tried.
+        volume = if (simulateVolume) simulatedVolume ?: (max / 2) else audio.getStreamVolume(AudioManager.STREAM_MUSIC),
+        maxVolume = max,
+        muted = if (simulateVolume) simulatedMute else audio.isStreamMute(AudioManager.STREAM_MUSIC),
+        volumeAdjustable = !audio.isVolumeFixed || simulateVolume,
+        volumeSimulated = simulateVolume,
     )
 
     fun playPause() {
@@ -147,9 +163,10 @@ class MediaRepository(private val context: Context, private val scope: Coroutine
     fun playFromSearch(query: String) =
         controller?.transportControls?.playFromSearch(query, Bundle())
 
-    // Only meaningful where volume isn't fixed; on Android Automotive [MediaState.volumeAdjustable]
-    // is false and the UI hides these controls.
+    // Only meaningful where volume isn't fixed (or is simulated); on a release Automotive build
+    // [MediaState.volumeAdjustable] is false and the UI hides these controls.
     fun volumeStep(direction: Int) {
+        if (simulateVolume) return setVolume(_state.value.volume + direction)
         audio.adjustStreamVolume(
             AudioManager.STREAM_MUSIC,
             if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, 0
@@ -158,12 +175,15 @@ class MediaRepository(private val context: Context, private val scope: Coroutine
     }
 
     fun setVolume(index: Int) {
-        audio.setStreamVolume(AudioManager.STREAM_MUSIC, index.coerceIn(0, _state.value.maxVolume), 0)
+        val target = index.coerceIn(0, _state.value.maxVolume)
+        if (simulateVolume) simulatedVolume = target
+        else audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
         publish()
     }
 
     fun toggleMute() {
-        audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0)
+        if (simulateVolume) simulatedMute = !simulatedMute
+        else audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0)
         publish()
     }
 

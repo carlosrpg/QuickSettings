@@ -25,6 +25,27 @@ class LayoutLogicTest {
     }
 
     @Test
+    fun `media volume follows vertical travel while a skip arms independently`() {
+        fun guide(x: Float, y: Float, adjustable: Boolean = true) =
+            mediaGuide(Offset(x, y), startVolume = 10, max = 15, adjustable = adjustable, volumeStepPx = 16f, trackThresholdPx = 64f)
+
+        // Up three steps and a little sideways: volume rises, no skip armed.
+        val up = guide(20f, -50f)
+        assertThat(up.volume).isEqualTo(13)
+        assertThat(up.volumeDirection).isEqualTo(1)
+        assertThat(up.trackArmed).isFalse()
+        // Diagonal: both at once, the skip is armed but only applied on release by the caller.
+        val both = guide(-70f, 40f)
+        assertThat(both.volume).isEqualTo(8)
+        assertThat(both.trackDirection).isEqualTo(-1)
+        assertThat(both.trackArmed).isTrue()
+        // Clamped at the top; fixed-volume builds never change it.
+        assertThat(guide(0f, -400f).volume).isEqualTo(15)
+        assertThat(guide(0f, -400f, adjustable = false).volume).isEqualTo(10)
+        assertThat(guide(0f, -400f, adjustable = false).volumeDirection).isEqualTo(0)
+    }
+
+    @Test
     fun `landscape packs the approved four column grid`() {
         val rows = packRows(listOf(MEDIA, NAVIGATION, ASSIST, CLIMATE, CAR_MODE, AUTONOMY), columns = 4)
         assertThat(rows).containsExactly(

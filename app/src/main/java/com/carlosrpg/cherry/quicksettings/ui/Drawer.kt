@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -273,39 +274,34 @@ private fun SemiTile(
     val climateStepPx = with(density) { 20.dp.toPx() }
     when (type) {
         WidgetType.MEDIA -> {
-            val g = remember { GestureMemo() }
+            // One card for both directions, no axis lock: volume follows up/down live; a track
+            // skip arms past the threshold and fires only on release (dragging back cancels it).
+            var startVolume by remember { mutableIntStateOf(0) }
+            var guide by remember { mutableStateOf<Hud.Media?>(null) }
+            fun guideFor(total: Offset): Hud.Media {
+                val now = actions.media.state.value
+                return mediaGuide(total, startVolume, now.maxVolume, now.volumeAdjustable, volumeStepPx, choiceStepPx, now.volumeSimulated)
+            }
             MediaTile(media, Modifier.tapOrDrag(
                 onTap = actions.media::playPause,
-                onDragStart = { g.reset(DragSteps(lockPx, volumeStepPx), actions.media.state.value.volume) },
+                onDragStart = {
+                    startVolume = actions.media.state.value.volume
+                    guide = guideFor(Offset.Zero).also(setHud)
+                },
                 onDrag = { total ->
-                    val s = g.steps.steps(total)
-                    when (g.steps.axis) {
-                        Axis.VERTICAL -> {
-                            val now = actions.media.state.value
-                            if (!now.volumeAdjustable) {
-                                setHud(Hud.VolumeUnavailable)
-                            } else {
-                                val v = (g.start - s).coerceIn(0, now.maxVolume) // up = louder
-                                if (v != now.volume) actions.media.setVolume(v)
-                                setHud(Hud.Volume(v, now.maxVolume))
-                            }
-                        }
-                        Axis.HORIZONTAL -> {
-                            val direction = total.x.sign.toInt()
-                            g.target = if (abs(total.x) >= choiceStepPx) direction else 0
-                            setHud(Hud.Track(direction, g.target != 0))
-                        }
-                        null -> Unit
+                    val next = guideFor(total)
+                    if (next.adjustable && next.volume != actions.media.state.value.volume) actions.media.setVolume(next.volume)
+                    if (next != guide) {
+                        guide = next
+                        setHud(next)
                     }
                 },
                 onRelease = {
-                    if (g.steps.axis == Axis.HORIZONTAL) when (g.target) {
-                        1 -> actions.media.next()
-                        -1 -> actions.media.previous()
-                    }
+                    guide?.takeIf { it.trackArmed }?.let { if (it.trackDirection > 0) actions.media.next() else actions.media.previous() }
+                    guide = null
                     setHud(null)
                 },
-                onCancel = { setHud(null) },
+                onCancel = { guide = null; setHud(null) },
             ))
         }
         WidgetType.CAR_MODE -> {
@@ -406,31 +402,7 @@ private fun GuideHud(hud: Hud, modifier: Modifier = Modifier) {
                     }
                 }
             }
-            Hud.VolumeUnavailable -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                QsIcon(Icons.Volume, Qs.Dim, 40.dp)
-                QsText(stringResource(R.string.hud_volume_unavailable), 16.sp, weight = FontWeight.SemiBold)
-                QsText(stringResource(R.string.hud_volume_use_car), 13.sp, Qs.Muted)
-            }
-            is Hud.Volume -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-                val fraction = if (hud.max > 0) hud.value / hud.max.toFloat() else 0f
-                Box(Modifier.width(28.dp).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Color(0x1FFFFFFF)), contentAlignment = Alignment.BottomCenter) {
-                    Box(Modifier.fillMaxWidth().fillMaxHeight(fraction).background(Qs.Text))
-                }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    QsIcon(Icons.ChevronUp, Qs.Text, 28.dp)
-                    QsText("${hud.value}", 64.sp, weight = FontWeight.Bold)
-                    QsText(stringResource(R.string.hud_media_volume), 13.sp, Qs.Muted)
-                    QsIcon(Icons.ChevronDown, Qs.Dim, 28.dp)
-                }
-            }
-            is Hud.Track -> Column(verticalArrangement = Arrangement.spacedBy(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    TrackBubble(Icons.Prev, hud.armed && hud.direction < 0)
-                    QsText(stringResource(if (hud.direction < 0) R.string.previous_track else R.string.next_track), 15.sp, weight = FontWeight.SemiBold)
-                    TrackBubble(Icons.Next, hud.armed && hud.direction > 0)
-                }
-                QsText(stringResource(if (hud.armed) R.string.hud_lift_to_skip else R.string.hud_keep_dragging), 13.sp, Qs.Muted)
-            }
+            is Hud.Media -> MediaGuide(hud)
             is Hud.Mode -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BatteryMode.entries.forEach { mode ->
                     val selected = mode == hud.target
@@ -473,16 +445,71 @@ private fun GuideHud(hud: Hud, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The media control card: volume in the centre with + above and − below (lit in the direction
+ * being dragged), previous/next on the sides filling toward the skip threshold and turning solid
+ * white once armed.
+ */
 @Composable
-private fun TrackBubble(icon: String, active: Boolean) {
-    val size = if (active) 72.dp else 56.dp
+private fun MediaGuide(hud: Hud.Media) {
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
+        VolumeHint(Icons.Plus, active = hud.volumeDirection > 0, enabled = hud.adjustable)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            TrackHint(Icons.Prev, if (hud.trackDirection < 0) hud.trackProgress else 0f)
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (hud.adjustable) {
+                    QsText("${hud.volume}", 44.sp, weight = FontWeight.Bold)
+                    val fraction = if (hud.max > 0) hud.volume / hud.max.toFloat() else 0f
+                    Box(Modifier.width(72.dp).height(5.dp).clip(RoundedCornerShape(3.dp)).background(Color(0x26FFFFFF))) {
+                        Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Qs.Text))
+                    }
+                } else {
+                    QsIcon(Icons.Volume, Qs.Dim, 34.dp)
+                }
+                val caption = when {
+                    hud.trackArmed -> stringResource(if (hud.trackDirection > 0) R.string.hud_release_next else R.string.hud_release_previous)
+                    hud.simulated -> stringResource(R.string.hud_volume_simulated)
+                    hud.adjustable -> stringResource(R.string.hud_media_volume)
+                    else -> stringResource(R.string.use_car_volume)
+                }
+                androidx.compose.material3.Text(
+                    caption, color = if (hud.trackArmed) Qs.Text else Qs.Muted, fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold, maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
+            TrackHint(Icons.Next, if (hud.trackDirection > 0) hud.trackProgress else 0f)
+        }
+        VolumeHint(Icons.Minus, active = hud.volumeDirection < 0, enabled = hud.adjustable)
+    }
+}
+
+@Composable
+private fun VolumeHint(icon: String, active: Boolean, enabled: Boolean) {
+    val shape = RoundedCornerShape(18.dp)
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(size / 2))
+        Modifier.size(36.dp).clip(shape)
             .background(if (active) Color.White else Color.Transparent)
-            .border(1.dp, Qs.Hairline, RoundedCornerShape(size / 2)),
+            .border(1.dp, if (active) Color.White else Qs.Hairline, shape),
         contentAlignment = Alignment.Center,
     ) {
-        QsIcon(icon, if (active) Color(0xFF0B1018) else Qs.Dim, 24.dp, filled = true)
+        QsIcon(icon, when { active -> Color(0xFF0B1018); enabled -> Qs.Text; else -> Color(0x406B7686) }, 18.dp)
+    }
+}
+
+/** [progress] 0..1 toward the skip threshold; at 1 the skip is armed and fires on release. */
+@Composable
+private fun TrackHint(icon: String, progress: Float) {
+    val armed = progress >= 1f
+    val size = if (armed) 64.dp else 56.dp
+    val shape = RoundedCornerShape(size / 2)
+    Box(
+        Modifier.size(size).clip(shape)
+            .background(if (armed) Color.White else Color.White.copy(alpha = 0.22f * progress))
+            .border(1.dp, if (armed) Color.White else Qs.Hairline, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        QsIcon(icon, if (armed) Color(0xFF0B1018) else Qs.Text.copy(alpha = 0.45f + 0.55f * progress), 22.dp, filled = true)
     }
 }
 

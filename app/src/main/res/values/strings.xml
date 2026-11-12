@@ -15,10 +15,9 @@
 
     <!-- Gesture guide -->
     <string name="hud_media_volume">media volume</string>
-    <string name="hud_volume_unavailable">Volume isn\'t available to apps</string>
-    <string name="hud_volume_use_car">Use the steering-wheel or screen controls</string>
-    <string name="hud_lift_to_skip">Lift to skip · drag back to cancel</string>
-    <string name="hud_keep_dragging">Keep dragging</string>
+    <string name="hud_volume_simulated">expected volume · simulated</string>
+    <string name="hud_release_next">Release: next track</string>
+    <string name="hud_release_previous">Release: previous track</string>
     <string name="hud_current">current</string>
     <string name="hud_hold_at">hold %1$d%%</string>
     <string name="hud_now">%1$s · now</string>
