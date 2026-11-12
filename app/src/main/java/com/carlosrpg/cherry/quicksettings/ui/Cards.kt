@@ -253,18 +253,32 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
             QsText(stringResource(R.string.tap_say_destination), 13.sp, Qs.Muted)
         }
     } else {
-        Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(Qs.Route), contentAlignment = Alignment.Center) {
-                if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(44.dp))
-                else QsIcon(Icons.TurnRight, Color.White, 40.dp, strokeWidth = 2.6f)
-            }
-            Column(Modifier.padding(start = 14.dp)) {
-                QsText(nav.title.orEmpty(), 26.sp, weight = FontWeight.Bold)
-                QsText(nav.text.orEmpty(), 14.sp, Qs.TextSoft)
+        // The next manoeuvre takes all the room the card has; the ETA line only claims space
+        // when the nav app actually sends one.
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.CenterStart) {
+            val arrow = minOf(maxHeight * 0.8f, maxWidth * 0.36f).coerceIn(56.dp, 160.dp)
+            val distanceSize = (arrow.value * 0.42f).sp
+            val instructionSize = (arrow.value * 0.17f).coerceIn(14f, 24f).sp
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(arrow * 0.18f)) {
+                Box(
+                    Modifier.size(arrow).clip(RoundedCornerShape(arrow * 0.26f)).background(Qs.Route),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(arrow * 0.7f))
+                    else QsIcon(Icons.TurnRight, Color.White, arrow * 0.64f, strokeWidth = 2.6f)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    nav.title?.let {
+                        Text(it, color = Qs.Text, fontSize = distanceSize, lineHeight = distanceSize, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    nav.text?.let {
+                        Text(it, color = Qs.TextSoft, fontSize = instructionSize, lineHeight = instructionSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
         }
-        Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(Qs.Hairline))
         if (nav.subText != null) {
+            Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(Qs.Hairline))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QsIcon(Icons.Pin, Qs.Muted, 18.dp)
                 QsText(nav.subText, 18.sp, weight = FontWeight.Bold)
