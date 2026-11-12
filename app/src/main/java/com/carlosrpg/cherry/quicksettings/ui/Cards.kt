@@ -387,45 +387,13 @@ fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = 
 
 @Composable
 fun RangeCard(car: CarState, modifier: Modifier = Modifier) = QsCard(modifier) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        CardLabel(stringResource(R.string.range))
-        val total = listOfNotNull(car.electricRangeKm, car.fuelRangeKm).takeIf { it.isNotEmpty() }?.sum()
-        QsText(stringResource(R.string.range_total, total?.let { "$it km" } ?: "--"), 14.sp, Qs.Muted)
-    }
-    Row(Modifier.weight(1f).padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        RangeHalf(
-            stringResource(R.string.range_electric), Icons.Battery, Qs.chargeColor(car.batterySoc), car.electricRangeKm,
-            car.batterySoc, car.chargeLimit?.let { stringResource(R.string.range_limit, it) }, car.chargeLimit,
+    CardLabel(stringResource(R.string.range))
+    // The same mirrored gauge as the semi-open tile, sized to the card.
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val ring = minOf(maxHeight * 0.92f, maxWidth / 2.9f)
+        MirrorRangeLarge(
+            car.batterySoc, car.electricRangeKm, car.fuelPercent, car.fuelRangeKm, car.chargeLimit,
+            Qs.chargeColor(car.batterySoc), ring,
         )
-        RangeHalf(stringResource(R.string.range_fuel), Icons.Fuel, Qs.Fuel, car.fuelRangeKm, car.fuelPercent, stringResource(R.string.range_tank), null)
-    }
-}
-
-@Composable
-private fun RowScope.RangeHalf(name: String, icon: String, color: Color, km: Int?, percent: Int?, note: String?, marker: Int?) {
-    Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(Color(0x38000000)).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            QsIcon(icon, color, 20.dp)
-            QsText(name, 14.sp, color, FontWeight.SemiBold)
-        }
-        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom) {
-            QsText(km?.toString() ?: "--", 44.sp, weight = FontWeight.Bold)
-            QsText("km", 18.sp, Qs.Muted, modifier = Modifier.padding(start = 6.dp, bottom = 6.dp))
-        }
-        Box(Modifier.weight(1f))
-        Box(Modifier.fillMaxWidth().height(14.dp)) {
-            Box(Modifier.fillMaxSize().clip(RoundedCornerShape(7.dp)).background(Color(0x1AFFFFFF))) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth((percent ?: 0) / 100f).background(color))
-            }
-            if (marker != null) {
-                Box(Modifier.fillMaxWidth(marker / 100f).fillMaxHeight()) {
-                    Box(Modifier.align(Alignment.CenterEnd).width(2.dp).height(24.dp).background(Qs.Text))
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            QsText(percent?.let { "$it%" } ?: "--", 13.sp, color, FontWeight.Bold)
-            note?.let { QsText(it, 13.sp, Qs.Muted) }
-        }
     }
 }

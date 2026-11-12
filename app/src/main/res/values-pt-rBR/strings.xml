@@ -35,7 +35,7 @@
     <string name="desc_media">Mídia</string>
     <string name="desc_climate">Clima %1$s graus, ventilação %2$s</string>
     <string name="desc_mode">Modo da bateria %1$s, recuperação de energia %2$s</string>
-    <string name="desc_autonomy">Bateria %1$s por cento, autonomia elétrica %2$s quilômetros</string>
+    <string name="desc_autonomy">Bateria %1$s por cento, autonomia elétrica %2$s quilômetros, combustível %3$s por cento, autonomia a combustão %4$s quilômetros, total %5$s quilômetros</string>
     <string name="desc_nav_idle">Navegação, toque para buscar um destino</string>
     <string name="desc_nav">Navegação %1$s</string>
     <string name="desc_assist">Frenagem de emergência %1$s, auto hold %2$s, permanência na faixa %3$s</string>
@@ -79,11 +79,10 @@
     <string name="hold_battery_at">Manter a bateria em</string>
     <string name="hold_target_desc">Meta de retenção da bateria</string>
     <string name="range">Autonomia</string>
-    <string name="range_total">total %1$s</string>
+    <string name="range_total_caption">total</string>
     <string name="range_electric">Elétrica</string>
     <string name="range_fuel">Combustível</string>
     <string name="range_limit">limite %1$d%%</string>
-    <string name="range_tank">tanque</string>
 
     <string name="back">Voltar</string>
     <string name="permissions">Permissões</string>

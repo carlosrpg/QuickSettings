@@ -40,7 +40,7 @@
     <string name="desc_media">Media</string>
     <string name="desc_climate">Climate %1$s degrees, fan %2$s</string>
     <string name="desc_mode">Battery mode %1$s, regeneration %2$s</string>
-    <string name="desc_autonomy">Battery %1$s percent, electric range %2$s kilometres</string>
+    <string name="desc_autonomy">Battery %1$s percent, electric range %2$s kilometres, fuel %3$s percent, fuel range %4$s kilometres, total %5$s kilometres</string>
     <string name="desc_nav_idle">Navigation, tap to search a destination</string>
     <string name="desc_nav">Navigation %1$s</string>
     <string name="desc_assist">Emergency braking %1$s, auto hold %2$s, lane keeping %3$s</string>
@@ -89,11 +89,10 @@
     <string name="hold_battery_at">Hold battery at</string>
     <string name="hold_target_desc">Battery hold target</string>
     <string name="range">Range</string>
-    <string name="range_total">total %1$s</string>
+    <string name="range_total_caption">total</string>
     <string name="range_electric">Electric</string>
     <string name="range_fuel">Fuel</string>
     <string name="range_limit">limit %1$d%%</string>
-    <string name="range_tank">tank</string>
 
     <!-- Settings -->
     <string name="back">Back</string>

@@ -179,32 +179,16 @@ fun ModeTile(car: CarState, modifier: Modifier = Modifier) {
     }
 }
 
-/** Arc ring, starting at 12 o'clock. */
-@Composable
-fun Ring(fraction: Float?, color: Color, size: Dp, stroke: Dp, modifier: Modifier = Modifier, track: Color = Color(0x1FFFFFFF)) {
-    Canvas(modifier.size(size)) {
-        val w = stroke.toPx()
-        val inset = w / 2
-        val arcSize = Size(this.size.width - w, this.size.height - w)
-        drawArc(track, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(w))
-        if (fraction != null && fraction > 0f) {
-            drawArc(color, -90f, 360f * fraction.coerceIn(0f, 1f), false, Offset(inset, inset), arcSize, style = Stroke(w, cap = StrokeCap.Round))
-        }
-    }
-}
-
 @Composable
 fun AutonomyTile(car: CarState, modifier: Modifier = Modifier) {
-    val description = stringResource(R.string.desc_autonomy, car.batterySoc?.toString() ?: "--", car.electricRangeKm?.toString() ?: "--")
+    val description = stringResource(
+        R.string.desc_autonomy,
+        car.batterySoc?.toString() ?: "--", car.electricRangeKm?.toString() ?: "--",
+        car.fuelPercent?.toString() ?: "--", car.fuelRangeKm?.toString() ?: "--",
+        totalRange(car.electricRangeKm, car.fuelRangeKm)?.toString() ?: "--",
+    )
     TileFrame(description, modifier) {
-        Column(Modifier.fillMaxSize().padding(top = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
-                Ring(car.batterySoc?.div(100f), Qs.chargeColor(car.batterySoc), 64.dp, 6.dp)
-                Ring(car.fuelPercent?.div(100f), Qs.Fuel, 46.dp, 4.dp)
-                Text(car.batterySoc?.toString() ?: "--", color = Qs.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-            Text(car.electricRangeKm?.let { "$it km" } ?: "-- km", color = Qs.TextSoft, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-        }
+        MirrorRangeTile(car.batterySoc, car.electricRangeKm, car.fuelPercent, car.fuelRangeKm, Qs.chargeColor(car.batterySoc))
     }
 }
 
