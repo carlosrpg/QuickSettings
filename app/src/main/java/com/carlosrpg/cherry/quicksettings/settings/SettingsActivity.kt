@@ -276,50 +276,53 @@ class SettingsActivity : ComponentActivity() {
         val all = order + WidgetType.entries.filter { it !in order }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             all.forEach { type ->
-                val on = type in order
-                val isDragged = dragging == type
-                val title = stringResource(type.titleRes())
-                Row(
-                    Modifier.fillMaxWidth().height(64.dp)
-                        .zIndex(if (isDragged) 1f else 0f)
-                        .offset { IntOffset(0, if (isDragged) dragOffset.roundToInt() else 0) }
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isDragged) Color(0x1AFFFFFF) else Color(0x0AFFFFFF))
-                        .border(1.dp, Color(0x0FFFFFFF), RoundedCornerShape(16.dp))
-                        .padding(start = 4.dp, end = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    val reorderDescription = stringResource(R.string.reorder, title)
-                    Box(
-                        Modifier.size(56.dp).semantics { contentDescription = reorderDescription }
-                            .then(if (!on) Modifier else Modifier.pointerInput(type) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { dragging = type; dragOffset = 0f },
-                                    onDrag = { change, amount ->
-                                        change.consume()
-                                        dragOffset += amount.y
-                                        val from = order.indexOf(type)
-                                        val shift = (dragOffset / rowHeightPx).roundToInt()
-                                        val to = (from + shift).coerceIn(0, order.lastIndex)
-                                        if (to != from) {
-                                            order = order.toMutableList().apply { add(to, removeAt(from)) }
-                                            dragOffset -= (to - from) * rowHeightPx
-                                        }
-                                    },
-                                    onDragEnd = { dragging = null; dragOffset = 0f; onChange(order) },
-                                    onDragCancel = { dragging = null; dragOffset = 0f; order = enabled },
-                                )
-                            }),
-                        contentAlignment = Alignment.Center,
-                    ) { QsIcon(Icons.Drag, if (on) Qs.Muted else Color(0x336B7686), 22.dp, strokeWidth = 3f) }
-                    WidgetBadge(type, on)
-                    Column(Modifier.weight(1f)) {
-                        QsText(title, 16.sp, if (on) Qs.Text else Qs.Muted, FontWeight.SemiBold)
-                        QsText(stringResource(type.subtitleRes()), 13.sp, Qs.Muted)
-                    }
-                    Toggle(on, stringResource(R.string.show_widget, title)) {
-                        onChange(if (on) order - type else order + type)
+                // Keyed so a row keeps its drag gesture when it moves to another slot.
+                key(type) {
+                    val on = type in order
+                    val isDragged = dragging == type
+                    val title = stringResource(type.titleRes())
+                    Row(
+                        Modifier.fillMaxWidth().height(64.dp)
+                            .zIndex(if (isDragged) 1f else 0f)
+                            .offset { IntOffset(0, if (isDragged) dragOffset.roundToInt() else 0) }
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isDragged) Color(0x1AFFFFFF) else Color(0x0AFFFFFF))
+                            .border(1.dp, Color(0x0FFFFFFF), RoundedCornerShape(16.dp))
+                            .padding(start = 4.dp, end = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        val reorderDescription = stringResource(R.string.reorder, title)
+                        Box(
+                            Modifier.size(56.dp).semantics { contentDescription = reorderDescription }
+                                .then(if (!on) Modifier else Modifier.pointerInput(type, enabled) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = { dragging = type; dragOffset = 0f },
+                                        onDrag = { change, amount ->
+                                            change.consume()
+                                            dragOffset += amount.y
+                                            val from = order.indexOf(type)
+                                            val shift = (dragOffset / rowHeightPx).roundToInt()
+                                            val to = (from + shift).coerceIn(0, order.lastIndex)
+                                            if (to != from) {
+                                                order = order.toMutableList().apply { add(to, removeAt(from)) }
+                                                dragOffset -= (to - from) * rowHeightPx
+                                            }
+                                        },
+                                        onDragEnd = { dragging = null; dragOffset = 0f; onChange(order) },
+                                        onDragCancel = { dragging = null; dragOffset = 0f; order = enabled },
+                                    )
+                                }),
+                            contentAlignment = Alignment.Center,
+                        ) { QsIcon(Icons.Drag, if (on) Qs.Muted else Color(0x336B7686), 22.dp, strokeWidth = 3f) }
+                        WidgetBadge(type, on)
+                        Column(Modifier.weight(1f)) {
+                            QsText(title, 16.sp, if (on) Qs.Text else Qs.Muted, FontWeight.SemiBold)
+                            QsText(stringResource(type.subtitleRes()), 13.sp, Qs.Muted)
+                        }
+                        Toggle(on, stringResource(R.string.show_widget, title)) {
+                            onChange(if (on) order - type else order + type)
+                        }
                     }
                 }
             }
