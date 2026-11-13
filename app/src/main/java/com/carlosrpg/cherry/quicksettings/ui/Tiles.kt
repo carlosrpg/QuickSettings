@@ -169,7 +169,7 @@ fun RegenDial(regen: RegenLevel?, size: Dp, modifier: Modifier = Modifier) {
     val brake = remember { PathParser().parsePathString(REGEN_BRAKE).toPath().apply { fillType = PathFillType.EvenOdd } }
     Canvas(modifier.size(size)) {
         scale(this.size.minDimension / REGEN_VIEWPORT, pivot = Offset.Zero) {
-            drawPath(brake, if (lit > 0) Qs.Text else Qs.Dim)
+            drawPath(brake, if (lit > 0) Qs.Mode else Qs.Dim)
             // The rim is one shape; each third is painted through a wedge cut from the centre.
             val section = REGEN_RIM_SWEEP / 3
             for (i in 0 until 3) {
