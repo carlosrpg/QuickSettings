@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.jconfig.carbus.carinfo.BatteryMode
+import app.jconfig.carbus.carinfo.FcwLevel
 import app.jconfig.carbus.carinfo.RegenLevel
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.car.CarState
@@ -265,14 +266,21 @@ fun AssistRing(on: Boolean?, icon: String, size: Dp = 34.dp, iconSize: Dp = 20.d
 
 @Composable
 fun AssistTile(car: CarState, modifier: Modifier = Modifier) {
-    val description = stringResource(R.string.desc_assist, onOffLabel(car.aeb), onOffLabel(car.autoHold), onOffLabel(car.laneKeep))
+    val collision = car.collisionWarning?.let { it != FcwLevel.OFF }
+    val description = stringResource(
+        R.string.desc_assist, onOffLabel(car.aeb), onOffLabel(collision), onOffLabel(car.autoHold), onOffLabel(car.laneKeep),
+    )
     TileFrame(description, modifier) {
+        // The four rows of the open card, in the same order, as a two by two grid.
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.SpaceEvenly, horizontalAlignment = Alignment.CenterHorizontally) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 AssistRing(car.aeb, Icons.Brake)
-                AssistRing(car.autoHold, Icons.AutoHold)
+                AssistRing(collision, Icons.Collision)
             }
-            AssistRing(car.laneKeep, Icons.Lane)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AssistRing(car.autoHold, Icons.AutoHold)
+                AssistRing(car.laneKeep, Icons.Lane)
+            }
         }
     }
 }

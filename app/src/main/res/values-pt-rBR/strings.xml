@@ -38,7 +38,7 @@
     <string name="desc_autonomy">Bateria %1$s por cento, autonomia elétrica %2$s quilômetros, combustível %3$s por cento, autonomia a combustão %4$s quilômetros, total %5$s quilômetros</string>
     <string name="desc_nav_idle">Navegação, toque para buscar um destino</string>
     <string name="desc_nav">Navegação %1$s</string>
-    <string name="desc_assist">Frenagem de emergência %1$s, auto hold %2$s, permanência na faixa %3$s</string>
+    <string name="desc_assist">Frenagem de emergência %1$s, alerta de colisão %2$s, auto hold %3$s, prevenção de saída de faixa %4$s</string>
 
     <string name="open_app">Abrir %1$s</string>
     <string name="media_app">App de mídia</string>
@@ -159,5 +159,5 @@
     <string name="widget_navigation">Navegação</string>
     <string name="widget_navigation_sub">Próxima manobra, chegada, destino por voz</string>
     <string name="widget_assist">Assistência</string>
-    <string name="widget_assist_sub">Frenagem de emergência, auto hold, permanência na faixa</string>
+    <string name="widget_assist_sub">Frenagem de emergência, alerta de colisão, auto hold, faixa</string>
 </resources>
