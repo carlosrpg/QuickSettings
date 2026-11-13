@@ -41,7 +41,7 @@ object Qs {
     val EnergyCritical = Color(0xFFFF5A5F)
     val Fuel = Color(0xFFF2B84B)
     val Route = Color(0xFF4DA3FF)
-    val Mode = Color(0xFF2FD3B5)
+    val Mode = Color(0xFF3DDC97)
 
     val DrawerRadius = 32.dp
     val TileRadius = 22.dp
