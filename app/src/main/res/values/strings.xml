@@ -84,6 +84,14 @@
     <string name="assist_aeb">Emergency braking</string>
     <string name="assist_auto_hold">Auto hold</string>
     <string name="assist_lane">Lane departure prevention</string>
+    <string name="assist_fcw">Collision warning</string>
+    <string name="fcw_near">Near</string>
+    <string name="fcw_standard">Standard</string>
+    <string name="fcw_far">Far</string>
+    <string name="climate_ac">A/C</string>
+    <string name="climate_sync">Sync</string>
+    <string name="climate_recirculation">Recirculate</string>
+    <string name="debug_log">Debug log</string>
     <string name="assist_confirm_off">Tap again to turn off</string>
     <string name="assist_block_ignition">Ignition is off</string>
     <string name="assist_block_speed">Only below 10 km/h</string>

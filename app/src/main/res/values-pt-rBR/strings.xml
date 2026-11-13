@@ -76,6 +76,14 @@
     <string name="assist_aeb">Frenagem de emergência</string>
     <string name="assist_auto_hold">Auto Hold</string>
     <string name="assist_lane">Prevenção de saída de faixa</string>
+    <string name="assist_fcw">Alerta de colisão</string>
+    <string name="fcw_near">Perto</string>
+    <string name="fcw_standard">Padrão</string>
+    <string name="fcw_far">Longe</string>
+    <string name="climate_ac">A/C</string>
+    <string name="climate_sync">Sync</string>
+    <string name="climate_recirculation">Recircular</string>
+    <string name="debug_log">Log de depuração</string>
     <string name="assist_confirm_off">Toque de novo para desligar</string>
     <string name="assist_block_ignition">Ignição desligada</string>
     <string name="assist_block_speed">Só abaixo de 10 km/h</string>

@@ -5,6 +5,8 @@ import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.ClimatePanelSpec
+import app.jconfig.carbus.carinfo.ClimateSwitch
+import app.jconfig.carbus.carinfo.FcwLevel
 import app.jconfig.carbus.carinfo.FanSpec
 import app.jconfig.carbus.carinfo.NewEnergyIds
 import app.jconfig.carbus.carinfo.OutsideTempSpec
@@ -42,6 +44,10 @@ data class CarState(
     val aeb: Boolean? = null,
     val autoHold: Boolean? = null,
     val laneKeep: Boolean? = null,
+    val collisionWarning: FcwLevel? = null,
+    val acOn: Boolean? = null,
+    val recirculation: Boolean? = null,
+    val sync: Boolean? = null,
 )
 
 /**
@@ -73,7 +79,6 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     val state: StateFlow<CarState> = _state.asStateFlow()
 
     private val mutex = Mutex()
-    private val climateSteps = Mutex()
     private var pollJob: Job? = null
 
     /** Whether the car's own service is bound. Until it is, every value stays empty. */
@@ -105,6 +110,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         fun int(module: Int, id: Int): Int? = bus.getItemValueOrNull(module, id)
         fun percent(module: Int, id: Int): Int? = int(module, id)?.takeIf { it in 0..100 }
         fun assist(id: Int) = AssistIds.isOn(id, int(AssistIds.MODULE, id))
+        fun climate(switch: ClimateSwitch) = switch.isOn(int(HVAC, switch.item))
         return CarState(
             speedKmh = int(READONLY, TelemetryIds.ITEM_CAR_SPEED),
             cabinTempC = int(HVAC, CabinTempSpec.ITEM_READ)
@@ -131,6 +137,10 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
             aeb = assist(AssistIds.ITEM_AEB),
             autoHold = assist(AssistIds.ITEM_AUTO_HOLD),
             laneKeep = assist(AssistIds.ITEM_LANE_DEPARTURE_PREVENTION),
+            collisionWarning = FcwLevel.of(bus.getItemValues(AssistIds.MODULE, FcwLevel.ITEM)),
+            acOn = climate(ClimateSwitch.AC),
+            recirculation = climate(ClimateSwitch.RECIRCULATION),
+            sync = climate(ClimateSwitch.SYNC),
         )
     }
 
@@ -155,14 +165,64 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     /** Writes only when the clamped value differs from what the car last reported. */
     fun setCabinTemp(celsius: Int) {
         val target = celsius.coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX)
-        if (target != state.value.cabinTempC) {
-            stepClimate(CabinTempSpec.ITEM_WRITE, state.value.cabinTempC, target, CabinTempSpec::toRaw)
-        }
+        if (target != state.value.cabinTempC) write(HVAC, CabinTempSpec.ITEM_WRITE, CabinTempSpec.toRaw(target))
     }
 
     fun setFan(level: Int) {
         val target = level.coerceIn(FanSpec.MIN, FanSpec.MAX)
-        if (target != state.value.fanLevel) stepClimate(FanSpec.ITEM_WRITE, state.value.fanLevel, target) { it }
+        if (target != state.value.fanLevel) write(HVAC, FanSpec.ITEM_WRITE, target)
+    }
+
+    /** Flips a climate panel button. The car's own panel applies no gate to these. */
+    fun toggleClimate(switch: ClimateSwitch) {
+        val on = when (switch) {
+            ClimateSwitch.AC -> state.value.acOn
+            ClimateSwitch.RECIRCULATION -> state.value.recirculation
+            ClimateSwitch.SYNC -> state.value.sync
+        } ?: return
+        write(HVAC, switch.item, switch.command(!on))
+    }
+
+    /**
+     * Moves forward collision warning to its next state: Off, Near, Standard, Far, Off. No
+     * confirmation, by the owner's choice. The car's own gates still apply: ignition on, and
+     * the switch itself (to or from Off) only below 10 km/h; the sensitivity can change at any
+     * speed. A blocked step is skipped and its reason returned, so from Far at speed the
+     * cycle goes on to Near instead of Off.
+     */
+    suspend fun cycleCollisionWarning(): AssistBlock? {
+        var sent = false
+        val blocked = withContext(Dispatchers.IO) {
+            mutex.withLock {
+                if (!bus.isServiceConnected()) return@withLock AssistBlock.UNAVAILABLE
+                if (!AssistIds.ignitionOn(bus.getItemValueOrNull(READONLY, AssistIds.ITEM_POWER_MODE))) {
+                    return@withLock AssistBlock.IGNITION_OFF
+                }
+                val current = FcwLevel.of(bus.getItemValues(AssistIds.MODULE, FcwLevel.ITEM))
+                    ?: return@withLock AssistBlock.UNAVAILABLE
+                val speed = bus.getItemValueOrNull(READONLY, TelemetryIds.ITEM_CAR_SPEED)
+                val slow = speed != null && speed < AssistIds.AEB_MAX_SPEED_KMH
+                if (current == FcwLevel.OFF && !slow) return@withLock AssistBlock.TOO_FAST
+                var next = FcwLevel.entries[(current.ordinal + 1) % FcwLevel.entries.size]
+                var hint: AssistBlock? = null
+                if (next == FcwLevel.OFF && !slow) {
+                    next = FcwLevel.NEAR
+                    hint = AssistBlock.TOO_FAST
+                }
+                try {
+                    bus.sendItemValues(AssistIds.MODULE, FcwLevel.ITEM, next.command(current))
+                    sent = true
+                } catch (e: LinkageError) {
+                    return@withLock AssistBlock.UNAVAILABLE
+                }
+                hint
+            }
+        }
+        if (sent) {
+            delay(WRITE_SETTLE_MS)
+            refresh()
+        }
+        return blocked
     }
 
     /**
@@ -216,37 +276,6 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         }
     }
 
-    /**
-     * Walks a climate value to [target] one step at a time, one command per step, and never
-     * interleaved with the other climate value. That is how the car's own +/- controls and the
-     * other apps known to change it quietly behave; a single jump of several steps, or a
-     * temperature and a fan command together, is the one thing this app did differently when
-     * the car answered by opening its climate panel.
-     */
-    private fun stepClimate(item: Int, from: Int?, target: Int, raw: (Int) -> Int) {
-        scope.launch(Dispatchers.IO) {
-            var watchPanel = false
-            climateSteps.withLock {
-                val start = from ?: target
-                val steps = if (start == target) listOf(target) else if (start < target) (start + 1..target) else (start - 1 downTo target)
-                for (value in steps) {
-                    mutex.withLock {
-                        try {
-                            watchPanel = watchPanel || !climatePanelShowing()
-                            bus.sendItemValue(HVAC, item, raw(value))
-                        } catch (e: LinkageError) {
-                            // Vendor class mismatch on the device; the next poll shows the real state.
-                        }
-                    }
-                    delay(CLIMATE_STEP_MS)
-                }
-            }
-            if (watchPanel) keepClimatePanelDown()
-            delay(WRITE_SETTLE_MS)
-            refresh()
-        }
-    }
-
     private fun climatePanelShowing() =
         ClimatePanelSpec.isShowing(bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE))
 
@@ -274,7 +303,6 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     companion object {
         const val POLL_MS = 1_500L
         const val WRITE_SETTLE_MS = 400L
-        const val CLIMATE_STEP_MS = 250L
         private const val PANEL_WATCH_POLLS = 8
         private const val PANEL_WATCH_POLL_MS = 150L
     }

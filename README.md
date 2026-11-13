@@ -16,11 +16,11 @@ Style: **Night Glass**, the approved styleguide.
 | Widget | Semi-open | Open |
 |---|---|---|
 | Media | Album art, play/pause. Press and drag: up/down volume, left/right previous/next | Source (an app, tap to open it, or one of the car's own: Bluetooth, USB, CarPlay, Android Auto, …), title, progress, transport, volume, voice search sent to the app that owns the session |
-| Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | A large quadrant: touch anywhere to place the marker and drag it; values update live and are set on release |
+| Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | A large quadrant: touch anywhere to place the marker and drag it; values update live and are set on release. Below it, A/C, Sync and Recirculate buttons that follow the car's state |
 | Car mode | Battery-mode glyph and regen bars. Press and drag: up/down battery mode, left/right regen | Initial / Smart / Forced, hold-target slider when Forced, Low / Medium / High regen |
 | Autonomy | Battery ring (outer) and fuel ring (inner), electric km | Electric and fuel range, km and %, total |
 | Navigation | Next manoeuvre and distance; with no route, a tap starts a voice destination search | Nav app (tap to open it), next turn, street, ETA, voice destination |
-| Assist | Emergency braking, auto hold, lane departure prevention (status) | Same, with On/Off; tap a row to switch it. The car's own rules apply: ignition on, emergency braking only below 10 km/h, and a second tap to turn emergency braking or lane prevention off |
+| Assist | Emergency braking, auto hold, lane departure prevention (status) | Same, with On/Off, plus forward collision warning (a tap cycles Off, Near, Standard, Far; Off only below 10 km/h); tap a row to switch it. The car's own rules apply: ignition on, emergency braking only below 10 km/h, and a second tap to turn emergency braking or lane prevention off |
 
 Media volume: up, down and mute go through `AudioManager.adjustVolume`, the call the
 steering-wheel keys end in. The car's audio service moves whichever source is playing by one step
@@ -57,7 +57,9 @@ notification listener, which restarts the process and with it the drawer, so thi
 notification access being granted.
 
 The **Status** panel at the bottom of the settings screen shows, live, whether the car-data
-link, the car-media link and notification access are up.
+link, the car-media link and notification access are up. Its **Debug log** button prints, as text to
+photograph, the navigation state, every notification posted right now and the last ones the
+listener was handed. A navigation app that is guiding and has no line there is not posting one.
 
 Nothing writes to the car on its own. Every write comes from a tap, a slider release or a
 drag release. Regen and battery mode aren't gated on speed: the stock settings app doesn't gate

@@ -71,6 +71,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.carlosrpg.cherry.quicksettings.BuildConfig
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.app
+import com.carlosrpg.cherry.quicksettings.nav.DebugLog
 import com.carlosrpg.cherry.quicksettings.nav.NavStore
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
@@ -296,7 +297,42 @@ class SettingsActivity : ComponentActivity() {
         )
         // What the nav app last posted: the clue when its directions don't show.
         NavStore.lastSeen?.let { Text(it, color = Qs.Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
-        QsText(stringResource(R.string.status_version, BuildConfig.VERSION_NAME), 12.sp, Qs.Muted)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            QsText(stringResource(R.string.status_version, BuildConfig.VERSION_NAME), 12.sp, Qs.Muted, modifier = Modifier.weight(1f))
+            GlassButton(null, stringResource(R.string.debug_log), { showDebug = !showDebug }, label = stringResource(R.string.debug_log))
+        }
+        if (showDebug) DebugText()
+    }
+
+    private var showDebug by mutableStateOf(false)
+
+    /**
+     * Everything needed to see why media or directions are missing, as plain text to photograph:
+     * the links, the navigation state, what is posted right now and what the listener was handed
+     * recently. If a nav app is guiding and has no line here, it is not posting a notification.
+     */
+    @Composable
+    private fun DebugText() {
+        val listener = QsNotificationListener.instance
+        val nav = NavStore.state.collectAsState().value
+        val navApps = NavStore.KNOWN_NAV_PACKAGES.mapNotNull { pkg ->
+            runCatching { "$pkg ${packageManager.getPackageInfo(pkg, 0).versionName}" }.getOrNull()
+        }
+        val active = listener?.describeActive().orEmpty()
+        val text = buildString {
+            appendLine("${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())}  v${BuildConfig.VERSION_NAME}  mock=${BuildConfig.USE_MOCK}  user=${android.os.Process.myUserHandle()}")
+            appendLine("car=${app.car.isConnected()}  carMedia=${app.media.carMediaConnected}  source=${app.media.carSourceLabel}")
+            appendLine("access=${hasNotificationAccess()}  listenerConnected=${listener != null}")
+            appendLine("nav apps installed: ${navApps.ifEmpty { listOf("none known") }.joinToString()}")
+            appendLine("nav route: ${nav?.let { "${it.packageName} \"${it.title}\" / \"${it.text}\" / \"${it.subText}\" arrow=${it.maneuver != null}" } ?: "none"}")
+            appendLine("last nav app: ${NavStore.lastNavPackage}")
+            appendLine("last nav notification: ${NavStore.lastSeen}")
+            appendLine("--- posted now (${active.size})")
+            active.forEach(::appendLine)
+            appendLine("--- handed to the listener (newest last)")
+            DebugLog.snapshot().forEach(::appendLine)
+        }
+        Text(text.trimEnd(), color = Qs.Text, fontSize = 13.sp, lineHeight = 17.sp, fontFamily = FontFamily.Monospace)
     }
 
     @Composable

@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.annotation.StringRes
+import app.jconfig.carbus.carinfo.ClimateSwitch
+import app.jconfig.carbus.carinfo.FcwLevel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -303,11 +306,30 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
 @Composable
 fun AssistCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
     CardLabel(stringResource(R.string.driver_assist))
-    // Fills the card: the gap between the rows grows with it and never drops below 8 dp.
+    // Fills the card: the gap between the rows grows with it.
     Column(Modifier.weight(1f).fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.SpaceBetween) {
         AssistRow(Assist.AEB, car.aeb, Icons.Brake, stringResource(R.string.assist_aeb), actions)
+        CollisionWarningRow(car.collisionWarning, actions)
         AssistRow(Assist.AUTO_HOLD, car.autoHold, Icons.AutoHold, stringResource(R.string.assist_auto_hold), actions)
         AssistRow(Assist.LANE, car.laneKeep, Icons.Lane, stringResource(R.string.assist_lane), actions)
+    }
+}
+
+@StringRes
+private fun AssistBlock.messageRes(): Int = when (this) {
+    AssistBlock.IGNITION_OFF -> R.string.assist_block_ignition
+    AssistBlock.TOO_FAST -> R.string.assist_block_speed
+    AssistBlock.UNAVAILABLE -> R.string.assist_block_unavailable
+}
+
+/** Clears a row's "tap again" or "why not" notice after a moment. */
+@Composable
+private fun NoticeTimeout(active: Boolean, key: Any?, clear: () -> Unit) {
+    LaunchedEffect(active, key) {
+        if (active) {
+            delay(ASSIST_NOTICE_MS)
+            clear()
+        }
     }
 }
 
@@ -318,41 +340,67 @@ private fun AssistRow(assist: Assist, on: Boolean?, icon: String, name: String, 
     var armed by remember { mutableStateOf(false) }
     // Why the car's rules refused the last tap, shown in place of On / Off for a moment.
     var blocked by remember { mutableStateOf<AssistBlock?>(null) }
-    LaunchedEffect(armed, blocked) {
-        if (armed || blocked != null) {
-            delay(ASSIST_NOTICE_MS)
+    NoticeTimeout(armed || blocked != null, blocked) { armed = false; blocked = null }
+    val notice = if (armed) R.string.assist_confirm_off else blocked?.messageRes()
+    val pill = when (on) {
+        true -> stringResource(R.string.pill_on)
+        false -> stringResource(R.string.pill_off)
+        null -> "--"
+    }
+    AssistRowFrame(on, icon, name, pill, notice, enabled = on != null) {
+        blocked = null
+        if (on == true && assist.confirmOff && !armed) {
+            armed = true
+        } else {
             armed = false
-            blocked = null
+            scope.launch { blocked = actions.car.toggleAssist(assist) }
         }
     }
+}
+
+/** Off, Near, Standard, Far: each tap moves to the next; a step the car's rules block is skipped. */
+@Composable
+private fun CollisionWarningRow(level: FcwLevel?, actions: DrawerActions) {
+    val scope = rememberCoroutineScope()
+    var blocked by remember { mutableStateOf<AssistBlock?>(null) }
+    NoticeTimeout(blocked != null, blocked) { blocked = null }
+    val pill = when (level) {
+        FcwLevel.OFF -> stringResource(R.string.pill_off)
+        FcwLevel.NEAR -> stringResource(R.string.fcw_near)
+        FcwLevel.STANDARD -> stringResource(R.string.fcw_standard)
+        FcwLevel.FAR -> stringResource(R.string.fcw_far)
+        null -> "--"
+    }
+    AssistRowFrame(
+        level?.let { it != FcwLevel.OFF }, Icons.Collision, stringResource(R.string.assist_fcw), pill,
+        blocked?.messageRes(), enabled = level != null,
+    ) {
+        scope.launch { blocked = actions.car.cycleCollisionWarning() }
+    }
+}
+
+@Composable
+private fun AssistRowFrame(
+    on: Boolean?,
+    icon: String,
+    name: String,
+    pill: String,
+    @StringRes notice: Int?,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(Color(0x38000000))
-            .clickable(enabled = on != null, onClickLabel = name) {
-                blocked = null
-                if (on == true && assist.confirmOff && !armed) {
-                    armed = true
-                } else {
-                    armed = false
-                    scope.launch { blocked = actions.car.toggleAssist(assist) }
-                }
-            }
+            .clickable(enabled = enabled, onClickLabel = name, onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AssistRing(on, icon, 40.dp, 22.dp)
         QsText(name, 14.sp, if (on == true) Qs.Text else Qs.Muted, FontWeight.SemiBold, Modifier.weight(1f).padding(start = 12.dp))
-        val notice = when {
-            armed -> R.string.assist_confirm_off
-            blocked == AssistBlock.IGNITION_OFF -> R.string.assist_block_ignition
-            blocked == AssistBlock.TOO_FAST -> R.string.assist_block_speed
-            blocked == AssistBlock.UNAVAILABLE -> R.string.assist_block_unavailable
-            else -> null
-        }
         val (text, fg, bg) = when {
             notice != null -> Triple(stringResource(notice), Qs.EnergyLow, Qs.EnergyLow.copy(alpha = 0.16f))
-            on == true -> Triple(stringResource(R.string.pill_on), Qs.Energy, Qs.Energy.copy(alpha = 0.16f))
-            on == false -> Triple(stringResource(R.string.pill_off), Qs.Muted, Color(0x14FFFFFF))
-            else -> Triple("--", Qs.Muted, Color(0x14FFFFFF))
+            on == true -> Triple(pill, Qs.Energy, Qs.Energy.copy(alpha = 0.16f))
+            else -> Triple(pill, Qs.Muted, Color(0x14FFFFFF))
         }
         Box(Modifier.clip(RoundedCornerShape(10.dp)).background(bg).padding(horizontal = 10.dp, vertical = 5.dp)) {
             QsText(text, 13.sp, fg, FontWeight.Bold)
@@ -391,6 +439,23 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
                 ),
         )
     }
+    // The climate panel's own buttons, lit from the car's state and flipped on tap.
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ClimateButton(ClimateSwitch.AC, car.acOn, stringResource(R.string.climate_ac), actions, Modifier.weight(1f))
+        ClimateButton(ClimateSwitch.SYNC, car.sync, stringResource(R.string.climate_sync), actions, Modifier.weight(1f))
+        ClimateButton(ClimateSwitch.RECIRCULATION, car.recirculation, stringResource(R.string.climate_recirculation), actions, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun ClimateButton(switch: ClimateSwitch, on: Boolean?, label: String, actions: DrawerActions, modifier: Modifier) {
+    val state = onOffLabel(on)
+    GlassButton(
+        null, "$label, $state", { actions.car.toggleClimate(switch) }, modifier,
+        label = label,
+        tint = when (on) { true -> Qs.Energy; false -> Qs.TextSoft; null -> Qs.Dim },
+        background = if (on == true) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
+    )
 }
 
 @Composable

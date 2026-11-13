@@ -5,6 +5,8 @@ import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.NewEnergyIds
 import app.jconfig.carbus.carinfo.OutsideTempSpec
 import app.jconfig.carbus.carinfo.RegenLevel
+import app.jconfig.carbus.carinfo.ClimateSwitch
+import app.jconfig.carbus.carinfo.FcwLevel
 import app.jconfig.carbus.carinfo.TelemetryIds
 import app.jconfig.carbus.carinfo.VDEventCarInfo
 import app.jconfig.carbus.mock.MockCarBus
@@ -26,4 +28,6 @@ fun seededMockBus(): MockCarBus = MockCarBus().apply {
     sendItemValue(AssistIds.MODULE, AssistIds.ITEM_AUTO_HOLD, 1)
     sendItemValue(AssistIds.MODULE, AssistIds.ITEM_LANE_DEPARTURE_PREVENTION, 0)
     sendItemValue(readonly, AssistIds.ITEM_POWER_MODE, 2) // ignition on
+    sendItemValues(AssistIds.MODULE, FcwLevel.ITEM, FcwLevel.STANDARD.command(null))
+    sendItemValue(VDEventCarInfo.MODULE_HVAC, ClimateSwitch.SYNC.item, ClimateSwitch.SYNC.command(false))
 }

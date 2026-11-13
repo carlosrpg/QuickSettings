@@ -104,12 +104,15 @@ object NavStore {
 class QsNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
+        instance = this
+        DebugLog.add("listener", "listener connected, ${activeNotifications.orEmpty().size} active")
         val navs = activeNotifications.orEmpty().filter(::isNavApp)
         navs.lastOrNull()?.let { NavStore.rememberApp(it.packageName) }
         NavStore.publish(navs.mapNotNull(::route).lastOrNull())
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        DebugLog.add(sbn.key, "+ " + describe(sbn))
         if (!isNavApp(sbn)) return
         NavStore.rememberApp(sbn.packageName)
         val route = route(sbn)
@@ -121,11 +124,32 @@ class QsNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        DebugLog.add(sbn.key, "- ${sbn.packageName}")
         val current = NavStore.state.value ?: return
         if (current.packageName == sbn.packageName && isNavApp(sbn)) NavStore.publish(null)
     }
 
-    override fun onListenerDisconnected() = NavStore.publish(null)
+    override fun onListenerDisconnected() {
+        instance = null
+        DebugLog.add("listener", "listener disconnected")
+        NavStore.publish(null)
+    }
+
+    /** One line per notification currently posted, as the system reports them to this listener. */
+    fun describeActive(): List<String> = try {
+        activeNotifications.orEmpty().map(::describe)
+    } catch (e: SecurityException) {
+        listOf("not allowed: ${e.message}")
+    }
+
+    private fun describe(sbn: StatusBarNotification): String {
+        val n = sbn.notification
+        fun short(key: String) = n.extras.getCharSequence(key)?.toString()?.take(DEBUG_TEXT_CHARS)
+        @Suppress("DEPRECATION")
+        val ownLayout = n.contentView != null || n.bigContentView != null || n.headsUpContentView != null
+        return "${sbn.packageName} cat=${n.category} ongoing=${sbn.isOngoing} icon=${n.getLargeIcon() != null} " +
+            "layout=$ownLayout nav=${isNavApp(sbn)} \"${short(Notification.EXTRA_TITLE)}\" / \"${short(Notification.EXTRA_TEXT)}\""
+    }
 
     /** A notification from a navigation app: its category says so, or it's a known app's ongoing one. */
     private fun isNavApp(sbn: StatusBarNotification): Boolean =
@@ -202,7 +226,12 @@ class QsNotificationListener : NotificationListenerService() {
         }
     }
 
-    private companion object {
-        const val MANEUVER_PX = 128
+    companion object {
+        private const val MANEUVER_PX = 128
+        private const val DEBUG_TEXT_CHARS = 28
+
+        /** The connected listener, or null while the system has not bound it. */
+        @Volatile var instance: QsNotificationListener? = null
+            private set
     }
 }
