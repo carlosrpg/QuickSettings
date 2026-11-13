@@ -151,30 +151,51 @@ fun onOffLabel(on: Boolean?): String = stringResource(
 )
 
 /**
- * Regenerative braking as a brake disc with a bolt at its hub. The rim is three arcs, and
- * as many light up as the level: one for Low, two for Medium, all three for High.
+ * Regenerative braking as a braked wheel: the brake disc with a bolt at its hub, the caliper
+ * gripping it at the upper right, and the wheel's rim running round the rest. The rim is three
+ * arcs, and as many are green as the level: one for Low, two for Medium, all three for High.
  */
 @Composable
 fun RegenDial(regen: RegenLevel?, size: Dp, modifier: Modifier = Modifier) {
     val lit = when (regen) { RegenLevel.LOW -> 1; RegenLevel.MEDIUM -> 2; RegenLevel.HIGH -> 3; null -> 0 }
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
-            val rim = this.size.minDimension * 0.1f
-            val arc = Size(this.size.width - rim, this.size.height - rim)
-            val topLeft = Offset(rim / 2, rim / 2)
-            // Three arcs of 96 degrees with 24 degree gaps, filling clockwise from the lower left.
+            val s = this.size.minDimension
+            val centre = Offset(this.size.width / 2, this.size.height / 2)
+            fun ring(radius: Float) = Offset(centre.x - radius, centre.y - radius) to Size(radius * 2, radius * 2)
+
+            // The rim: open at the upper right, where the caliper sits. Angles are clockwise
+            // from 3 o'clock; the arcs fill from the lower right round to the top.
+            val rimWidth = s * 0.085f
+            val (rimAt, rimSize) = ring(s / 2 - rimWidth / 2)
+            val segment = (RIM_SWEEP - 2 * RIM_GAP) / 3
             for (i in 0 until 3) {
                 drawArc(
-                    if (i < lit) Qs.Energy else Color(0x2EFFFFFF), 150f + i * 120f, 96f, false,
-                    topLeft, arc, style = Stroke(rim, cap = StrokeCap.Round),
+                    if (i < lit) Qs.Energy else Color(0x2EFFFFFF), RIM_START + i * (segment + RIM_GAP), segment, false,
+                    rimAt, rimSize, style = Stroke(rimWidth, cap = StrokeCap.Round),
                 )
             }
-            // The disc inside the rim.
-            drawCircle(Color(0x59FFFFFF), radius = this.size.minDimension * 0.29f, style = Stroke(rim * 0.35f))
+            // The brake disc.
+            val discRadius = s * 0.27f
+            drawCircle(Color(0xB3FFFFFF), discRadius, centre, style = Stroke(s * 0.055f))
+            // The caliper: a thick pad over the disc's edge, with its mounting bolt.
+            val (padAt, padSize) = ring(s * 0.35f)
+            drawArc(Qs.Text, CALIPER_START, CALIPER_SWEEP, false, padAt, padSize, style = Stroke(s * 0.2f, cap = StrokeCap.Round))
+            val mid = Math.toRadians((CALIPER_START + CALIPER_SWEEP / 2).toDouble())
+            drawCircle(
+                Color(0xFF161C26), s * 0.035f,
+                centre + Offset((s * 0.37f * kotlin.math.cos(mid)).toFloat(), (s * 0.37f * kotlin.math.sin(mid)).toFloat()),
+            )
         }
-        QsIcon(Icons.Bolt, if (lit > 0) Qs.Text else Qs.Dim, size * 0.36f, strokeWidth = 2.2f)
+        QsIcon(Icons.Bolt, if (lit > 0) Qs.Energy else Qs.Dim, size * 0.28f, strokeWidth = 2.2f)
     }
 }
+
+private const val RIM_START = 12f
+private const val RIM_SWEEP = 246f
+private const val RIM_GAP = 14f
+private const val CALIPER_START = -70f
+private const val CALIPER_SWEEP = 50f
 
 @Composable
 fun ModeTile(car: CarState, modifier: Modifier = Modifier) {

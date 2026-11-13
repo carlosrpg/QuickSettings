@@ -470,11 +470,11 @@ fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = 
         CycleButton(
             stringResource(R.string.battery_mode), car.batteryMode?.label() ?: "--", Modifier.weight(1f),
             onClick = { actions.car.setBatteryMode(nextOf(BatteryMode.entries, car.batteryMode)) },
-        ) { QsIcon(car.batteryMode.icon(), Qs.Mode, 46.dp, strokeWidth = 1.8f) }
+        ) { size -> QsIcon(car.batteryMode.icon(), Qs.Mode, size, strokeWidth = 1.6f) }
         CycleButton(
             stringResource(R.string.regeneration), car.regen?.label() ?: "--", Modifier.weight(1f),
             onClick = { actions.car.setRegen(nextOf(RegenLevel.entries, car.regen)) },
-        ) { RegenDial(car.regen, 50.dp) }
+        ) { size -> RegenDial(car.regen, size) }
     }
     // The hold target is always shown, so the card keeps one layout; it only works in Forced,
     // so anywhere else it is greyed out and disabled. Written once on release, not per step.
@@ -512,18 +512,21 @@ private fun CycleButton(
     value: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    symbol: @Composable () -> Unit,
+    symbol: @Composable (size: Dp) -> Unit,
 ) {
     Column(
         modifier.fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(Qs.Button)
             .clickable(onClickLabel = title, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = "$title, $value" }
-            .padding(vertical = 10.dp, horizontal = 6.dp),
-        verticalArrangement = Arrangement.SpaceEvenly, horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(vertical = 8.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CardLabel(title)
-        symbol()
-        QsText(value, 15.sp, weight = FontWeight.Bold)
+        // The symbol is the point of the button: it takes all the room the two texts leave.
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+            symbol(minOf(maxWidth, maxHeight))
+        }
+        QsText(value, 13.sp, Qs.TextSoft, FontWeight.SemiBold)
     }
 }
 
