@@ -60,6 +60,7 @@ import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.FanSpec
 import app.jconfig.carbus.carinfo.RegenLevel
 import com.carlosrpg.cherry.quicksettings.R
+import com.carlosrpg.cherry.quicksettings.app
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
 import com.carlosrpg.cherry.quicksettings.car.CarState
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
@@ -98,6 +99,14 @@ class DrawerActions(
 
     fun openNavApp() {
         if (NavStore.openApp(context)) close()
+    }
+
+    val cluster get() = context.app.cluster
+
+    /** Sends the navigation app to the instrument cluster, or brings it back if it is there. */
+    fun toggleNavOnCluster() {
+        val shown = cluster.onCluster.value
+        if (shown != null) cluster.bringBack() else NavStore.navPackage(context)?.let(cluster::sendToCluster)
     }
 
     fun navAppLabel(): String? = NavStore.navPackage(context)?.let { AppInfo.label(context, it) }

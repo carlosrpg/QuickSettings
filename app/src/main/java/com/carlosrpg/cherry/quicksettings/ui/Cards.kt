@@ -29,6 +29,7 @@ import androidx.annotation.StringRes
 import app.jconfig.carbus.carinfo.ClimateSwitch
 import app.jconfig.carbus.carinfo.FcwLevel
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import com.carlosrpg.cherry.quicksettings.car.Assist
@@ -256,6 +257,18 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
         OpenAppChip(actions.navAppIcon(), Qs.Route, appName, actions::openNavApp, Modifier.weight(1f))
         Gap(10.dp)
         GlassButton(Icons.Mic, stringResource(R.string.voice_destination), actions::voiceNav, tint = if (listening) Qs.Route else Qs.Text)
+        // Only on a car with a cluster display: send the nav app there, or bring it back.
+        if (remember { actions.cluster.clusterDisplayId() } != null) {
+            val onCluster = actions.cluster.onCluster.collectAsState().value != null
+            Gap(10.dp)
+            GlassButton(
+                Icons.Cluster,
+                stringResource(if (onCluster) R.string.cluster_bring_back else R.string.cluster_send),
+                actions::toggleNavOnCluster,
+                tint = if (onCluster) Qs.Energy else Qs.Text,
+                background = if (onCluster) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
+            )
+        }
     }
     if (nav == null) {
         Column(

@@ -3,10 +3,12 @@ package com.carlosrpg.cherry.quicksettings
 import android.app.Application
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.CarInfoProxy
+import app.jconfig.carbus.cluster.ClusterNavigation
 import app.jconfig.carbus.media.CarMedia
 import app.jconfig.carbus.media.VdbusCarMedia
 import app.jconfig.carbus.mock.MockCarMedia
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
+import com.carlosrpg.cherry.quicksettings.cluster.ClusterProjection
 import com.carlosrpg.cherry.quicksettings.car.seededMockBus
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
@@ -21,6 +23,7 @@ class QuickSettingsApp : Application() {
     lateinit var car: CarRepository private set
     lateinit var media: MediaRepository private set
     lateinit var settings: SettingsStore private set
+    lateinit var cluster: ClusterProjection private set
 
     override fun onCreate() {
         super.onCreate()
@@ -33,6 +36,9 @@ class QuickSettingsApp : Application() {
         carMedia.bind()
         media = MediaRepository(this, scope, carMedia)
         settings = SettingsStore(this)
+        // The car-side signals for showing an app on the instrument cluster; none off the car.
+        val clusterSignals = if (BuildConfig.USE_MOCK) null else ClusterNavigation.create(this).also { it.bind() }
+        cluster = ClusterProjection(this, clusterSignals)
         // Always on: whatever brought the process up (boot, the system re-binding the
         // notification listener after the process was killed, an app update) also brings the
         // drawer back. No-op until the overlay permission is granted.
