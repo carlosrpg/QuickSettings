@@ -205,14 +205,12 @@ fun ModeTile(car: CarState, modifier: Modifier = Modifier) {
     )
     TileFrame(description, modifier) {
         // Regeneration is the tile: its icon takes nearly all of it. The battery mode is a small
-        // badge over its lower right corner.
+        // symbol over its lower right corner, with a dark outline along its strokes to lift it
+        // off the regen rim behind it.
         RegenDial(car.regen, Qs.TileSize * 0.78f, Modifier.align(Alignment.Center))
-        Box(
-            Modifier.align(Alignment.BottomEnd).padding(5.dp).size(Qs.TileSize * 0.3f)
-                .clip(CircleShape).background(Color(0xF0161C26)),
-            contentAlignment = Alignment.Center,
-        ) {
-            QsIcon(car.batteryMode.icon(), Qs.Mode, Qs.TileSize * 0.2f)
+        Box(Modifier.align(Alignment.BottomEnd).padding(6.dp), contentAlignment = Alignment.Center) {
+            QsIcon(car.batteryMode.icon(), Color(0xFF161C26), Qs.TileSize * 0.26f, strokeWidth = 5.5f)
+            QsIcon(car.batteryMode.icon(), Qs.Mode, Qs.TileSize * 0.26f, strokeWidth = 2f)
         }
     }
 }
