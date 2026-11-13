@@ -62,12 +62,18 @@ data class MediaState(
 )
 
 /**
- * The car's source wins unless an Android app is playing right now: the head unit only names
- * a source of its own (Bluetooth, USB, CarPlay, Android Auto, …) while that source holds the
- * audio, and a paused session of some app used earlier says less than that.
+ * Which feed the media widget shows. Whichever is playing wins, an app first. When neither is
+ * playing (the usual case right after a pause), the one already on screen stays: pausing an app
+ * must not hand the widget to a car source that happens to exist, and the other way round.
+ * With nothing shown before, a known car source is shown ahead of a paused app.
  */
-internal fun showCarSource(sessionPlaying: Boolean, car: CarMediaState?): Boolean =
-    car != null && !sessionPlaying
+internal fun showCarSource(sessionPresent: Boolean, sessionPlaying: Boolean, car: CarMediaState?, carShown: Boolean): Boolean = when {
+    car == null -> false
+    sessionPlaying -> false
+    car.status == CarPlayStatus.PLAYING || car.status == CarPlayStatus.LOADING -> true
+    !sessionPresent -> true
+    else -> carShown
+}
 
 @StringRes
 internal fun CarMediaSource.labelRes(): Int = when (this) {
@@ -110,6 +116,7 @@ class MediaRepository(
     /** Last reading of the car's own source, and the one on screen right now (if any). */
     private var car: CarMediaState? = null
     private var shownCar: CarMediaState? = null
+    private var shownOnce = false
     private var carArtKey: Any? = null
     private var carArt: Bitmap? = null
 
@@ -208,7 +215,8 @@ class MediaRepository(
     private fun publish() {
         val c = controller
         val sessionPlaying = c?.playbackState?.state == PlaybackState.STATE_PLAYING
-        val carNow = car.takeIf { showCarSource(sessionPlaying, it) }
+        val carNow = car.takeIf { showCarSource(c != null, sessionPlaying, it, carShown = shownCar != null || !shownOnce) }
+        shownOnce = true
         shownCar = carNow
         _state.value = (if (carNow != null) carState(carNow) else sessionState(c)).withVolume()
     }
