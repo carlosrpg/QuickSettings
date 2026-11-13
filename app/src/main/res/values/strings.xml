@@ -139,6 +139,7 @@
     <string name="status_simulated">simulated</string>
     <string name="status_access_granted">access granted</string>
     <string name="status_no_access">no notification access</string>
+    <string name="cluster_none">No instrument cluster display found</string>
     <string name="cluster_send">Show the navigation app on the instrument cluster</string>
     <string name="cluster_bring_back">Bring the navigation app back from the cluster</string>
     <string name="status_navigation">Navigation</string>

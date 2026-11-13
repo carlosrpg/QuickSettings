@@ -128,6 +128,7 @@
     <string name="status_simulated">simulado</string>
     <string name="status_access_granted">acesso concedido</string>
     <string name="status_no_access">sem acesso às notificações</string>
+    <string name="cluster_none">Nenhuma tela de painel de instrumentos encontrada</string>
     <string name="cluster_send">Mostrar o app de navegação no painel de instrumentos</string>
     <string name="cluster_bring_back">Trazer o app de navegação de volta do painel</string>
     <string name="status_navigation">Navegação</string>

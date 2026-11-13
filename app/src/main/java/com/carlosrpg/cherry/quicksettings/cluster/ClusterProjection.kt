@@ -37,13 +37,23 @@ class ClusterProjection(private val context: Context, private val signals: Clust
     /** Package this app last sent to the cluster and has not brought back. */
     val onCluster: StateFlow<String?> = _onCluster.asStateFlow()
 
-    /** The cluster's display: id 2 on this head unit, else any other 1920x720 one. Null = none. */
+    /**
+     * The cluster's display. On the car it is display 2, else another 1920x720 one. Failing
+     * both, any other display the system lists for apps is taken: that is the cluster on the
+     * Automotive emulator (an "HDMI" display 1), which is how this can be tried off the car.
+     * Null when the default display is the only one.
+     */
     fun clusterDisplayId(): Int? {
         val others = displays.displays.filter { it.displayId != Display.DEFAULT_DISPLAY }
         return (others.firstOrNull { it.displayId == CLUSTER_DISPLAY_ID }
-            ?: others.firstOrNull { it.mode.physicalWidth == CLUSTER_WIDTH && it.mode.physicalHeight == CLUSTER_HEIGHT })
+            ?: others.firstOrNull { it.mode.physicalWidth == CLUSTER_WIDTH && it.mode.physicalHeight == CLUSTER_HEIGHT }
+            ?: others.firstOrNull())
             ?.displayId
     }
+
+    /** Every display the system lists for this app, as "id:WxH", for the debug screen. */
+    fun describeDisplays(): String =
+        displays.displays.joinToString(" ") { "${it.displayId}:${it.mode.physicalWidth}x${it.mode.physicalHeight}" }
 
     /** Sends [packageName] to the cluster. False when there is no cluster display or no such app. */
     fun sendToCluster(packageName: String): Boolean {

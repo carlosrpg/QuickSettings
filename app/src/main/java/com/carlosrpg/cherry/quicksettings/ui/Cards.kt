@@ -257,18 +257,25 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
         OpenAppChip(actions.navAppIcon(), Qs.Route, appName, actions::openNavApp, Modifier.weight(1f))
         Gap(10.dp)
         GlassButton(Icons.Mic, stringResource(R.string.voice_destination), actions::voiceNav, tint = if (listening) Qs.Route else Qs.Text)
-        // Only on a car with a cluster display: send the nav app there, or bring it back.
-        if (remember { actions.cluster.clusterDisplayId() } != null) {
-            val onCluster = actions.cluster.onCluster.collectAsState().value != null
-            Gap(10.dp)
-            GlassButton(
-                Icons.Cluster,
-                stringResource(if (onCluster) R.string.cluster_bring_back else R.string.cluster_send),
-                actions::toggleNavOnCluster,
-                tint = if (onCluster) Qs.Energy else Qs.Text,
-                background = if (onCluster) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
-            )
-        }
+        // Send the nav app to the instrument cluster, or bring it back. Always shown; dimmed
+        // and inert where the system reports no cluster display (looked up each time the card
+        // is drawn, since a display can come and go).
+        val hasCluster = actions.cluster.clusterDisplayId() != null
+        val onCluster = actions.cluster.onCluster.collectAsState().value != null
+        Gap(10.dp)
+        GlassButton(
+            Icons.Cluster,
+            stringResource(
+                when {
+                    !hasCluster -> R.string.cluster_none
+                    onCluster -> R.string.cluster_bring_back
+                    else -> R.string.cluster_send
+                }
+            ),
+            { if (hasCluster || onCluster) actions.toggleNavOnCluster() },
+            tint = when { onCluster -> Qs.Energy; hasCluster -> Qs.Text; else -> Qs.Dim },
+            background = if (onCluster) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
+        )
     }
     if (nav == null) {
         Column(

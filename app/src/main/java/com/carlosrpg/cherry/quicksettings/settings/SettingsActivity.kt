@@ -328,6 +328,7 @@ class SettingsActivity : ComponentActivity() {
             appendLine("${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())}  v${BuildConfig.VERSION_NAME}  mock=${BuildConfig.USE_MOCK}  user=${android.os.Process.myUserHandle()}")
             appendLine("car=${app.car.isConnected()}  carMedia=${app.media.carMediaConnected}  source=${app.media.carSourceLabel}")
             appendLine("raw ${app.car.debugRanges()}")
+            appendLine("cluster display=${app.cluster.clusterDisplayId()}  displays=${app.cluster.describeDisplays()}  onCluster=${app.cluster.onCluster.value}")
             appendLine("access=${hasNotificationAccess()}  listenerConnected=${listener != null}")
             appendLine("nav apps installed: ${navApps.ifEmpty { listOf("none known") }.joinToString()}")
             appendLine("nav route: ${nav?.let { "${it.packageName} \"${it.title}\" / \"${it.text}\" / \"${it.subText}\" arrow=${it.maneuver != null}" } ?: "none"}")
