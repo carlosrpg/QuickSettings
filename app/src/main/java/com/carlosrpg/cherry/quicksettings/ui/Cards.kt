@@ -26,6 +26,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import com.carlosrpg.cherry.quicksettings.car.Assist
+import com.carlosrpg.cherry.quicksettings.car.AssistBlock
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -163,6 +169,8 @@ private fun formatTime(ms: Long): String {
     return "%d:%02d".format(s / 60, s % 60)
 }
 
+private const val ASSIST_NOTICE_MS = 4_000L
+
 @Composable
 fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier = Modifier) = QsCard(modifier) {
     val appName = media.appLabel ?: stringResource(R.string.media_app)
@@ -293,28 +301,58 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
 }
 
 @Composable
-fun AssistCard(car: CarState, modifier: Modifier = Modifier) = QsCard(modifier) {
+fun AssistCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
     CardLabel(stringResource(R.string.driver_assist))
     // Fills the card: the gap between the rows grows with it and never drops below 8 dp.
     Column(Modifier.weight(1f).fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.SpaceBetween) {
-        AssistRow(car.aeb, Icons.Brake, stringResource(R.string.assist_aeb))
-        AssistRow(car.autoHold, Icons.AutoHold, stringResource(R.string.assist_auto_hold))
-        AssistRow(car.laneKeep, Icons.Lane, stringResource(R.string.assist_lane))
+        AssistRow(Assist.AEB, car.aeb, Icons.Brake, stringResource(R.string.assist_aeb), actions)
+        AssistRow(Assist.AUTO_HOLD, car.autoHold, Icons.AutoHold, stringResource(R.string.assist_auto_hold), actions)
+        AssistRow(Assist.LANE, car.laneKeep, Icons.Lane, stringResource(R.string.assist_lane), actions)
     }
 }
 
 @Composable
-private fun AssistRow(on: Boolean?, icon: String, name: String) {
+private fun AssistRow(assist: Assist, on: Boolean?, icon: String, name: String, actions: DrawerActions) {
+    val scope = rememberCoroutineScope()
+    // Switching a safety function off takes a second tap, as the car's own page asks first.
+    var armed by remember { mutableStateOf(false) }
+    // Why the car's rules refused the last tap, shown in place of On / Off for a moment.
+    var blocked by remember { mutableStateOf<AssistBlock?>(null) }
+    LaunchedEffect(armed, blocked) {
+        if (armed || blocked != null) {
+            delay(ASSIST_NOTICE_MS)
+            armed = false
+            blocked = null
+        }
+    }
     Row(
-        Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(Color(0x38000000)).padding(horizontal = 12.dp),
+        Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(Color(0x38000000))
+            .clickable(enabled = on != null, onClickLabel = name) {
+                blocked = null
+                if (on == true && assist.confirmOff && !armed) {
+                    armed = true
+                } else {
+                    armed = false
+                    scope.launch { blocked = actions.car.toggleAssist(assist) }
+                }
+            }
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AssistRing(on, icon, 40.dp, 22.dp)
         QsText(name, 14.sp, if (on == true) Qs.Text else Qs.Muted, FontWeight.SemiBold, Modifier.weight(1f).padding(start = 12.dp))
-        val (text, fg, bg) = when (on) {
-            true -> Triple(stringResource(R.string.pill_on), Qs.Energy, Qs.Energy.copy(alpha = 0.16f))
-            false -> Triple(stringResource(R.string.pill_off), Qs.Muted, Color(0x14FFFFFF))
-            null -> Triple("--", Qs.Muted, Color(0x14FFFFFF))
+        val notice = when {
+            armed -> R.string.assist_confirm_off
+            blocked == AssistBlock.IGNITION_OFF -> R.string.assist_block_ignition
+            blocked == AssistBlock.TOO_FAST -> R.string.assist_block_speed
+            blocked == AssistBlock.UNAVAILABLE -> R.string.assist_block_unavailable
+            else -> null
+        }
+        val (text, fg, bg) = when {
+            notice != null -> Triple(stringResource(notice), Qs.EnergyLow, Qs.EnergyLow.copy(alpha = 0.16f))
+            on == true -> Triple(stringResource(R.string.pill_on), Qs.Energy, Qs.Energy.copy(alpha = 0.16f))
+            on == false -> Triple(stringResource(R.string.pill_off), Qs.Muted, Color(0x14FFFFFF))
+            else -> Triple("--", Qs.Muted, Color(0x14FFFFFF))
         }
         Box(Modifier.clip(RoundedCornerShape(10.dp)).background(bg).padding(horizontal = 10.dp, vertical = 5.dp)) {
             QsText(text, 13.sp, fg, FontWeight.Bold)

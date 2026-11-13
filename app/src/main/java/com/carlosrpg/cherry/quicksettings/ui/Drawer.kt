@@ -567,7 +567,7 @@ private fun OpenDrawer(
                     when (type) {
                         WidgetType.MEDIA -> MediaCard(media, actions, listening, m)
                         WidgetType.NAVIGATION -> NavCard(nav, actions, listening, m)
-                        WidgetType.ASSIST -> AssistCard(car, m)
+                        WidgetType.ASSIST -> AssistCard(car, actions, m)
                         WidgetType.CLIMATE -> ClimateCard(car, actions, m)
                         WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)
                         WidgetType.AUTONOMY -> RangeCard(car, m)

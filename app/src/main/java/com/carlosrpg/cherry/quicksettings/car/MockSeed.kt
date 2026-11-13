@@ -24,5 +24,6 @@ fun seededMockBus(): MockCarBus = MockCarBus().apply {
     sendItemValue(VDEventCarInfo.MODULE_HVAC, OutsideTempSpec.ITEM_ID, (14 + OutsideTempSpec.RAW_OFFSET) * 2)
     sendItemValue(AssistIds.MODULE, AssistIds.ITEM_AEB, 1)
     sendItemValue(AssistIds.MODULE, AssistIds.ITEM_AUTO_HOLD, 1)
-    sendItemValue(AssistIds.MODULE, AssistIds.ITEM_EMERGENCY_LANE_KEEPING, 0)
+    sendItemValue(AssistIds.MODULE, AssistIds.ITEM_LANE_DEPARTURE_PREVENTION, 0)
+    sendItemValue(readonly, AssistIds.ITEM_POWER_MODE, 2) // ignition on
 }

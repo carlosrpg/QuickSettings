@@ -7,6 +7,11 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
 import com.carlosrpg.cherry.quicksettings.util.AppInfo
 import com.carlosrpg.cherry.quicksettings.util.AppInfo.toBitmap
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +35,13 @@ data class NavState(
 object NavStore {
     private val _state = MutableStateFlow<NavState?>(null)
     val state: StateFlow<NavState?> = _state.asStateFlow()
+
+    /**
+     * Shape of the last notification seen from a navigation app, for the settings status
+     * panel: when directions don't show, this says what the app actually posted.
+     */
+    @Volatile var lastSeen: String? = null
+        internal set
 
     /** Last nav app seen; used to open it or send it a destination when no route is active. */
     @Volatile var lastNavPackage: String? = null
@@ -94,14 +106,15 @@ class QsNotificationListener : NotificationListenerService() {
     override fun onListenerConnected() {
         val navs = activeNotifications.orEmpty().filter(::isNavApp)
         navs.lastOrNull()?.let { NavStore.rememberApp(it.packageName) }
-        NavStore.publish(navs.lastOrNull(::hasRoute)?.let(::parse))
+        NavStore.publish(navs.mapNotNull(::route).lastOrNull())
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (!isNavApp(sbn)) return
         NavStore.rememberApp(sbn.packageName)
+        val route = route(sbn)
         when {
-            hasRoute(sbn) -> NavStore.publish(parse(sbn))
+            route != null -> NavStore.publish(route)
             // The same app going back to an idle status means the route ended.
             NavStore.state.value?.packageName == sbn.packageName -> NavStore.publish(null)
         }
@@ -119,24 +132,74 @@ class QsNotificationListener : NotificationListenerService() {
         sbn.notification.category == Notification.CATEGORY_NAVIGATION ||
             (sbn.packageName in NavStore.KNOWN_NAV_PACKAGES && sbn.isOngoing)
 
-    // Idle status notifications ("Driving with Google Maps", Waze's "Running. Tap to open.")
-    // carry no manoeuvre arrow. A route has the arrow, or is a navigation-category notification
-    // with an instruction in it.
-    private fun hasRoute(sbn: StatusBarNotification): Boolean =
-        sbn.notification.getLargeIcon() != null ||
-            (sbn.notification.category == Notification.CATEGORY_NAVIGATION &&
-                !sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT).isNullOrBlank())
+    /**
+     * The route a nav app's notification describes, or null for an idle status one ("Driving
+     * with Google Maps", Waze's "Running. Tap to open."). Two shapes are understood:
+     *  - the standard one: title / text / large icon. A route has the manoeuvre arrow as its
+     *    large icon, or is a navigation-category notification with an instruction in it;
+     *  - a layout of the app's own (Waze draws its directions that way and leaves the standard
+     *    fields empty): the texts and the biggest image are read from the layout itself.
+     */
+    private fun route(sbn: StatusBarNotification): NavState? {
+        val n = sbn.notification
+        val extras = n.extras
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+        val arrow = n.getLargeIcon()
+        val custom = if (arrow == null) customContent(n) else null
+        NavStore.lastSeen = "${sbn.packageName} cat=${n.category} title=${!title.isNullOrBlank()} " +
+            "text=${!text.isNullOrBlank()} icon=${arrow != null} layout=${custom?.first?.size ?: "no"}"
+        val standard = arrow != null || (n.category == Notification.CATEGORY_NAVIGATION && !text.isNullOrBlank())
+        return when {
+            standard -> NavState(
+                packageName = sbn.packageName,
+                appLabel = AppInfo.label(this, sbn.packageName),
+                title = title,
+                text = text,
+                subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
+                maneuver = arrow?.loadDrawable(this)?.toBitmap(MANEUVER_PX),
+            )
+            // An instruction needs at least two texts (distance and street); one alone is a status line.
+            custom != null && custom.first.size >= 2 -> NavState(
+                packageName = sbn.packageName,
+                appLabel = AppInfo.label(this, sbn.packageName),
+                title = custom.first[0],
+                text = custom.first[1],
+                subText = custom.first.drop(2).joinToString(" \u00b7 ").takeIf { it.isNotBlank() },
+                maneuver = custom.second,
+            )
+            else -> null
+        }
+    }
 
-    private fun parse(sbn: StatusBarNotification): NavState {
-        val extras = sbn.notification.extras
-        return NavState(
-            packageName = sbn.packageName,
-            appLabel = AppInfo.label(this, sbn.packageName),
-            title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
-            text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
-            subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
-            maneuver = sbn.notification.getLargeIcon()?.loadDrawable(this)?.toBitmap(MANEUVER_PX),
-        )
+    /** The visible texts, top to bottom, and the biggest image of a notification's own layout. */
+    private fun customContent(n: Notification): Pair<List<String>, Bitmap?>? {
+        @Suppress("DEPRECATION")
+        val views = n.bigContentView ?: n.contentView ?: n.headsUpContentView ?: return null
+        return try {
+            val texts = mutableListOf<String>()
+            var image: Bitmap? = null
+            var imageArea = 0
+            fun walk(view: View) {
+                if (view.visibility != View.VISIBLE) return
+                when (view) {
+                    is ViewGroup -> for (i in 0 until view.childCount) walk(view.getChildAt(i))
+                    is TextView -> view.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let(texts::add)
+                    is ImageView -> view.drawable?.let { drawable ->
+                        val area = drawable.intrinsicWidth * drawable.intrinsicHeight
+                        if (area > imageArea) {
+                            imageArea = area
+                            image = drawable.toBitmap(MANEUVER_PX)
+                        }
+                    }
+                }
+            }
+            walk(views.apply(applicationContext, FrameLayout(this)))
+            texts to image
+        } catch (e: Exception) {
+            // The layout belongs to another app and may not inflate here.
+            null
+        }
     }
 
     private companion object {

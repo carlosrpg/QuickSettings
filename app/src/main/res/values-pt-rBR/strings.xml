@@ -75,7 +75,11 @@
     <string name="driver_assist">Assistência ao motorista</string>
     <string name="assist_aeb">Frenagem de emergência</string>
     <string name="assist_auto_hold">Auto Hold</string>
-    <string name="assist_lane">Permanência na faixa</string>
+    <string name="assist_lane">Prevenção de saída de faixa</string>
+    <string name="assist_confirm_off">Toque de novo para desligar</string>
+    <string name="assist_block_ignition">Ignição desligada</string>
+    <string name="assist_block_speed">Só abaixo de 10 km/h</string>
+    <string name="assist_block_unavailable">Indisponível</string>
 
     <string name="climate_driver">Clima · motorista</string>
     <string name="outside_temp">ext. %1$d°</string>
@@ -115,6 +119,8 @@
     <string name="status_simulated">simulado</string>
     <string name="status_access_granted">acesso concedido</string>
     <string name="status_no_access">sem acesso às notificações</string>
+    <string name="status_navigation">Navegação</string>
+    <string name="status_no_route">sem rota</string>
     <string name="status_version">Versão %1$s</string>
     <string name="drawer_position">Posição da gaveta</string>
     <string name="side">Lado</string>

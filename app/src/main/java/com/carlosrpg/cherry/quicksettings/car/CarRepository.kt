@@ -4,6 +4,7 @@ import app.jconfig.carbus.carinfo.AssistIds
 import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.CarBus
+import app.jconfig.carbus.carinfo.ClimatePanelSpec
 import app.jconfig.carbus.carinfo.FanSpec
 import app.jconfig.carbus.carinfo.NewEnergyIds
 import app.jconfig.carbus.carinfo.OutsideTempSpec
@@ -22,6 +23,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** One snapshot of the car. `null` = not read or not available. */
 data class CarState(
@@ -41,6 +43,20 @@ data class CarState(
     val autoHold: Boolean? = null,
     val laneKeep: Boolean? = null,
 )
+
+/**
+ * The driver-assist switches the drawer can flip, with the gates the car's own UI applies
+ * before it writes: all need the ignition on; emergency braking also needs the car below
+ * 10 km/h; [confirmOff] ones ask before switching off.
+ */
+enum class Assist(val item: Int, val confirmOff: Boolean, val maxSpeedKmh: Int? = null) {
+    AEB(AssistIds.ITEM_AEB, confirmOff = true, maxSpeedKmh = AssistIds.AEB_MAX_SPEED_KMH),
+    AUTO_HOLD(AssistIds.ITEM_AUTO_HOLD, confirmOff = false),
+    LANE(AssistIds.ITEM_LANE_DEPARTURE_PREVENTION, confirmOff = true),
+}
+
+/** Why a toggle was not sent. */
+enum class AssistBlock { IGNITION_OFF, TOO_FAST, UNAVAILABLE }
 
 private const val ENERGY = VDEventCarInfo.MODULE_NEW_ENERGY
 private const val READONLY = VDEventCarInfo.MODULE_READONLY_INFO
@@ -113,7 +129,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
             ),
             aeb = assist(AssistIds.ITEM_AEB),
             autoHold = assist(AssistIds.ITEM_AUTO_HOLD),
-            laneKeep = assist(AssistIds.ITEM_EMERGENCY_LANE_KEEPING),
+            laneKeep = assist(AssistIds.ITEM_LANE_DEPARTURE_PREVENTION),
         )
     }
 
@@ -146,23 +162,85 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         if (target != state.value.fanLevel) write(HVAC, FanSpec.ITEM_WRITE, target)
     }
 
+    /**
+     * Flips [assist] from a tap. Every gate is checked against a fresh read, not the last poll,
+     * and a failed read blocks the write. Returns why nothing was sent, or null when it was.
+     */
+    suspend fun toggleAssist(assist: Assist): AssistBlock? {
+        val blocked = withContext(Dispatchers.IO) {
+            mutex.withLock {
+                if (!bus.isServiceConnected()) return@withLock AssistBlock.UNAVAILABLE
+                if (!AssistIds.ignitionOn(bus.getItemValueOrNull(READONLY, AssistIds.ITEM_POWER_MODE))) {
+                    return@withLock AssistBlock.IGNITION_OFF
+                }
+                if (assist.maxSpeedKmh != null) {
+                    val speed = bus.getItemValueOrNull(READONLY, TelemetryIds.ITEM_CAR_SPEED)
+                        ?: return@withLock AssistBlock.UNAVAILABLE
+                    if (speed >= assist.maxSpeedKmh) return@withLock AssistBlock.TOO_FAST
+                }
+                val on = AssistIds.isOn(assist.item, bus.getItemValueOrNull(AssistIds.MODULE, assist.item))
+                    ?: return@withLock AssistBlock.UNAVAILABLE
+                try {
+                    bus.sendItemValue(AssistIds.MODULE, assist.item, AssistIds.command(!on))
+                } catch (e: LinkageError) {
+                    return@withLock AssistBlock.UNAVAILABLE
+                }
+                null
+            }
+        }
+        if (blocked == null) {
+            delay(WRITE_SETTLE_MS)
+            refresh()
+        }
+        return blocked
+    }
+
     private fun write(module: Int, id: Int, value: Int) {
         scope.launch(Dispatchers.IO) {
             // One bus call at a time: two writes racing each other (or a poll) can be lost.
+            var watchPanel = false
             mutex.withLock {
                 try {
+                    watchPanel = module == HVAC && !climatePanelShowing()
                     bus.sendItemValue(module, id, value)
                 } catch (e: LinkageError) {
                     // Vendor class mismatch on the device; the next poll shows the real state.
                 }
             }
+            if (watchPanel) keepClimatePanelDown()
             delay(WRITE_SETTLE_MS)
             refresh()
+        }
+    }
+
+    private fun climatePanelShowing() =
+        ClimatePanelSpec.isShowing(bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE))
+
+    /**
+     * The car answers a climate write by asking its own climate panel to open, full screen.
+     * Watch for that request for a moment and send the panel's close request, as the stock
+     * settings app does. Only called when the panel was not already up, so one the driver
+     * opened is left alone.
+     */
+    private suspend fun keepClimatePanelDown() {
+        repeat(PANEL_WATCH_POLLS) {
+            delay(PANEL_WATCH_POLL_MS)
+            mutex.withLock {
+                try {
+                    if (climatePanelShowing()) {
+                        bus.sendItemValue(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE, ClimatePanelSpec.COMMAND_CLOSE)
+                    }
+                } catch (e: LinkageError) {
+                    // As above.
+                }
+            }
         }
     }
 
     companion object {
         const val POLL_MS = 1_500L
         const val WRITE_SETTLE_MS = 400L
+        private const val PANEL_WATCH_POLLS = 8
+        private const val PANEL_WATCH_POLL_MS = 150L
     }
 }

@@ -20,7 +20,7 @@ Style: **Night Glass**, the approved styleguide.
 | Car mode | Battery-mode glyph and regen bars. Press and drag: up/down battery mode, left/right regen | Initial / Smart / Forced, hold-target slider when Forced, Low / Medium / High regen |
 | Autonomy | Battery ring (outer) and fuel ring (inner), electric km | Electric and fuel range, km and %, total |
 | Navigation | Next manoeuvre and distance; with no route, a tap starts a voice destination search | Nav app (tap to open it), next turn, street, ETA, voice destination |
-| Assist | Emergency braking, auto hold, lane keeping (read only) | Same, with On/Off |
+| Assist | Emergency braking, auto hold, lane departure prevention (status) | Same, with On/Off; tap a row to switch it. The car's own rules apply: ignition on, emergency braking only below 10 km/h, and a second tap to turn emergency braking or lane prevention off |
 
 Media volume: up, down and mute go through `AudioManager.adjustVolume`, the call the
 steering-wheel keys end in. The car's audio service moves whichever source is playing by one step
@@ -44,7 +44,17 @@ builds).
     session. Radio and DAB show only their name for now.
 
   An app that is playing wins; otherwise the car's current source is shown.
-- **Navigation**: the navigation app's turn-by-turn notification (title, text, arrow).
+- **Navigation**: the navigation app's turn-by-turn notification (title, text, arrow). When
+  an app draws its directions with a layout of its own and leaves the standard fields empty,
+  the texts and the arrow are read from that layout.
+- **Climate**: the car answers a temperature or fan write by asking its own full-screen climate
+  panel to open. The app watches for that request for about a second after its write and sends
+  the panel's close request, unless the panel was already open.
+
+**Always on.** The drawer runs as a foreground service that starts at boot, and again whenever
+the app's process starts for any reason. If the process is killed, the system re-binds the
+notification listener, which restarts the process and with it the drawer, so this depends on
+notification access being granted.
 
 The **Status** panel at the bottom of the settings screen shows, live, whether the car-data
 link, the car-media link and notification access are up.

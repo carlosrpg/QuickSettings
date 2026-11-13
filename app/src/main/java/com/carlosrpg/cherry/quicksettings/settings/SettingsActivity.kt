@@ -71,6 +71,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.carlosrpg.cherry.quicksettings.BuildConfig
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.app
+import com.carlosrpg.cherry.quicksettings.nav.NavStore
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import com.carlosrpg.cherry.quicksettings.overlay.TapRelayService
@@ -288,6 +289,13 @@ class SettingsActivity : ComponentActivity() {
             R.string.status_media_apps, sessions,
             stringResource(if (sessions) R.string.status_access_granted else R.string.status_no_access),
         )
+        val route = NavStore.state.collectAsState().value
+        StatusRow(
+            R.string.status_navigation, route != null,
+            route?.appLabel ?: stringResource(R.string.status_no_route),
+        )
+        // What the nav app last posted: the clue when its directions don't show.
+        NavStore.lastSeen?.let { Text(it, color = Qs.Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
         QsText(stringResource(R.string.status_version, BuildConfig.VERSION_NAME), 12.sp, Qs.Muted)
     }
 

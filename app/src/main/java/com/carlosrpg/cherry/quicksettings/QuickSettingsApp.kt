@@ -9,6 +9,7 @@ import app.jconfig.carbus.mock.MockCarMedia
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
 import com.carlosrpg.cherry.quicksettings.car.seededMockBus
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
+import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import com.carlosrpg.cherry.quicksettings.settings.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -32,6 +33,10 @@ class QuickSettingsApp : Application() {
         carMedia.bind()
         media = MediaRepository(this, scope, carMedia)
         settings = SettingsStore(this)
+        // Always on: whatever brought the process up (boot, the system re-binding the
+        // notification listener after the process was killed, an app update) also brings the
+        // drawer back. No-op until the overlay permission is granted.
+        OverlayService.start(this)
     }
 }
 

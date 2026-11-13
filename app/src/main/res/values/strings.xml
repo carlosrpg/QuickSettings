@@ -83,7 +83,11 @@
     <string name="driver_assist">Driver assist</string>
     <string name="assist_aeb">Emergency braking</string>
     <string name="assist_auto_hold">Auto hold</string>
-    <string name="assist_lane">Lane keeping</string>
+    <string name="assist_lane">Lane departure prevention</string>
+    <string name="assist_confirm_off">Tap again to turn off</string>
+    <string name="assist_block_ignition">Ignition is off</string>
+    <string name="assist_block_speed">Only below 10 km/h</string>
+    <string name="assist_block_unavailable">Not available</string>
 
     <!-- Climate -->
     <string name="climate_driver">Climate · driver</string>
@@ -126,6 +130,8 @@
     <string name="status_simulated">simulated</string>
     <string name="status_access_granted">access granted</string>
     <string name="status_no_access">no notification access</string>
+    <string name="status_navigation">Navigation</string>
+    <string name="status_no_route">no route</string>
     <string name="status_version">Version %1$s</string>
     <string name="drawer_position">Drawer position</string>
     <string name="side">Side</string>
