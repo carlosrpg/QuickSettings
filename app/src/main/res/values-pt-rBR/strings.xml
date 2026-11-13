@@ -80,9 +80,10 @@
     <string name="fcw_near">Perto</string>
     <string name="fcw_standard">Padrão</string>
     <string name="fcw_far">Longe</string>
-    <string name="climate_ac">A/C</string>
-    <string name="climate_sync">Sync</string>
-    <string name="climate_recirculation">Recircular</string>
+    <string name="climate_power">Ligar ou desligar o clima</string>
+    <string name="climate_auto">Modo automático</string>
+    <string name="climate_sync">Sincronizar zonas</string>
+    <string name="climate_recirculation">Recircular o ar</string>
     <string name="debug_log">Log de depuração</string>
     <string name="assist_confirm_off">Toque de novo para desligar</string>
     <string name="assist_block_ignition">Ignição desligada</string>

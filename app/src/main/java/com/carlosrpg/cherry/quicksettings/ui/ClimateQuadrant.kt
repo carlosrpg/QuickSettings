@@ -115,11 +115,13 @@ fun ClimateQuadrant(temp: Int?, fan: Int?, style: QuadrantStyle, modifier: Modif
     val plot = style.size - inset - far
     // Night glass with the temperature scale as a soft wash: warm at the top, cool at the bottom.
     Box(modifier.size(style.size).background(QuadrantGlass).background(QuadrantWash)) {
-        // The climate mark, centred on the plot area.
-        QsIcon(
-            Icons.AirConditioner, Color(0x59FFFFFF), style.mark, strokeWidth = 1.6f,
-            modifier = Modifier.offset(x = inset + (plot - style.mark) / 2, y = far + (plot - style.mark) / 2),
-        )
+        // "A/C" across the plot says what this controls; it lights up while the compressor runs.
+        CenteredAt(x = inset + plot / 2, y = far + plot / 2) {
+            Text(
+                "A/C", color = if (acOn == true) Qs.Energy.copy(alpha = 0.45f) else Color(0x33FFFFFF),
+                fontSize = (style.mark.value * 0.5f).sp, fontWeight = FontWeight.Bold, maxLines = 1,
+            )
+        }
         // Axes.
         Box(Modifier.offset(x = inset, y = far).width(1.dp).height(plot).background(Color(0x73FFFFFF)))
         Box(Modifier.offset(x = inset, y = far + plot).width(plot).height(1.dp).background(Color(0x73FFFFFF)))
@@ -128,12 +130,6 @@ fun ClimateQuadrant(temp: Int?, fan: Int?, style: QuadrantStyle, modifier: Modif
         QsIcon(Icons.Wind, Qs.Text, style.axisIcon, modifier = Modifier.offset(x = style.size - style.axisIcon - 3.dp, y = far + plot + (inset - style.axisIcon) / 2))
         // Values in the middle of their axes.
         CenteredAt(x = inset / 2, y = far + plot / 2) { AxisNumber(temp?.let { "$it°" } ?: "--", style.number) }
-        // The A/C state in the corner: says this is the climate control, and whether it is cooling.
-        Text(
-            "A/C", Modifier.align(Alignment.TopEnd).padding(top = far * 0.6f, end = far * 0.8f),
-            color = if (acOn == true) Qs.Energy else Color(0x80FFFFFF),
-            fontSize = style.number * 0.8f, fontWeight = FontWeight.Bold, maxLines = 1,
-        )
         CenteredAt(x = inset + plot / 2, y = far + plot + inset / 2) { AxisNumber(fan?.toString() ?: "--", style.number) }
         if (temp != null && fan != null) {
             val x = inset + plot * fanFraction(fan)

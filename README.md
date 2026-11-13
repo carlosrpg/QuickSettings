@@ -16,7 +16,7 @@ Style: **Night Glass**, the approved styleguide.
 | Widget | Semi-open | Open |
 |---|---|---|
 | Media | Album art, play/pause. Press and drag: up/down volume, left/right previous/next | Source (an app, tap to open it, or one of the car's own: Bluetooth, USB, CarPlay, Android Auto, …), title, progress, transport, volume, voice search sent to the app that owns the session |
-| Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | A large quadrant: touch anywhere to place the marker and drag it; values update live and are set on release. Below it, A/C, Sync and Recirculate buttons that follow the car's state |
+| Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | A large quadrant: touch anywhere to place the marker and drag it; values update live and are set on release. Beside it, four symbol buttons that follow the car's state: climate on/off, automatic mode, zone sync and air recirculation. "A/C" in the quadrant lights up while the compressor runs |
 | Car mode | Battery-mode glyph and regen bars. Press and drag: up/down battery mode, left/right regen | Initial / Smart / Forced, hold-target slider when Forced, Low / Medium / High regen |
 | Autonomy | Battery ring (outer) and fuel ring (inner), electric km | Electric and fuel range, km and %, total |
 | Navigation | Next manoeuvre and distance; with no route, a tap starts a voice destination search | Nav app (tap to open it), next turn, street, ETA, voice destination |

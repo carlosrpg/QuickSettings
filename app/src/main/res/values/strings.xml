@@ -88,9 +88,10 @@
     <string name="fcw_near">Near</string>
     <string name="fcw_standard">Standard</string>
     <string name="fcw_far">Far</string>
-    <string name="climate_ac">A/C</string>
-    <string name="climate_sync">Sync</string>
-    <string name="climate_recirculation">Recirculate</string>
+    <string name="climate_power">Climate on or off</string>
+    <string name="climate_auto">Automatic mode</string>
+    <string name="climate_sync">Sync zones</string>
+    <string name="climate_recirculation">Recirculate air</string>
     <string name="debug_log">Debug log</string>
     <string name="assist_confirm_off">Tap again to turn off</string>
     <string name="assist_block_ignition">Ignition is off</string>

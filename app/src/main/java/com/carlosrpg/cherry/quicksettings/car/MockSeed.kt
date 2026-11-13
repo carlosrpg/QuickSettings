@@ -22,7 +22,8 @@ fun seededMockBus(): MockCarBus = MockCarBus().apply {
     sendItemValue(energy, NewEnergyIds.ITEM_SOC_TARGET, 50)
     sendItemValues(energy, NewEnergyIds.ITEM_ELECTRIC_RANGE, intArrayOf(0, 58))
     sendItemValues(readonly, TelemetryIds.ITEM_RANGE_KM, intArrayOf(0x02, 0x2A)) // 554 km
-    sendItemValues(readonly, TelemetryIds.ITEM_FUEL_PERCENT, intArrayOf(45))
+    sendItemValues(readonly, TelemetryIds.ITEM_FUEL_PERCENT, intArrayOf(0x01, 0xC2)) // 45.0 %
+    sendItemValue(VDEventCarInfo.MODULE_HVAC, ClimateSwitch.AC.item, ClimateSwitch.AC.command(true))
     sendItemValue(VDEventCarInfo.MODULE_HVAC, OutsideTempSpec.ITEM_ID, (14 + OutsideTempSpec.RAW_OFFSET) * 2)
     sendItemValue(AssistIds.MODULE, AssistIds.ITEM_AEB, 1)
     sendItemValue(AssistIds.MODULE, AssistIds.ITEM_AUTO_HOLD, 1)

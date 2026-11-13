@@ -417,43 +417,47 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
     val temp = car.cabinTempC
     val fan = car.fanLevel
     // The quadrant is the control: touch anywhere to place the marker and drag it. Values update
-    // live under the finger; the car gets them once, on release.
+    // live under the finger; the car gets them once, on release. It takes all the room the card
+    // has; the panel's buttons stand in two pairs on either side of it.
     var picked by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val description = stringResource(R.string.desc_climate, (picked?.first ?: temp)?.toString() ?: "--", (picked?.second ?: fan)?.toString() ?: "--")
-    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-        val style = QuadrantStyle.scaled(minOf(maxWidth, maxHeight))
-        ClimateQuadrant(
-            picked?.first ?: temp, picked?.second ?: fan, style, acOn = car.acOn,
-            modifier =
-            Modifier.clip(RoundedCornerShape(18.dp))
-                .semantics { contentDescription = description }
-                .quadrantPicker(
-                    style,
-                    onMove = { t, f -> picked = t to f },
-                    onEnd = {
-                        picked?.let { (t, f) ->
-                            actions.car.setCabinTemp(t)
-                            actions.car.setFan(f)
-                        }
-                        picked = null
-                    },
-                ),
-        )
-    }
-    // The climate panel's own buttons, lit from the car's state and flipped on tap.
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ClimateButton(ClimateSwitch.AC, car.acOn, stringResource(R.string.climate_ac), actions, Modifier.weight(1f))
-        ClimateButton(ClimateSwitch.SYNC, car.sync, stringResource(R.string.climate_sync), actions, Modifier.weight(1f))
-        ClimateButton(ClimateSwitch.RECIRCULATION, car.recirculation, stringResource(R.string.climate_recirculation), actions, Modifier.weight(1f))
+    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
+            ClimateButton(ClimateSwitch.POWER, car.climateOn, Icons.Power, stringResource(R.string.climate_power), actions)
+            ClimateButton(ClimateSwitch.AUTO, car.autoClimate, Icons.AutoMode, stringResource(R.string.climate_auto), actions)
+        }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+            val style = QuadrantStyle.scaled(minOf(maxWidth, maxHeight))
+            ClimateQuadrant(
+                picked?.first ?: temp, picked?.second ?: fan, style, acOn = car.acOn,
+                modifier = Modifier.clip(RoundedCornerShape(18.dp))
+                    .semantics { contentDescription = description }
+                    .quadrantPicker(
+                        style,
+                        onMove = { t, f -> picked = t to f },
+                        onEnd = {
+                            picked?.let { (t, f) ->
+                                actions.car.setCabinTemp(t)
+                                actions.car.setFan(f)
+                            }
+                            picked = null
+                        },
+                    ),
+            )
+        }
+        Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
+            ClimateButton(ClimateSwitch.SYNC, car.sync, Icons.SyncZones, stringResource(R.string.climate_sync), actions)
+            ClimateButton(ClimateSwitch.RECIRCULATION, car.recirculation, Icons.Recirculate, stringResource(R.string.climate_recirculation), actions)
+        }
     }
 }
 
+/** One of the climate panel's buttons, as a symbol: lit from the car's state, flipped on tap. */
 @Composable
-private fun ClimateButton(switch: ClimateSwitch, on: Boolean?, label: String, actions: DrawerActions, modifier: Modifier) {
+private fun ClimateButton(switch: ClimateSwitch, on: Boolean?, icon: String, name: String, actions: DrawerActions) {
     val state = onOffLabel(on)
     GlassButton(
-        null, "$label, $state", { actions.car.toggleClimate(switch) }, modifier,
-        label = label,
+        icon, "$name, $state", { actions.car.toggleClimate(switch) },
         tint = when (on) { true -> Qs.Energy; false -> Qs.TextSoft; null -> Qs.Dim },
         background = if (on == true) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
     )

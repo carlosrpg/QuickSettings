@@ -45,7 +45,9 @@ data class CarState(
     val autoHold: Boolean? = null,
     val laneKeep: Boolean? = null,
     val collisionWarning: FcwLevel? = null,
+    val climateOn: Boolean? = null,
     val acOn: Boolean? = null,
+    val autoClimate: Boolean? = null,
     val recirculation: Boolean? = null,
     val sync: Boolean? = null,
 )
@@ -83,6 +85,13 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     /** Whether the car's own service is bound. Until it is, every value stays empty. */
     fun isConnected(): Boolean = bus.isServiceConnected()
+
+    /** Raw payloads of the range and fuel items, for the debug screen. */
+    fun debugRanges(): String = listOf(
+        "fuel%" to bus.getItemValues(READONLY, TelemetryIds.ITEM_FUEL_PERCENT),
+        "fuelKm" to bus.getItemValues(READONLY, TelemetryIds.ITEM_RANGE_KM),
+        "evKm" to bus.getItemValues(ENERGY, NewEnergyIds.ITEM_ELECTRIC_RANGE),
+    ).joinToString("  ") { (name, raw) -> "$name=${raw.toList()}" }
 
     /** Polls while something is on screen; call [stopPolling] when the drawer closes. */
     fun startPolling(intervalMs: Long = POLL_MS) {
@@ -138,7 +147,9 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
             autoHold = assist(AssistIds.ITEM_AUTO_HOLD),
             laneKeep = assist(AssistIds.ITEM_LANE_DEPARTURE_PREVENTION),
             collisionWarning = FcwLevel.of(bus.getItemValues(AssistIds.MODULE, FcwLevel.ITEM)),
+            climateOn = climate(ClimateSwitch.POWER),
             acOn = climate(ClimateSwitch.AC),
+            autoClimate = climate(ClimateSwitch.AUTO),
             recirculation = climate(ClimateSwitch.RECIRCULATION),
             sync = climate(ClimateSwitch.SYNC),
         )
@@ -176,7 +187,9 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     /** Flips a climate panel button. The car's own panel applies no gate to these. */
     fun toggleClimate(switch: ClimateSwitch) {
         val on = when (switch) {
+            ClimateSwitch.POWER -> state.value.climateOn
             ClimateSwitch.AC -> state.value.acOn
+            ClimateSwitch.AUTO -> state.value.autoClimate
             ClimateSwitch.RECIRCULATION -> state.value.recirculation
             ClimateSwitch.SYNC -> state.value.sync
         } ?: return
