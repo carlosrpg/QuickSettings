@@ -73,6 +73,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     val state: StateFlow<CarState> = _state.asStateFlow()
 
     private val mutex = Mutex()
+    private val climateSteps = Mutex()
     private var pollJob: Job? = null
 
     /** Whether the car's own service is bound. Until it is, every value stays empty. */
@@ -154,12 +155,14 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     /** Writes only when the clamped value differs from what the car last reported. */
     fun setCabinTemp(celsius: Int) {
         val target = celsius.coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX)
-        if (target != state.value.cabinTempC) write(HVAC, CabinTempSpec.ITEM_WRITE, CabinTempSpec.toRaw(target))
+        if (target != state.value.cabinTempC) {
+            stepClimate(CabinTempSpec.ITEM_WRITE, state.value.cabinTempC, target, CabinTempSpec::toRaw)
+        }
     }
 
     fun setFan(level: Int) {
         val target = level.coerceIn(FanSpec.MIN, FanSpec.MAX)
-        if (target != state.value.fanLevel) write(HVAC, FanSpec.ITEM_WRITE, target)
+        if (target != state.value.fanLevel) stepClimate(FanSpec.ITEM_WRITE, state.value.fanLevel, target) { it }
     }
 
     /**
@@ -213,6 +216,37 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         }
     }
 
+    /**
+     * Walks a climate value to [target] one step at a time, one command per step, and never
+     * interleaved with the other climate value. That is how the car's own +/- controls and the
+     * other apps known to change it quietly behave; a single jump of several steps, or a
+     * temperature and a fan command together, is the one thing this app did differently when
+     * the car answered by opening its climate panel.
+     */
+    private fun stepClimate(item: Int, from: Int?, target: Int, raw: (Int) -> Int) {
+        scope.launch(Dispatchers.IO) {
+            var watchPanel = false
+            climateSteps.withLock {
+                val start = from ?: target
+                val steps = if (start == target) listOf(target) else if (start < target) (start + 1..target) else (start - 1 downTo target)
+                for (value in steps) {
+                    mutex.withLock {
+                        try {
+                            watchPanel = watchPanel || !climatePanelShowing()
+                            bus.sendItemValue(HVAC, item, raw(value))
+                        } catch (e: LinkageError) {
+                            // Vendor class mismatch on the device; the next poll shows the real state.
+                        }
+                    }
+                    delay(CLIMATE_STEP_MS)
+                }
+            }
+            if (watchPanel) keepClimatePanelDown()
+            delay(WRITE_SETTLE_MS)
+            refresh()
+        }
+    }
+
     private fun climatePanelShowing() =
         ClimatePanelSpec.isShowing(bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE))
 
@@ -240,6 +274,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     companion object {
         const val POLL_MS = 1_500L
         const val WRITE_SETTLE_MS = 400L
+        const val CLIMATE_STEP_MS = 250L
         private const val PANEL_WATCH_POLLS = 8
         private const val PANEL_WATCH_POLL_MS = 150L
     }
