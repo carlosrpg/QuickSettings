@@ -117,10 +117,12 @@ fun ClimateTile(car: CarState, modifier: Modifier = Modifier) {
     }
 }
 
+/** Initial = a marker with a bolt, Smart = a light bulb, Forced = a charging battery. */
 fun BatteryMode?.icon(): String = when (this) {
-    BatteryMode.SMART -> Icons.BatteryBolt
-    BatteryMode.FORCED -> Icons.BatteryLock
-    else -> Icons.Battery
+    BatteryMode.INITIAL -> Icons.MarkerBolt
+    BatteryMode.SMART -> Icons.Bulb
+    BatteryMode.FORCED -> Icons.BatteryBolt
+    null -> Icons.Battery
 }
 
 @StringRes
@@ -148,17 +150,29 @@ fun onOffLabel(on: Boolean?): String = stringResource(
     when (on) { true -> R.string.value_on; false -> R.string.value_off; null -> R.string.value_unknown }
 )
 
+/**
+ * Regenerative braking as a brake disc with a bolt at its hub. The rim is three arcs, and
+ * as many light up as the level: one for Low, two for Medium, all three for High.
+ */
 @Composable
-fun RegenBars(regen: RegenLevel?, barWidth: Dp = 10.dp, maxHeight: Dp = 18.dp) {
-    val filled = when (regen) { RegenLevel.LOW -> 1; RegenLevel.MEDIUM -> 2; RegenLevel.HIGH -> 3; null -> 0 }
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
-        for (i in 1..3) {
-            Box(
-                Modifier.width(barWidth).height(maxHeight * (0.44f + 0.28f * (i - 1)))
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(if (i <= filled) Qs.Energy else Color(0x2EFFFFFF))
-            )
+fun RegenDial(regen: RegenLevel?, size: Dp, modifier: Modifier = Modifier) {
+    val lit = when (regen) { RegenLevel.LOW -> 1; RegenLevel.MEDIUM -> 2; RegenLevel.HIGH -> 3; null -> 0 }
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val rim = this.size.minDimension * 0.1f
+            val arc = Size(this.size.width - rim, this.size.height - rim)
+            val topLeft = Offset(rim / 2, rim / 2)
+            // Three arcs of 96 degrees with 24 degree gaps, filling clockwise from the lower left.
+            for (i in 0 until 3) {
+                drawArc(
+                    if (i < lit) Qs.Energy else Color(0x2EFFFFFF), 150f + i * 120f, 96f, false,
+                    topLeft, arc, style = Stroke(rim, cap = StrokeCap.Round),
+                )
+            }
+            // The disc inside the rim.
+            drawCircle(Color(0x59FFFFFF), radius = this.size.minDimension * 0.29f, style = Stroke(rim * 0.35f))
         }
+        QsIcon(Icons.Bolt, if (lit > 0) Qs.Text else Qs.Dim, size * 0.36f, strokeWidth = 2.2f)
     }
 }
 
@@ -174,7 +188,7 @@ fun ModeTile(car: CarState, modifier: Modifier = Modifier) {
             Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Qs.Mode.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
                 QsIcon(car.batteryMode.icon(), Qs.Mode, 26.dp)
             }
-            RegenBars(car.regen)
+            RegenDial(car.regen, 30.dp)
         }
     }
 }

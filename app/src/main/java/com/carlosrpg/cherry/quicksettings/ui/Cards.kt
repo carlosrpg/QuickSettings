@@ -465,16 +465,24 @@ private fun ClimateButton(switch: ClimateSwitch, on: Boolean?, icon: String, nam
 
 @Composable
 fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
-    CardLabel(stringResource(R.string.battery_mode))
-    Segmented(BatteryMode.entries, car.batteryMode, { it.label() }, Qs.Mode, actions.car::setBatteryMode, Modifier.padding(top = 6.dp))
+    // Two buttons, each a symbol of the current state; a tap moves to the next one.
+    Row(Modifier.weight(3f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        CycleButton(
+            stringResource(R.string.battery_mode), car.batteryMode?.label() ?: "--", Modifier.weight(1f),
+            onClick = { actions.car.setBatteryMode(nextOf(BatteryMode.entries, car.batteryMode)) },
+        ) { QsIcon(car.batteryMode.icon(), Qs.Mode, 46.dp, strokeWidth = 1.8f) }
+        CycleButton(
+            stringResource(R.string.regeneration), car.regen?.label() ?: "--", Modifier.weight(1f),
+            onClick = { actions.car.setRegen(nextOf(RegenLevel.entries, car.regen)) },
+        ) { RegenDial(car.regen, 50.dp) }
+    }
     // The hold target is always shown, so the card keeps one layout; it only works in Forced,
     // so anywhere else it is greyed out and disabled. Written once on release, not per step.
     val forced = car.batteryMode == BatteryMode.FORCED
     var dragging by remember { mutableStateOf(false) }
     var value by remember { mutableFloatStateOf((car.holdTarget ?: 50).toFloat()) }
     if (!dragging) value = (car.holdTarget ?: 50).toFloat()
-    // Free height is shared evenly between the three blocks, so none of them drifts apart.
-    Spacer(Modifier.weight(1f).heightIn(min = 10.dp))
+    Spacer(Modifier.height(12.dp))
     // Same inset as the segmented controls above and below, so all three line up.
     Column(Modifier.padding(horizontal = 4.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -492,9 +500,31 @@ fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = 
             enabled = forced,
         )
     }
-    Spacer(Modifier.weight(1f).heightIn(min = 10.dp))
-    CardLabel(stringResource(R.string.regeneration))
-    Segmented(RegenLevel.entries, car.regen, { it.label() }, Qs.Energy, actions.car::setRegen, Modifier.padding(top = 6.dp))
+}
+
+/** The state after [current] in [all], wrapping round; the first when nothing is known yet. */
+private fun <T> nextOf(all: List<T>, current: T?): T = all[(all.indexOf(current) + 1) % all.size]
+
+/** A big button that shows one state as a symbol and steps to the next on tap. */
+@Composable
+private fun CycleButton(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    symbol: @Composable () -> Unit,
+) {
+    Column(
+        modifier.fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(Qs.Button)
+            .clickable(onClickLabel = title, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = "$title, $value" }
+            .padding(vertical = 10.dp, horizontal = 6.dp),
+        verticalArrangement = Arrangement.SpaceEvenly, horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CardLabel(title)
+        symbol()
+        QsText(value, 15.sp, weight = FontWeight.Bold)
+    }
 }
 
 @Composable

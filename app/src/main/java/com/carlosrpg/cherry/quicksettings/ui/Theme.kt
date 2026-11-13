@@ -97,6 +97,9 @@ object Icons {
     const val Thermometer = "M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0zM12 10v5.5"
     /** Air-conditioner unit blowing air: the climate mark behind the quadrant (after SVG Repo's CC0 "airconditioning-o"). */
     const val AirConditioner = "M5 3h14a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zM5.5 8.5h13M12 14v7M8 14c0 3-1.3 5.3-3.6 7M16 14c0 3 1.3 5.3 3.6 7"
+    const val Bolt = "M13 3L6 13h5l-1 8l7-10h-5z"
+    const val Bulb = "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3"
+    const val MarkerBolt = "M12 21.5s-6.5-6-6.5-11.2a6.5 6.5 0 1 1 13 0c0 5.2-6.5 11.2-6.5 11.2M12.9 6.6l-2.4 3.6h3l-2.4 3.6"
     const val Power = "M12 4v8M7.6 6.6a7 7 0 1 0 8.8 0"
     const val AutoMode = "M7.5 18L12 6l4.5 12M9.2 13.8h5.6"
     const val SyncZones = "M4 9h13l-3.5-3.5M20 15H7l3.5 3.5"
