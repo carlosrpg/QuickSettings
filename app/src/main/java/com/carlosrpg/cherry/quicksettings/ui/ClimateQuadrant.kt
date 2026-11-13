@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -108,16 +109,15 @@ private fun fanFraction(f: Int) = (f / FanSpec.MAX.toFloat()).coerceIn(0f, 1f)
  * over everything; the values sit in the middle of their axes.
  */
 @Composable
-fun ClimateQuadrant(temp: Int?, fan: Int?, style: QuadrantStyle, modifier: Modifier = Modifier) {
+fun ClimateQuadrant(temp: Int?, fan: Int?, style: QuadrantStyle, modifier: Modifier = Modifier, acOn: Boolean? = null) {
     val inset = style.axisInset
     val far = style.topRightInset
     val plot = style.size - inset - far
-    Box(modifier.size(style.size).background(Qs.TempGradient)) {
-        // Low fan dims the colour; full fan shows it at full strength.
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xC70A0E14), Color(0x0D0A0E14)))))
+    // Night glass with the temperature scale as a soft wash: warm at the top, cool at the bottom.
+    Box(modifier.size(style.size).background(QuadrantGlass).background(QuadrantWash)) {
         // The climate mark, centred on the plot area.
         QsIcon(
-            Icons.AirConditioner, Color(0x40FFFFFF), style.mark, strokeWidth = 1.6f,
+            Icons.AirConditioner, Color(0x59FFFFFF), style.mark, strokeWidth = 1.6f,
             modifier = Modifier.offset(x = inset + (plot - style.mark) / 2, y = far + (plot - style.mark) / 2),
         )
         // Axes.
@@ -127,7 +127,13 @@ fun ClimateQuadrant(temp: Int?, fan: Int?, style: QuadrantStyle, modifier: Modif
         QsIcon(Icons.Thermometer, Qs.Text, style.axisIcon, modifier = Modifier.offset(x = (inset - style.axisIcon) / 2, y = 3.dp))
         QsIcon(Icons.Wind, Qs.Text, style.axisIcon, modifier = Modifier.offset(x = style.size - style.axisIcon - 3.dp, y = far + plot + (inset - style.axisIcon) / 2))
         // Values in the middle of their axes.
-        CenteredAt(x = inset / 2, y = far + plot / 2) { AxisNumber(temp?.toString() ?: "--", style.number) }
+        CenteredAt(x = inset / 2, y = far + plot / 2) { AxisNumber(temp?.let { "$it°" } ?: "--", style.number) }
+        // The A/C state in the corner: says this is the climate control, and whether it is cooling.
+        Text(
+            "A/C", Modifier.align(Alignment.TopEnd).padding(top = far * 0.6f, end = far * 0.8f),
+            color = if (acOn == true) Qs.Energy else Color(0x80FFFFFF),
+            fontSize = style.number * 0.8f, fontWeight = FontWeight.Bold, maxLines = 1,
+        )
         CenteredAt(x = inset + plot / 2, y = far + plot + inset / 2) { AxisNumber(fan?.toString() ?: "--", style.number) }
         if (temp != null && fan != null) {
             val x = inset + plot * fanFraction(fan)
@@ -150,6 +156,11 @@ fun ClimateQuadrant(temp: Int?, fan: Int?, style: QuadrantStyle, modifier: Modif
         }
     }
 }
+
+private val QuadrantGlass = Color(0xFF161C26)
+private val QuadrantWash = Brush.verticalGradient(
+    listOf(Qs.Warm.copy(alpha = 0.34f), Color(0x339A7BD1), Qs.Route.copy(alpha = 0.34f))
+)
 
 @Composable
 private fun AxisNumber(text: String, size: TextUnit) =

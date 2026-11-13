@@ -423,7 +423,8 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
         val style = QuadrantStyle.scaled(minOf(maxWidth, maxHeight))
         ClimateQuadrant(
-            picked?.first ?: temp, picked?.second ?: fan, style,
+            picked?.first ?: temp, picked?.second ?: fan, style, acOn = car.acOn,
+            modifier =
             Modifier.clip(RoundedCornerShape(18.dp))
                 .semantics { contentDescription = description }
                 .quadrantPicker(

@@ -113,7 +113,7 @@ fun ClimateTile(car: CarState, modifier: Modifier = Modifier) {
     val fan = car.fanLevel
     val description = stringResource(R.string.desc_climate, temp?.toString() ?: "--", fan?.toString() ?: "--")
     TileFrame(description, modifier) {
-        ClimateQuadrant(temp, fan, QuadrantStyle.Tile)
+        ClimateQuadrant(temp, fan, QuadrantStyle.Tile, acOn = car.acOn)
     }
 }
 
