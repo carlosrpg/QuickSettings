@@ -6,6 +6,7 @@ import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.ClimatePanelSpec
 import app.jconfig.carbus.carinfo.ClimateSwitch
+import com.carlosrpg.cherry.quicksettings.nav.DebugLog
 import app.jconfig.carbus.carinfo.FcwLevel
 import app.jconfig.carbus.carinfo.FanSpec
 import app.jconfig.carbus.carinfo.NewEnergyIds
@@ -81,6 +82,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     val state: StateFlow<CarState> = _state.asStateFlow()
 
     private val mutex = Mutex()
+    private val climate = Mutex()
     private var pollJob: Job? = null
 
     /** Whether the car's own service is bound. Until it is, every value stays empty. */
@@ -273,50 +275,71 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     private fun write(module: Int, id: Int, value: Int) {
         scope.launch(Dispatchers.IO) {
-            // One bus call at a time: two writes racing each other (or a poll) can be lost.
-            var watchPanel = false
-            mutex.withLock {
-                try {
-                    watchPanel = module == HVAC && !climatePanelShowing()
-                    bus.sendItemValue(module, id, value)
-                } catch (e: LinkageError) {
-                    // Vendor class mismatch on the device; the next poll shows the real state.
-                }
+            if (module == HVAC) {
+                // One climate command at a time, each watched to its end before the next goes out:
+                // a temperature and a fan change from one drag never reach the car together. The
+                // app known to change the climate without the car's panel appearing never sends
+                // two at once either.
+                climate.withLock { writeClimate(id, value) }
+            } else {
+                send(module, id, value)
             }
-            if (watchPanel) keepClimatePanelDown()
             delay(WRITE_SETTLE_MS)
             refresh()
         }
     }
 
-    private fun climatePanelShowing() =
-        ClimatePanelSpec.isShowing(bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE))
+    /** One bus call at a time: two writes racing each other (or a poll) can be lost. */
+    private suspend fun send(module: Int, id: Int, value: Int) = mutex.withLock {
+        try {
+            bus.sendItemValue(module, id, value)
+        } catch (e: LinkageError) {
+            // Vendor class mismatch on the device; the next poll shows the real state.
+        }
+    }
 
     /**
-     * The car answers a climate write by asking its own climate panel to open, full screen.
-     * Watch for that request for a moment and send the panel's close request, as the stock
-     * settings app does. Only called when the panel was not already up, so one the driver
-     * opened is left alone.
+     * A climate write, followed by a watch on the car's "show climate panel" item. Every change
+     * of that item is written to the debug log against the write that preceded it, so a test on
+     * the car shows exactly which command makes the car raise its panel.
      */
-    private suspend fun keepClimatePanelDown() {
+    private suspend fun writeClimate(id: Int, value: Int) {
+        val before = mutex.withLock { panelItem() }
+        DebugLog.add("climate-$id-${System.currentTimeMillis()}", "hvac $id=$value  panel=$before")
+        send(HVAC, id, value)
+        var last = before
+        val start = System.currentTimeMillis()
         repeat(PANEL_WATCH_POLLS) {
             delay(PANEL_WATCH_POLL_MS)
             mutex.withLock {
-                try {
-                    if (climatePanelShowing()) {
+                val now = panelItem()
+                if (now != last) {
+                    DebugLog.add("climate-$id-${System.currentTimeMillis()}", "  after $id=$value: panel $last->$now at +${System.currentTimeMillis() - start}ms")
+                    last = now
+                }
+                // Close a panel our write raised, as the stock settings app does; one the driver
+                // had open before is left alone.
+                if (!ClimatePanelSpec.isShowing(before) && ClimatePanelSpec.isShowing(now)) {
+                    try {
                         bus.sendItemValue(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE, ClimatePanelSpec.COMMAND_CLOSE)
+                    } catch (e: LinkageError) {
+                        // As above.
                     }
-                } catch (e: LinkageError) {
-                    // As above.
                 }
             }
         }
     }
 
+    private fun panelItem(): Int? = bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE)
+
     companion object {
         const val POLL_MS = 1_500L
         const val WRITE_SETTLE_MS = 400L
-        private const val PANEL_WATCH_POLLS = 8
+        // About two seconds: long enough to see the car react, short enough between two writes.
+        private const val PANEL_WATCH_POLLS = 14
         private const val PANEL_WATCH_POLL_MS = 150L
+
+        /** How long one climate write holds the next one back. */
+        const val CLIMATE_WRITE_MS = PANEL_WATCH_POLLS * PANEL_WATCH_POLL_MS
     }
 }
