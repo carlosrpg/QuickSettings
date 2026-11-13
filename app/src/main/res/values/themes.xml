@@ -5,4 +5,17 @@
         <item name="android:statusBarColor">#FF0B1018</item>
         <item name="android:navigationBarColor">#FF0B1018</item>
     </style>
+    <!-- The blank window that wakes the instrument cluster's display. -->
+    <style name="Theme.QuickSettings.ClusterWake" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:windowActionBar">false</item>
+    </style>
 </resources>

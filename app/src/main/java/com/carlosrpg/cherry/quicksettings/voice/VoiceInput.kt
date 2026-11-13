@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,9 @@ class VoiceInput(private val context: Context) {
             return
         }
         cancel()
+        // Android 11 lets a foreground service use the microphone only if it was (re)started
+        // while the app had a window on screen. At boot it had none; the drawer is showing now.
+        OverlayService.start(context)
         val r = SpeechRecognizer.createSpeechRecognizer(context)
         recognizer = r
         r.setRecognitionListener(object : RecognitionListener {

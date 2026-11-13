@@ -1,9 +1,11 @@
+import com.android.build.api.artifact.SingleArtifact
+import java.io.File
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
-
-import java.util.Properties
 
 val useMock = providers.gradleProperty("qs.mock").map { it.toBoolean() }.getOrElse(true)
 
@@ -23,9 +25,30 @@ android {
     defaultConfig {
         applicationId = "com.carlosrpg.cherry.quicksettings"
         minSdk = 30
+        // The head unit's own version (Android Automotive 11), so it shows no "built for an older
+        // version" notice. The overlay is then not granted at install, and the car has no settings
+        // page for it: it is granted over adb (the settings screen shows the command). The
+        // microphone is the normal runtime prompt.
         targetSdk = 30
-        versionCode = 1
-        versionName = providers.gradleProperty("appVersionName").getOrElse("0.1.0")
+        // Same scheme as AABrowser-Motion. CI passes -PappVersionName=X.Y.Z[-suffix]; local builds
+        // mirror it (next patch after the latest vX.Y.Z tag, "-dev") so they install over CI builds.
+        // Both are signed with the same key, and a lower versionCode would be rejected as a downgrade.
+        val appVersionName = (findProperty("appVersionName") as String?) ?: run {
+            val latestTag = runCatching {
+                providers.exec {
+                    commandLine("git", "tag", "--list", "v*", "--sort=-v:refname")
+                    isIgnoreExitValue = true
+                }.standardOutput.asText.get()
+            }.getOrDefault("").lineSequence().map(String::trim)
+                .firstOrNull { Regex("""v\d+\.\d+\.\d+""").matches(it) }
+            val (tagMajor, tagMinor, tagPatch) = (latestTag ?: "v0.1.0").removePrefix("v").split('.').map(String::toInt)
+            "$tagMajor.$tagMinor.${tagPatch + 1}-dev"
+        }
+        val semver = appVersionName.substringBefore('-').split('.').mapNotNull(String::toIntOrNull)
+        require(semver.size == 3) { "appVersionName must be MAJOR.MINOR.PATCH, got '$appVersionName'" }
+        val (major, minor, patch) = semver
+        versionCode = major * 1_000_000 + minor * 1_000 + patch
+        versionName = appVersionName
         buildConfigField("boolean", "USE_MOCK", useMock.toString())
     }
     signingConfigs {
@@ -55,14 +78,37 @@ android {
         unitTests.all { it.useJUnitPlatform() }
     }
     lint {
-        // The head unit runs Android 11; the app deliberately targets it.
+        // The head unit runs Android 11 and the app is sideloaded: it targets that, not the latest.
         disable += "ExpiredTargetSdkVersion"
         disable += "OldTargetApi"
+    }
+
+    // QuickSettings-<version>[_debug].apk in build/renamedApks/<variant>/, as AABrowser-Motion does.
+    androidComponents {
+        onVariants { variant ->
+            val versionLabel = android.defaultConfig.versionName ?: "unknown"
+            val suffix = if (variant.buildType == "debug") "_debug" else ""
+            val rename = tasks.register<RenameApkTask>("${variant.name}RenameApk") {
+                inputDir.set(variant.artifacts.get(SingleArtifact.APK))
+                outputDir.set(layout.buildDirectory.dir("renamedApks/${variant.name}"))
+                appName.set("QuickSettings")
+                versionNameProp.set(versionLabel)
+                debugSuffixProp.set(suffix)
+            }
+            afterEvaluate {
+                val assemble = "assemble${variant.name.replaceFirstChar { it.uppercase() }}"
+                if (tasks.findByName(assemble) != null) tasks.named(assemble).configure { finalizedBy(rename) }
+            }
+        }
     }
 }
 
 dependencies {
-    implementation(libs.carbus)
+    // jconfig-carbus, prebuilt: scripts/update-carbus.sh rebuilds both from a sibling checkout.
+    implementation(files("libs/carbus-0.2.0.aar"))
+    // The vendor client classes carbus reflects over. The car has no copy an app can load, so
+    // without this every car read fails (CarBundleTest guards it).
+    implementation(files("libs/vdbus-client-0.2.0.aar"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
@@ -78,4 +124,33 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.truth)
+}
+
+abstract class RenameApkTask : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val inputDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Input
+    abstract val appName: Property<String>
+
+    @get:Input
+    abstract val versionNameProp: Property<String>
+
+    @get:Input
+    abstract val debugSuffixProp: Property<String>
+
+    @TaskAction
+    fun run() {
+        val outDir = outputDir.get().asFile
+        if (outDir.exists()) outDir.listFiles()?.forEach { it.deleteRecursively() } else outDir.mkdirs()
+        inputDir.get().asFile.listFiles()?.filter { it.extension == "apk" }?.forEach { f ->
+            val dest = File(outDir, "${appName.get()}-${versionNameProp.get()}${debugSuffixProp.get()}.apk")
+            f.copyTo(dest, overwrite = true)
+            println("APK Renamed and Copied to: ${dest.absolutePath}")
+        }
+    }
 }

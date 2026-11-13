@@ -25,6 +25,25 @@ class LayoutLogicTest {
     }
 
     @Test
+    fun `media zones follow the zone map`() {
+        fun zone(x: Float, y: Float) = mediaZone(Offset(x, y), deadPx = 16f, bandHalfPx = 64f, sidePx = 56f)
+
+        // Dead band in the centre column.
+        assertThat(zone(0f, 0f)).isEqualTo(MediaZone.NONE)
+        assertThat(zone(30f, -10f)).isEqualTo(MediaZone.NONE)
+        // Slow volume just above / below the dead band, fast beyond the band, at any width.
+        assertThat(zone(10f, -30f)).isEqualTo(MediaZone.VOLUME_UP)
+        assertThat(zone(-20f, 40f)).isEqualTo(MediaZone.VOLUME_DOWN)
+        assertThat(zone(120f, -80f)).isEqualTo(MediaZone.VOLUME_UP_FAST)
+        assertThat(zone(-120f, 90f)).isEqualTo(MediaZone.VOLUME_DOWN_FAST)
+        // Sides inside the band are tracks, even a little off the centre line.
+        assertThat(zone(70f, -40f)).isEqualTo(MediaZone.NEXT)
+        assertThat(zone(-60f, 30f)).isEqualTo(MediaZone.PREVIOUS)
+        assertThat(MediaZone.VOLUME_UP_FAST.stepsPerSecond).isEqualTo(2)
+        assertThat(MediaZone.VOLUME_DOWN.stepsPerSecond).isEqualTo(1)
+    }
+
+    @Test
     fun `landscape packs the approved four column grid`() {
         val rows = packRows(listOf(MEDIA, NAVIGATION, ASSIST, CLIMATE, CAR_MODE, AUTONOMY), columns = 4)
         assertThat(rows).containsExactly(
@@ -49,5 +68,15 @@ class LayoutLogicTest {
         assertThat(SettingsStore.decode("MEDIA,BOGUS,MEDIA")).containsExactly(MEDIA)
         assertThat(SettingsStore.decode(null)).isNull()
         assertThat(SettingsStore.decode(SettingsStore.encode(emptyList<WidgetType>()))).isEmpty()
+    }
+
+    @Test
+    fun `a hidden widget keeps its place in the settings order`() {
+        // Hiding CLIMATE leaves it between MEDIA and CAR_MODE; an order saved before a widget
+        // existed gets that widget appended.
+        val shown = listOf(MEDIA, CAR_MODE)
+        assertThat(com.carlosrpg.cherry.quicksettings.settings.withHidden(listOf(MEDIA, CLIMATE, CAR_MODE)))
+            .containsExactly(MEDIA, CLIMATE, CAR_MODE, AUTONOMY, NAVIGATION, ASSIST).inOrder()
+        assertThat(listOf(MEDIA, CLIMATE, CAR_MODE).filter { it in shown }).containsExactly(MEDIA, CAR_MODE).inOrder()
     }
 }

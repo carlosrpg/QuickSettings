@@ -41,7 +41,7 @@ object Qs {
     val EnergyCritical = Color(0xFFFF5A5F)
     val Fuel = Color(0xFFF2B84B)
     val Route = Color(0xFF4DA3FF)
-    val Mode = Color(0xFF2FD3B5)
+    val Mode = Color(0xFF3DDC97)
 
     val DrawerRadius = 32.dp
     val TileRadius = 22.dp
@@ -93,7 +93,18 @@ object Icons {
     const val BatteryBolt = "$Battery M11 9l-2 3h3l-2 3"
     const val BatteryLock = "$Battery M7 12h6"
     const val Fuel = "M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3M7 8h4"
-    const val Fan = "M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"
+    const val Wind = "M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"
+    const val Thermometer = "M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0zM12 10v5.5"
+    /** Air-conditioner unit blowing air: the climate mark behind the quadrant (after SVG Repo's CC0 "airconditioning-o"). */
+    const val AirConditioner = "M5 3h14a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zM5.5 8.5h13M12 14v7M8 14c0 3-1.3 5.3-3.6 7M16 14c0 3 1.3 5.3 3.6 7"
+    const val Bulb = "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3"
+    const val MarkerBolt = "M12 21.5s-6.5-6-6.5-11.2a6.5 6.5 0 1 1 13 0c0 5.2-6.5 11.2-6.5 11.2M12.9 6.6l-2.4 3.6h3l-2.4 3.6"
+    const val Cluster = "M3.5 17a8.5 8.5 0 0 1 17 0M12 17l3.6-5.6M2.5 20h19"
+    const val Power = "M12 4v8M7.6 6.6a7 7 0 1 0 8.8 0"
+    const val AutoMode = "M7.5 18L12 6l4.5 12M9.2 13.8h5.6"
+    const val SyncZones = "M4 9h13l-3.5-3.5M20 15H7l3.5 3.5"
+    const val Recirculate = "M18.5 9A7 7 0 1 0 19 13.5M19 4.5V9h-4.5"
+    const val Collision = "M12 4L21 19H3ZM12 10v4M12 16.5h.01"
     const val Brake = "M17 12a5 5 0 1 1-10 0a5 5 0 1 1 10 0M5 7a8 8 0 0 0 0 10M19 7a8 8 0 0 1 0 10M12 10v2M12 14h.01"
     const val AutoHold = "M19 12a7 7 0 1 1-14 0a7 7 0 1 1 14 0M9.5 15l2.5-6 2.5 6M10.3 13h3.4"
     const val Lane = "M7 20L10 4M17 20L14 4M12 13v3"
@@ -110,10 +121,11 @@ fun QsIcon(
     filled: Boolean = false,
     strokeWidth: Float = 2f,
     modifier: Modifier = Modifier,
+    viewport: Float = 24f,
 ) {
     val parsed = remember(path) { PathParser().parsePathString(path).toPath() }
     Canvas(modifier.size(size)) {
-        val k = this.size.minDimension / 24f
+        val k = this.size.minDimension / viewport
         scale(k, k, pivot = Offset.Zero) {
             drawPath(
                 parsed, tint,

@@ -14,14 +14,16 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * The closed state: an invisible swipe zone along the edge that draws only the 6×72 dp hint.
- * A swipe away from the edge calls [onOpen]; a plain tap is handed to [onTap] with its screen
- * position so it can be replayed on the app underneath.
+ * The closed state: an invisible touch zone along the edge that draws only the 6×72 dp hint.
+ * With [tapOpens] a touch calls [onOpen] as soon as it lands. Otherwise a swipe away from the
+ * edge calls [onOpen] and a plain tap is handed to [onTap] with its screen position so it can
+ * be replayed on the app underneath.
  */
 @SuppressLint("ViewConstructor")
 class EdgeTouchView(
     context: Context,
     var side: Side,
+    var tapOpens: Boolean,
     private val onOpen: () -> Unit,
     private val onTap: (rawX: Float, rawY: Float) -> Unit,
 ) : View(context) {
@@ -55,6 +57,13 @@ class EdgeTouchView(
                 downX = event.rawX
                 downY = event.rawY
                 opened = false
+                // On touch-down, not on release: the car's back gesture takes over any touch that
+                // starts within 30 px of the screen edge once it moves, and we then never see the
+                // release.
+                if (tapOpens) {
+                    opened = true
+                    onOpen()
+                }
             }
             MotionEvent.ACTION_MOVE -> if (!opened) {
                 val inward = if (side == Side.LEFT) event.rawX - downX else downX - event.rawX

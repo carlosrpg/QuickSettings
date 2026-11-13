@@ -30,9 +30,22 @@
             </intent-filter>
         </activity>
 
+        <!-- "microphone": on Android 11 a foreground service gets the mic for voice search only
+             with this type (the drawer is not an activity, so the app is never "on top"). -->
         <service
             android:name=".overlay.OverlayService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- Blank, short-lived: started on the instrument cluster's display to wake it. -->
+        <activity
+            android:name=".cluster.ClusterWakeActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.QuickSettings.ClusterWake" />
 
         <service
             android:name=".nav.QsNotificationListener"
