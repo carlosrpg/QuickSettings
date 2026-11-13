@@ -69,4 +69,14 @@ class LayoutLogicTest {
         assertThat(SettingsStore.decode(null)).isNull()
         assertThat(SettingsStore.decode(SettingsStore.encode(emptyList<WidgetType>()))).isEmpty()
     }
+
+    @Test
+    fun `a hidden widget keeps its place in the settings order`() {
+        // Hiding CLIMATE leaves it between MEDIA and CAR_MODE; an order saved before a widget
+        // existed gets that widget appended.
+        val shown = listOf(MEDIA, CAR_MODE)
+        assertThat(com.carlosrpg.cherry.quicksettings.settings.withHidden(listOf(MEDIA, CLIMATE, CAR_MODE)))
+            .containsExactly(MEDIA, CLIMATE, CAR_MODE, AUTONOMY, NAVIGATION, ASSIST).inOrder()
+        assertThat(listOf(MEDIA, CLIMATE, CAR_MODE).filter { it in shown }).containsExactly(MEDIA, CAR_MODE).inOrder()
+    }
 }

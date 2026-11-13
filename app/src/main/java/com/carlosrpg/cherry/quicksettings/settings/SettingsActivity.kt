@@ -223,9 +223,14 @@ class SettingsActivity : ComponentActivity() {
             )
         }
         QsText(stringResource(R.string.widgets_hint), 13.sp, Qs.Muted)
-        val list = if (tab == 0) config.semi else config.open
+        val order = if (tab == 0) config.semiOrder else config.openOrder
+        val shown = if (tab == 0) config.semi else config.open
         key(tab) {
-            WidgetList(list) { updated -> store.update { if (tab == 0) it.copy(semi = updated) else it.copy(open = updated) } }
+            WidgetList(order, shown) { newOrder, newShown ->
+                store.update {
+                    if (tab == 0) it.copy(semi = newShown, semiOrder = newOrder) else it.copy(open = newShown, openOrder = newOrder)
+                }
+            }
         }
     }
 
@@ -375,17 +380,21 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun WidgetList(enabled: List<WidgetType>, onChange: (List<WidgetType>) -> Unit) {
+    /**
+     * [saved] is every widget in list order, hidden ones included, so a hidden widget keeps its
+     * row; [shown] is the ones switched on. [onChange] gets the new order and the shown widgets
+     * in that order.
+     */
+    private fun WidgetList(saved: List<WidgetType>, shown: List<WidgetType>, onChange: (List<WidgetType>, List<WidgetType>) -> Unit) {
         val rowHeightPx = with(LocalDensity.current) { 74.dp.toPx() }
         var dragging by remember { mutableStateOf<WidgetType?>(null) }
         var dragOffset by remember { mutableFloatStateOf(0f) }
-        var order by remember(enabled) { mutableStateOf(enabled) }
-        val all = order + WidgetType.entries.filter { it !in order }
+        var order by remember(saved) { mutableStateOf(saved) }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            all.forEach { type ->
+            order.forEach { type ->
                 // Keyed so a row keeps its drag gesture when it moves to another slot.
                 key(type) {
-                    val on = type in order
+                    val on = type in shown
                     val isDragged = dragging == type
                     val title = stringResource(type.titleRes())
                     Row(
@@ -402,7 +411,7 @@ class SettingsActivity : ComponentActivity() {
                         val reorderDescription = stringResource(R.string.reorder, title)
                         Box(
                             Modifier.size(56.dp).semantics { contentDescription = reorderDescription }
-                                .then(if (!on) Modifier else Modifier.pointerInput(type, enabled) {
+                                .then(Modifier.pointerInput(type, saved, shown) {
                                     detectVerticalDragGestures(
                                         onDragStart = { dragging = type; dragOffset = 0f },
                                         onVerticalDrag = { change, amount ->
@@ -416,8 +425,8 @@ class SettingsActivity : ComponentActivity() {
                                                 dragOffset -= (to - from) * rowHeightPx
                                             }
                                         },
-                                        onDragEnd = { dragging = null; dragOffset = 0f; onChange(order) },
-                                        onDragCancel = { dragging = null; dragOffset = 0f; order = enabled },
+                                        onDragEnd = { dragging = null; dragOffset = 0f; onChange(order, order.filter { it in shown }) },
+                                        onDragCancel = { dragging = null; dragOffset = 0f; order = saved },
                                     )
                                 }),
                             contentAlignment = Alignment.Center,
@@ -428,7 +437,7 @@ class SettingsActivity : ComponentActivity() {
                             QsText(stringResource(type.subtitleRes()), 13.sp, Qs.Muted)
                         }
                         Toggle(on, stringResource(R.string.show_widget, title)) {
-                            onChange(if (on) order - type else order + type)
+                            onChange(order, order.filter { if (it == type) !on else it in shown })
                         }
                     }
                 }
