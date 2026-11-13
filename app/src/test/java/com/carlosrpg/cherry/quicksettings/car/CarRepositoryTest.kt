@@ -35,8 +35,8 @@ class CarRepositoryTest {
         repo.refresh()
         repo.setCabinTemp(26)
         repo.setFan(7)
-        // Temperature, then fan: one after the other, each watched for the car's panel.
-        delay(2 * CarRepository.CLIMATE_WRITE_MS + CarRepository.WRITE_SETTLE_MS + 400)
+        // Both go out at once; each read back after its watch on the car's panel.
+        delay(CarRepository.CLIMATE_WRITE_MS + CarRepository.WRITE_SETTLE_MS + 400)
         repo.refresh()
         assertThat(repo.state.value.cabinTempC).isEqualTo(26)
         assertThat(repo.state.value.fanLevel).isEqualTo(7)

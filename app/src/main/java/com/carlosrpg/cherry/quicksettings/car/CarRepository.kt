@@ -82,7 +82,6 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     val state: StateFlow<CarState> = _state.asStateFlow()
 
     private val mutex = Mutex()
-    private val climate = Mutex()
     private var pollJob: Job? = null
 
     /** Whether the car's own service is bound. Until it is, every value stays empty. */
@@ -275,15 +274,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     private fun write(module: Int, id: Int, value: Int) {
         scope.launch(Dispatchers.IO) {
-            if (module == HVAC) {
-                // One climate command at a time, each watched to its end before the next goes out:
-                // a temperature and a fan change from one drag never reach the car together. The
-                // app known to change the climate without the car's panel appearing never sends
-                // two at once either.
-                climate.withLock { writeClimate(id, value) }
-            } else {
-                send(module, id, value)
-            }
+            if (module == HVAC) writeClimate(id, value) else send(module, id, value)
             delay(WRITE_SETTLE_MS)
             refresh()
         }
@@ -339,7 +330,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         private const val PANEL_WATCH_POLLS = 14
         private const val PANEL_WATCH_POLL_MS = 150L
 
-        /** How long one climate write holds the next one back. */
+        /** How long the car's panel item is watched after a climate write. */
         const val CLIMATE_WRITE_MS = PANEL_WATCH_POLLS * PANEL_WATCH_POLL_MS
     }
 }
