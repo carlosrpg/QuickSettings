@@ -524,7 +524,7 @@ private fun CycleButton(
         CardLabel(title)
         // The symbol is the point of the button: it takes all the room the two texts leave.
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
-            symbol(minOf(maxWidth, maxHeight))
+            symbol(minOf(maxWidth, maxHeight) * 0.8f)
         }
         QsText(value, 13.sp, Qs.TextSoft, FontWeight.SemiBold)
     }
