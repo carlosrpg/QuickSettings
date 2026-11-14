@@ -87,6 +87,8 @@ fun CardLabel(text: String, modifier: Modifier = Modifier) = Text(
 fun QsText(text: String, size: TextUnit = Qs.Body, color: Color = Qs.Text, weight: FontWeight = FontWeight.Medium, modifier: Modifier = Modifier) =
     Text(text, modifier, color = color, fontSize = size, fontWeight = weight, maxLines = 1, overflow = TextOverflow.Ellipsis)
 
+private val VOLUME_BUTTON_WIDTH = Qs.TouchMin * 2
+
 /** 56 dp button; with [label] or [leading] it grows to fit. */
 @Composable
 fun GlassButton(
@@ -233,7 +235,8 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
             stringResource(if (media.muted) R.string.unmute else R.string.mute), actions.media::toggleMute,
         )
         Gap(8.dp)
-        GlassButton(Icons.Minus, stringResource(R.string.volume_down), { actions.media.volumeStep(-1) })
+        // Twice as wide as the other buttons: volume is the one tapped by feel while driving.
+        GlassButton(Icons.Minus, stringResource(R.string.volume_down), { actions.media.volumeStep(-1) }, Modifier.width(VOLUME_BUTTON_WIDTH))
         Gap(8.dp)
         // On the car the level can't be read; its own volume bar pops up on every step instead.
         if (media.volumeKnown) {
@@ -243,7 +246,7 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
             }
             Gap(8.dp)
         }
-        GlassButton(Icons.Plus, stringResource(R.string.volume_up), { actions.media.volumeStep(1) })
+        GlassButton(Icons.Plus, stringResource(R.string.volume_up), { actions.media.volumeStep(1) }, Modifier.width(VOLUME_BUTTON_WIDTH))
         if (media.volumeKnown) {
             QsText("${media.volume}", 15.sp, weight = FontWeight.Bold, modifier = Modifier.width(30.dp).padding(start = 6.dp))
         }
