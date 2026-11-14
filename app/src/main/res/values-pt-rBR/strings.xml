@@ -150,7 +150,7 @@
     <string name="tap_to_open">Tocar na alça da borda para abrir</string>
     <string name="tap_to_open_hint">Desligado: abre só deslizando a partir da alça. O gesto de voltar do próprio carro captura deslizes que começam bem na borda da tela.</string>
     <string name="top_bar">Barra de informações no topo da tela</string>
-    <string name="top_bar_hint">Mostra mídia, bateria, combustível, regeneração e clima na área da barra superior do carro, ao lado do relógio, e some enquanto um app em tela cheia, como o Android Auto, esconde essa barra (precisa do acesso de acessibilidade). Só exibe: abra a gaveta pela alça lateral.</string>
+    <string name="top_bar_hint">Mostra mídia, bateria, combustível, regeneração e clima na área da barra superior do carro, ao lado do relógio, e some enquanto um app em tela cheia, como o Android Auto, esconde essa barra (precisa do acesso de acessibilidade). Deslize para baixo logo abaixo dela, mesmo sobre um app em tela cheia, para abrir a gaveta completa.</string>
     <string name="widgets">Widgets</string>
     <string name="state_semi">Compacta</string>
     <string name="state_open">Aberta</string>
