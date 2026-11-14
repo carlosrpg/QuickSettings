@@ -293,9 +293,13 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     // --- top pull-down zone ---------------------------------------------------------------
 
-    /** The swipe-down zone under the top bar: up while the bar shows and the drawer is closed. */
+    /**
+     * The swipe-down zone under the top bar: up whenever the bar is on and the drawer is closed.
+     * It stays for full-screen apps too, where the bar itself steps aside, so the drawer can still
+     * be pulled down over Android Auto or a video.
+     */
     private fun updateTopZone() {
-        val wanted = topBarView != null && !fullScreenApp && mode == null
+        val wanted = topBarView != null && mode == null
         val view = topZoneView
         when {
             wanted && view == null -> {

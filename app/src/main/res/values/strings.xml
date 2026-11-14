@@ -161,7 +161,7 @@
     <string name="tap_to_open">Touch the edge handle to open</string>
     <string name="tap_to_open_hint">Off: open only by swiping in from the handle. The car\'s own back gesture takes swipes that start at the very edge of the screen.</string>
     <string name="top_bar">Info bar at the top of the screen</string>
-    <string name="top_bar_hint">Shows media, battery, fuel, regeneration and climate in the car\'s top bar area, beside the clock, and steps aside while a full-screen app such as Android Auto hides that bar (this needs the accessibility access). Display only: open the drawer from the side handle.</string>
+    <string name="top_bar_hint">Shows media, battery, fuel, regeneration and climate in the car\'s top bar area, beside the clock, and steps aside while a full-screen app such as Android Auto hides that bar (this needs the accessibility access). Swipe down just below it, even over a full-screen app, to open the full drawer.</string>
     <string name="widgets">Widgets</string>
     <string name="state_semi">Semi-open</string>
     <string name="state_open">Open</string>
