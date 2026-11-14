@@ -15,7 +15,12 @@ import app.jconfig.carbus.carinfo.RangeCodec
 import app.jconfig.carbus.carinfo.RegenLevel
 import app.jconfig.carbus.carinfo.TelemetryIds
 import app.jconfig.carbus.carinfo.VDEventCarInfo
+import android.os.SystemClock
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** One snapshot of the car. `null` = not read or not available. */
 data class CarState(
@@ -83,9 +89,15 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     private val mutex = Mutex()
     private var pollJob: Job? = null
+    /** A read that timed out may still be blocked in the car's service: wait on it, don't stack more. */
+    private var inFlight: Deferred<CarState>? = null
 
     /** Whether the car's own service is bound. Until it is, every value stays empty. */
     fun isConnected(): Boolean = bus.isServiceConnected()
+
+    /** [SystemClock.elapsedRealtime] of the last complete read; 0 before the first. */
+    @Volatile var lastReadAt = 0L
+        private set
 
     /** Raw payloads of the range and fuel items, for the debug screen. */
     fun debugRanges(): String = listOf(
@@ -99,10 +111,22 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         if (pollJob?.isActive == true) return
         pollJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                refresh()
+                // One bad read must not end the loop: with the top bar up nothing restarts it.
+                try {
+                    refresh()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "car read failed", e)
+                }
                 delay(intervalMs)
             }
         }
+    }
+
+    fun restartPolling() {
+        stopPolling()
+        startPolling()
     }
 
     fun stopPolling() {
@@ -113,7 +137,18 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     suspend fun refresh() = mutex.withLock {
         // Before the vendor proxy connects every read returns 0, and 0 is a valid status for
         // several items (regen 0 = high, battery mode 0 = initial): show nothing rather than that.
-        if (bus.isServiceConnected()) _state.value = read(_state.value)
+        if (!bus.isServiceConnected()) return@withLock
+        // A binder call that never returns cannot be cancelled, so the read runs on its own
+        // and is abandoned after a while instead of holding the loop (and the lock) for good.
+        val previous = _state.value
+        val pending = inFlight?.takeIf { it.isActive } ?: scope.async(Dispatchers.IO) { read(previous) }.also { inFlight = it }
+        val next = withTimeoutOrNull(READ_TIMEOUT_MS) { pending.await() }
+        if (next == null) {
+            Log.w(TAG, "car read timed out")
+            return@withLock
+        }
+        _state.value = next
+        lastReadAt = SystemClock.elapsedRealtime()
     }
 
     internal fun read(previous: CarState): CarState {
@@ -325,6 +360,8 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     companion object {
         const val POLL_MS = 1_500L
+        private const val READ_TIMEOUT_MS = 5_000L
+        private const val TAG = "QsCar"
         const val WRITE_SETTLE_MS = 400L
         // About two seconds: long enough to see the car react, short enough between two writes.
         private const val PANEL_WATCH_POLLS = 14

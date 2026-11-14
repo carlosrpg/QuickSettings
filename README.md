@@ -90,9 +90,17 @@ adb shell cmd notification allow_listener com.carlosrpg.cherry.quicksettings/.na
 The app targets the head unit's own Android version (API 30), so there is no "built for an older
 version" notice; the cost is that the overlay is no longer granted at install.
 
-**Tap pass-through** (optional, and only with "Touch the edge handle to open" turned off; lets
-taps in the edge swipe zone reach the app behind). The first command appends to the existing
-list, so the car's own accessibility services stay on:
+**Foreground app** (optional, for "Info bar at the top of the screen"; one of the signals that
+tells the bar a full-screen app such as Android Auto is up, so it steps aside):
+
+```
+adb shell appops set com.carlosrpg.cherry.quicksettings GET_USAGE_STATS allow
+```
+
+**Tap pass-through** (optional; needed with "Touch the edge handle to open" turned off, and for
+the info bar, whose pull-down zone replays taps and whose full-screen check reads the window
+list). The first command appends to the existing list, so the car's own accessibility services
+stay on:
 
 ```
 adb shell 'settings --user current put secure enabled_accessibility_services "$(settings --user current get secure enabled_accessibility_services):com.carlosrpg.cherry.quicksettings/.overlay.TapRelayService"'

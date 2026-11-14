@@ -114,6 +114,8 @@
     <string name="perm_notif_why">Sessões de mídia e instruções de navegação.</string>
     <string name="perm_mic">Microfone</string>
     <string name="perm_mic_why">Busca por voz de mídia e destinos.</string>
+    <string name="perm_usage">App em primeiro plano (opcional)</string>
+    <string name="perm_usage_why">Ajuda a barra superior a perceber apps em tela cheia, como o Android Auto, e sair da frente.</string>
     <string name="perm_tap">Repasse de toques (opcional)</string>
     <string name="perm_tap_why">Deixa os toques na zona de deslize da borda chegarem ao app de trás.</string>
     <string name="grant">Permitir</string>
@@ -128,6 +130,9 @@
     <string name="status_simulated">simulado</string>
     <string name="status_access_granted">acesso concedido</string>
     <string name="status_no_access">sem acesso às notificações</string>
+    <string name="cluster_panel">Painel de instrumentos</string>
+    <string name="cluster_media_sync">Mostrar a mídia dos apps no painel</string>
+    <string name="cluster_media_sync_hint">Enquanto um app como o Motion toca e nenhuma fonte do carro está tocando, envia a faixa, o estado e o tempo para o cartão de mídia do painel. O carro retoma o cartão assim que uma fonte dele toca.</string>
     <string name="cluster_none">Nenhuma tela de painel de instrumentos encontrada</string>
     <string name="cluster_send">Mostrar o app de navegação no painel de instrumentos</string>
     <string name="cluster_bring_back">Trazer o app de navegação de volta do painel</string>
@@ -144,6 +149,8 @@
     <string name="position_bottom">base</string>
     <string name="tap_to_open">Tocar na alça da borda para abrir</string>
     <string name="tap_to_open_hint">Desligado: abre só deslizando a partir da alça. O gesto de voltar do próprio carro captura deslizes que começam bem na borda da tela.</string>
+    <string name="top_bar">Barra de informações no topo da tela</string>
+    <string name="top_bar_hint">Mostra mídia, bateria, combustível, regeneração e clima na área da barra superior do carro, ao lado do relógio, e some enquanto um app em tela cheia, como o Android Auto, esconde essa barra (precisa do acesso de acessibilidade). Só exibe: abra a gaveta pela alça lateral.</string>
     <string name="widgets">Widgets</string>
     <string name="state_semi">Compacta</string>
     <string name="state_open">Aberta</string>

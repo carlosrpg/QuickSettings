@@ -3,6 +3,7 @@ package com.carlosrpg.cherry.quicksettings
 import android.app.Application
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.CarInfoProxy
+import app.jconfig.carbus.cluster.ClusterMedia
 import app.jconfig.carbus.cluster.ClusterNavigation
 import app.jconfig.carbus.media.CarMedia
 import app.jconfig.carbus.media.VdbusCarMedia
@@ -10,6 +11,9 @@ import app.jconfig.carbus.mock.MockCarMedia
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
 import com.carlosrpg.cherry.quicksettings.cluster.ClusterProjection
 import com.carlosrpg.cherry.quicksettings.car.seededMockBus
+import com.carlosrpg.cherry.quicksettings.media.CarClusterMediaSink
+import com.carlosrpg.cherry.quicksettings.media.ClusterMediaSync
+import com.carlosrpg.cherry.quicksettings.media.LogClusterMediaSink
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import com.carlosrpg.cherry.quicksettings.settings.SettingsStore
@@ -24,6 +28,8 @@ class QuickSettingsApp : Application() {
     lateinit var media: MediaRepository private set
     lateinit var settings: SettingsStore private set
     lateinit var cluster: ClusterProjection private set
+    /** Writes an app's track to the instrument cluster when the setting is on; logs it off the car. */
+    lateinit var clusterMedia: ClusterMediaSync private set
 
     override fun onCreate() {
         super.onCreate()
@@ -39,6 +45,8 @@ class QuickSettingsApp : Application() {
         // The car-side signals for showing an app on the instrument cluster; none off the car.
         val clusterSignals = if (BuildConfig.USE_MOCK) null else ClusterNavigation.create(this).also { it.bind() }
         cluster = ClusterProjection(this, clusterSignals)
+        val clusterSink = if (BuildConfig.USE_MOCK) LogClusterMediaSink() else CarClusterMediaSink(ClusterMedia.create(this).also { it.bind() })
+        clusterMedia = ClusterMediaSync(clusterSink)
         // Always on: whatever brought the process up (boot, the system re-binding the
         // notification listener after the process was killed, an app update) also brings the
         // drawer back. No-op until the overlay permission is granted.

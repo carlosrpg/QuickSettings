@@ -15,7 +15,11 @@ enum class Side { LEFT, RIGHT }
  * @property open widgets of the open drawer, in order.
  * @property semiOrder every widget in the order the settings list shows it for the semi-open
  *   drawer, hidden ones included, so hiding a widget keeps its place. Same for [openOrder].
+ * @property clusterMediaSync while an app plays on its own (no car source behind it), write its
+ *   track to the instrument cluster's media card. Off by default: it writes to the car.
  * @property tapToOpen touching the edge handle opens the drawer; off = swipe only.
+ * @property topBar keep a strip of car and media info in the status bar's area at the top of
+ *   the screen, under the car's own clock and icons; display only (the car takes those touches).
  */
 data class QsConfig(
     val side: Side = Side.LEFT,
@@ -23,6 +27,8 @@ data class QsConfig(
     val semi: List<WidgetType> = WidgetType.entries,
     val open: List<WidgetType> = DEFAULT_OPEN,
     val tapToOpen: Boolean = true,
+    val topBar: Boolean = false,
+    val clusterMediaSync: Boolean = false,
     val semiOrder: List<WidgetType> = withHidden(semi),
     val openOrder: List<WidgetType> = withHidden(open),
 )
@@ -50,6 +56,8 @@ class SettingsStore(context: Context) {
             .putString(KEY_SEMI, encode(next.semi))
             .putString(KEY_OPEN, encode(next.open))
             .putBoolean(KEY_TAP_OPEN, next.tapToOpen)
+            .putBoolean(KEY_TOP_BAR, next.topBar)
+            .putBoolean(KEY_CLUSTER_MEDIA, next.clusterMediaSync)
             .putString(KEY_SEMI_ORDER, encode(next.semiOrder))
             .putString(KEY_OPEN_ORDER, encode(next.openOrder))
             .apply()
@@ -65,6 +73,8 @@ class SettingsStore(context: Context) {
             semi = semi,
             open = open,
             tapToOpen = prefs.getBoolean(KEY_TAP_OPEN, true),
+            topBar = prefs.getBoolean(KEY_TOP_BAR, false),
+            clusterMediaSync = prefs.getBoolean(KEY_CLUSTER_MEDIA, false),
             // A saved order may predate a widget; withHidden appends whatever it lacks.
             semiOrder = withHidden(decode(prefs.getString(KEY_SEMI_ORDER, null)) ?: semi),
             openOrder = withHidden(decode(prefs.getString(KEY_OPEN_ORDER, null)) ?: open),
@@ -77,6 +87,8 @@ class SettingsStore(context: Context) {
         private const val KEY_SEMI = "semi_widgets"
         private const val KEY_OPEN = "open_widgets"
         private const val KEY_TAP_OPEN = "tap_to_open"
+        private const val KEY_TOP_BAR = "top_bar"
+        private const val KEY_CLUSTER_MEDIA = "cluster_media_sync"
         private const val KEY_SEMI_ORDER = "semi_order"
         private const val KEY_OPEN_ORDER = "open_order"
 

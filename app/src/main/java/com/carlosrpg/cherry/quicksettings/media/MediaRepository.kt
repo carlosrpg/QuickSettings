@@ -1,5 +1,10 @@
 package com.carlosrpg.cherry.quicksettings.media
 
+import android.os.SystemClock
+import android.util.Log
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -45,6 +50,8 @@ data class MediaState(
     val art: Bitmap? = null,
     val playing: Boolean = false,
     val positionMs: Long = 0,
+    /** [android.os.SystemClock.elapsedRealtime] when [positionMs] was reported; 0 when unknown. */
+    val positionAt: Long = 0,
     val durationMs: Long = 0,
     val volume: Int = 0,
     val maxVolume: Int = 0,
@@ -113,6 +120,51 @@ class MediaRepository(
     private var pollJob: Job? = null
     private var sessionsListenerAdded = false
 
+    /** A car media read that timed out may still be blocked in the service: wait on it, don't stack more. */
+    private var carRead: kotlinx.coroutines.Deferred<CarMediaState?>? = null
+
+    /**
+     * Changes of the car's own source and of the app session, newest last. The car's meter
+     * service rewrites the cluster's media card on a car source change, so one right before the
+     * cluster lost an app's track points at that.
+     */
+    val events = EventRing(30)
+    private var lastCarLine: String? = null
+    private var lastSessionLine: String? = null
+
+    /** The car's media service now: source, status, track, time. */
+    fun describeCar(): String = describe(car)
+
+    /** The app session in front now: package, playing, track. */
+    fun describeSession(): String = controller?.let { c ->
+        val meta = c.metadata
+        val playback = c.playbackState
+        "${c.packageName} state=${playback?.state} '${meta?.getString(MediaMetadata.METADATA_KEY_TITLE)}' " +
+            "pos=${playback?.position} at=${playback?.lastPositionUpdateTime}"
+    } ?: "none"
+
+    private fun describe(c: CarMediaState?): String = c?.let {
+        "${it.source} (type ${it.type}) ${it.status} '${it.track?.title}' / '${it.track?.artist}' ${it.positionMs}/${it.durationMs} ms"
+    } ?: "none"
+
+    private fun noteChanges() {
+        val carLine = car?.let { "${it.source} ${it.status} '${it.track?.title}'" } ?: "none"
+        if (carLine != lastCarLine) {
+            events.add("car media: $carLine")
+            lastCarLine = carLine
+        }
+        val c = controller
+        val sessionLine = c?.let { "${it.packageName} state=${it.playbackState?.state} '${it.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)}'" } ?: "none"
+        if (sessionLine != lastSessionLine) {
+            events.add("app session: $sessionLine")
+            lastSessionLine = sessionLine
+        }
+    }
+
+    /** [SystemClock.elapsedRealtime] of the last complete refresh; 0 before the first. */
+    @Volatile var lastRefreshAt = 0L
+        private set
+
     /** Last reading of the car's own source, and the one on screen right now (if any). */
     private var car: CarMediaState? = null
     private var shownCar: CarMediaState? = null
@@ -137,7 +189,14 @@ class MediaRepository(
         if (pollJob?.isActive == true) return refresh()
         pollJob = scope.launch {
             while (isActive) {
-                refreshNow()
+                // One bad read must not end the loop: with the top bar up nothing restarts it.
+                try {
+                    refreshNow()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "media refresh failed", e)
+                }
                 delay(intervalMs)
             }
         }
@@ -148,6 +207,11 @@ class MediaRepository(
         pollJob = null
     }
 
+    fun restart() {
+        stop()
+        start()
+    }
+
     fun refresh() {
         scope.launch { refreshNow() }
     }
@@ -155,8 +219,17 @@ class MediaRepository(
     private suspend fun refreshNow() {
         readSessions()
         carMedia?.let { media ->
-            // Binder calls into the car's media service: off the main thread.
-            val reading = withContext(Dispatchers.IO) { media.read() }
+            // Binder calls into the car's media service: off the main thread, and abandoned
+            // after a while, since a call that never returns cannot be cancelled.
+            // (null is a real answer here, "no car source", so wait on completion, not the value.)
+            val pending = carRead?.takeIf { it.isActive } ?: scope.async(Dispatchers.IO) { media.read() }.also { carRead = it }
+            val finished = withTimeoutOrNull(READ_TIMEOUT_MS) { pending.join() } != null
+            val reading = if (finished) {
+                pending.await()
+            } else {
+                Log.w(TAG, "car media read timed out")
+                car
+            }
             val key = artKey(reading?.track)
             if (key != carArtKey) {
                 carArt = withContext(Dispatchers.IO) { decodeArt(reading?.track) }
@@ -165,6 +238,8 @@ class MediaRepository(
             car = reading
         }
         publish()
+        noteChanges()
+        lastRefreshAt = SystemClock.elapsedRealtime()
     }
 
     private fun readSessions() {
@@ -252,6 +327,7 @@ class MediaRepository(
                 ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON),
             playing = playback?.state == PlaybackState.STATE_PLAYING,
             positionMs = playback?.position ?: 0,
+            positionAt = playback?.lastPositionUpdateTime ?: 0,
             durationMs = meta?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0,
             hasAccess = hasAccess,
         )
@@ -331,6 +407,8 @@ class MediaRepository(
 
     companion object {
         const val POLL_MS = 2_000L
+        private const val READ_TIMEOUT_MS = 5_000L
+        private const val TAG = "QsMedia"
         private const val CAR_SETTLE_MS = 300L
     }
 }
