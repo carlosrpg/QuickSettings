@@ -125,6 +125,8 @@
     <string name="perm_notif_why">Media sessions and navigation directions.</string>
     <string name="perm_mic">Microphone</string>
     <string name="perm_mic_why">Voice search for media and destinations.</string>
+    <string name="perm_usage">Foreground app (optional)</string>
+    <string name="perm_usage_why">Helps the top bar notice full-screen apps such as Android Auto and step aside.</string>
     <string name="perm_tap">Tap pass-through (optional)</string>
     <string name="perm_tap_why">Lets taps in the edge swipe zone reach the app behind.</string>
     <string name="grant">Grant</string>
@@ -139,6 +141,9 @@
     <string name="status_simulated">simulated</string>
     <string name="status_access_granted">access granted</string>
     <string name="status_no_access">no notification access</string>
+    <string name="cluster_panel">Instrument cluster</string>
+    <string name="cluster_media_sync">Show app media on the cluster</string>
+    <string name="cluster_media_sync_hint">While an app such as Motion plays and no car source does, writes its track, play status and time to the cluster\'s media card. The car takes the card back as soon as one of its own sources plays.</string>
     <string name="cluster_none">No instrument cluster display found</string>
     <string name="cluster_send">Show the navigation app on the instrument cluster</string>
     <string name="cluster_bring_back">Bring the navigation app back from the cluster</string>
@@ -155,6 +160,8 @@
     <string name="position_bottom">bottom</string>
     <string name="tap_to_open">Touch the edge handle to open</string>
     <string name="tap_to_open_hint">Off: open only by swiping in from the handle. The car\'s own back gesture takes swipes that start at the very edge of the screen.</string>
+    <string name="top_bar">Info bar at the top of the screen</string>
+    <string name="top_bar_hint">Shows media, battery, fuel, regeneration and climate in the car\'s top bar area, beside the clock, and steps aside while a full-screen app such as Android Auto hides that bar (this needs the accessibility access). Display only: open the drawer from the side handle.</string>
     <string name="widgets">Widgets</string>
     <string name="state_semi">Semi-open</string>
     <string name="state_open">Open</string>

@@ -142,6 +142,7 @@ fun DrawerRoot(
     closing: Boolean,
     onClosed: () -> Unit,
     onTouch: () -> Unit,
+    fromTop: Boolean = false,
 ) {
     val car by actions.car.state.collectAsState()
     val media by actions.media.state.collectAsState()
@@ -166,8 +167,12 @@ fun DrawerRoot(
         Modifier
             .graphicsLayer {
                 val p = slide.value
-                // Whole width including the edge margin: the drawer travels fully off screen.
-                translationX = (1f - p) * size.width * (if (left) -1f else 1f)
+                // Whole width (or height) including the margin: the drawer travels fully off screen.
+                if (fromTop) {
+                    translationY = (1f - p) * -size.height
+                } else {
+                    translationX = (1f - p) * size.width * (if (left) -1f else 1f)
+                }
                 alpha = (0.4f + 0.6f * p).coerceIn(0f, 1f)
             }
             // The window is flush with the screen edge; the gap to the edge lives inside it.

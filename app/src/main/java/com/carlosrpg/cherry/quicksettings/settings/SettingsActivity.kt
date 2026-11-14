@@ -135,7 +135,7 @@ class SettingsActivity : ComponentActivity() {
                 QsText(stringResource(R.string.app_name), 26.sp, weight = FontWeight.Bold)
             }
             // Re-checked on every resume and every tick: grants happen in system settings or over adb.
-            key(refresh) { Permissions(config.tapToOpen) }
+            key(refresh) { Permissions(config.tapToOpen, config.topBar) }
             if (wide) {
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     Box(Modifier.weight(0.42f)) { PositionPanel(config) }
@@ -145,6 +145,7 @@ class SettingsActivity : ComponentActivity() {
                 PositionPanel(config)
                 WidgetsPanel(config)
             }
+            ClusterPanel(config)
             key(refresh) { Status() }
         }
     }
@@ -180,6 +181,27 @@ class SettingsActivity : ComponentActivity() {
                 Text(stringResource(R.string.tap_to_open_hint), color = Qs.Muted, fontSize = 13.sp)
             }
             Toggle(config.tapToOpen, tapLabel) { store.update { it.copy(tapToOpen = !it.tapToOpen) } }
+        }
+        val topBarLabel = stringResource(R.string.top_bar)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                QsText(topBarLabel, 16.sp, weight = FontWeight.SemiBold)
+                Text(stringResource(R.string.top_bar_hint), color = Qs.Muted, fontSize = 13.sp)
+            }
+            Toggle(config.topBar, topBarLabel) { store.update { it.copy(topBar = !it.topBar) } }
+        }
+    }
+
+    @Composable
+    private fun ClusterPanel(config: QsConfig) = Panel {
+        CardLabel(stringResource(R.string.cluster_panel))
+        val label = stringResource(R.string.cluster_media_sync)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                QsText(label, 16.sp, weight = FontWeight.SemiBold)
+                Text(stringResource(R.string.cluster_media_sync_hint), color = Qs.Muted, fontSize = 13.sp)
+            }
+            Toggle(config.clusterMediaSync, label) { app.settings.update { it.copy(clusterMediaSync = !it.clusterMediaSync) } }
         }
     }
 
@@ -241,15 +263,23 @@ class SettingsActivity : ComponentActivity() {
         else -> R.string.position_middle
     }
 
+    private fun hasUsageAccess() = getSystemService(android.app.AppOpsManager::class.java).unsafeCheckOpNoThrow(
+        android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName,
+    ) == android.app.AppOpsManager.MODE_ALLOWED
+
     @Composable
-    private fun Permissions(tapToOpen: Boolean) {
+    private fun Permissions(tapToOpen: Boolean, topBar: Boolean) {
         val overlay = OverlayService.canDraw(this)
         val notifications = hasNotificationAccess()
         val mic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        // The relay only matters in swipe-only mode; with tap to open a touch opens the drawer.
-        val tapRelay = tapToOpen || TapRelayService.instance != null
+        // The relay matters in swipe-only mode (with tap to open a touch opens the drawer) and
+        // for the top bar, which learns from it when a full-screen app is up.
+        val needsRelay = !tapToOpen || topBar
+        val tapRelay = !needsRelay || TapRelayService.instance != null
+        // Optional, for the top bar only: the foreground activity, one of its full-screen signals.
+        val usage = !topBar || hasUsageAccess()
         // Nothing to ask for: keep the screen about the drawer.
-        if (overlay && notifications && mic && tapRelay) return
+        if (overlay && notifications && mic && tapRelay && usage) return
         Panel {
             CardLabel(stringResource(R.string.permissions))
             // The car has no settings page for the overlay, notification access or accessibility,
@@ -263,7 +293,10 @@ class SettingsActivity : ComponentActivity() {
             PermissionRow(R.string.perm_mic, R.string.perm_mic_why, mic, null) {
                 micPermission.launch(Manifest.permission.RECORD_AUDIO)
             }
-            if (!tapToOpen) PermissionRow(R.string.perm_tap, R.string.perm_tap_why, tapRelay, ADB_TAP_RELAY) {
+            if (topBar) PermissionRow(R.string.perm_usage, R.string.perm_usage_why, usage, ADB_USAGE) {
+                open(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            }
+            if (needsRelay) PermissionRow(R.string.perm_tap, R.string.perm_tap_why, tapRelay, ADB_TAP_RELAY) {
                 open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
@@ -330,6 +363,19 @@ class SettingsActivity : ComponentActivity() {
             appendLine("raw ${app.car.debugRanges()}")
             appendLine("cluster display=${app.cluster.clusterDisplayId()}  displays=${app.cluster.describeDisplays()}  onCluster=${app.cluster.onCluster.value}")
             appendLine("access=${hasNotificationAccess()}  listenerConnected=${listener != null}")
+            val now = android.os.SystemClock.elapsedRealtime()
+            fun age(at: Long) = if (at == 0L) "never" else "${(now - at) / 1000} s ago"
+            appendLine("feeds: car read ${age(app.car.lastReadAt)}  media read ${age(app.media.lastRefreshAt)}")
+            appendLine("full screen: ${com.carlosrpg.cherry.quicksettings.overlay.FullScreenDetector.last}")
+            appendLine("--- cluster media (sync ${if (app.settings.config.value.clusterMediaSync) "on" else "off"})")
+            appendLine("sync: ${app.clusterMedia.describe()}")
+            appendLine("car media now: ${app.media.describeCar()}")
+            appendLine("app session now: ${app.media.describeSession()}")
+            appendLine("shown in widget: ${app.media.state.value.let { "${it.packageName ?: it.appLabel} playing=${it.playing} '${it.title}'" }}")
+            appendLine("sync events (newest last):")
+            app.clusterMedia.events.snapshot().ifEmpty { listOf("none") }.forEach { appendLine("  $it") }
+            appendLine("car source / session changes (newest last):")
+            app.media.events.snapshot().ifEmpty { listOf("none") }.forEach { appendLine("  $it") }
             appendLine("nav apps installed: ${navApps.ifEmpty { listOf("none known") }.joinToString()}")
             appendLine("nav route: ${nav?.let { "${it.packageName} \"${it.title}\" / \"${it.text}\" / \"${it.subText}\" arrow=${it.maneuver != null}" } ?: "none"}")
             appendLine("last nav app: ${NavStore.lastNavPackage}")
@@ -520,6 +566,9 @@ private const val STATUS_REFRESH_MS = 1_500L
 /** Typed by hand on a PC with adb; kept identical to the README. */
 const val ADB_OVERLAY =
     "adb shell appops set com.carlosrpg.cherry.quicksettings SYSTEM_ALERT_WINDOW allow"
+
+const val ADB_USAGE =
+    "adb shell appops set com.carlosrpg.cherry.quicksettings GET_USAGE_STATS allow"
 
 const val ADB_NOTIFICATIONS =
     "adb shell cmd notification allow_listener com.carlosrpg.cherry.quicksettings/.nav.QsNotificationListener"

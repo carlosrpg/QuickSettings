@@ -6,6 +6,7 @@ import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.ClimatePanelSpec
 import app.jconfig.carbus.carinfo.ClimateSwitch
+import com.carlosrpg.cherry.quicksettings.nav.DebugLog
 import app.jconfig.carbus.carinfo.FcwLevel
 import app.jconfig.carbus.carinfo.FanSpec
 import app.jconfig.carbus.carinfo.NewEnergyIds
@@ -14,7 +15,12 @@ import app.jconfig.carbus.carinfo.RangeCodec
 import app.jconfig.carbus.carinfo.RegenLevel
 import app.jconfig.carbus.carinfo.TelemetryIds
 import app.jconfig.carbus.carinfo.VDEventCarInfo
+import android.os.SystemClock
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** One snapshot of the car. `null` = not read or not available. */
 data class CarState(
@@ -82,9 +89,15 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     private val mutex = Mutex()
     private var pollJob: Job? = null
+    /** A read that timed out may still be blocked in the car's service: wait on it, don't stack more. */
+    private var inFlight: Deferred<CarState>? = null
 
     /** Whether the car's own service is bound. Until it is, every value stays empty. */
     fun isConnected(): Boolean = bus.isServiceConnected()
+
+    /** [SystemClock.elapsedRealtime] of the last complete read; 0 before the first. */
+    @Volatile var lastReadAt = 0L
+        private set
 
     /** Raw payloads of the range and fuel items, for the debug screen. */
     fun debugRanges(): String = listOf(
@@ -98,10 +111,22 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         if (pollJob?.isActive == true) return
         pollJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                refresh()
+                // One bad read must not end the loop: with the top bar up nothing restarts it.
+                try {
+                    refresh()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "car read failed", e)
+                }
                 delay(intervalMs)
             }
         }
+    }
+
+    fun restartPolling() {
+        stopPolling()
+        startPolling()
     }
 
     fun stopPolling() {
@@ -112,7 +137,18 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     suspend fun refresh() = mutex.withLock {
         // Before the vendor proxy connects every read returns 0, and 0 is a valid status for
         // several items (regen 0 = high, battery mode 0 = initial): show nothing rather than that.
-        if (bus.isServiceConnected()) _state.value = read(_state.value)
+        if (!bus.isServiceConnected()) return@withLock
+        // A binder call that never returns cannot be cancelled, so the read runs on its own
+        // and is abandoned after a while instead of holding the loop (and the lock) for good.
+        val previous = _state.value
+        val pending = inFlight?.takeIf { it.isActive } ?: scope.async(Dispatchers.IO) { read(previous) }.also { inFlight = it }
+        val next = withTimeoutOrNull(READ_TIMEOUT_MS) { pending.await() }
+        if (next == null) {
+            Log.w(TAG, "car read timed out")
+            return@withLock
+        }
+        _state.value = next
+        lastReadAt = SystemClock.elapsedRealtime()
     }
 
     internal fun read(previous: CarState): CarState {
@@ -273,50 +309,65 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     private fun write(module: Int, id: Int, value: Int) {
         scope.launch(Dispatchers.IO) {
-            // One bus call at a time: two writes racing each other (or a poll) can be lost.
-            var watchPanel = false
-            mutex.withLock {
-                try {
-                    watchPanel = module == HVAC && !climatePanelShowing()
-                    bus.sendItemValue(module, id, value)
-                } catch (e: LinkageError) {
-                    // Vendor class mismatch on the device; the next poll shows the real state.
-                }
-            }
-            if (watchPanel) keepClimatePanelDown()
+            if (module == HVAC) writeClimate(id, value) else send(module, id, value)
             delay(WRITE_SETTLE_MS)
             refresh()
         }
     }
 
-    private fun climatePanelShowing() =
-        ClimatePanelSpec.isShowing(bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE))
+    /** One bus call at a time: two writes racing each other (or a poll) can be lost. */
+    private suspend fun send(module: Int, id: Int, value: Int) = mutex.withLock {
+        try {
+            bus.sendItemValue(module, id, value)
+        } catch (e: LinkageError) {
+            // Vendor class mismatch on the device; the next poll shows the real state.
+        }
+    }
 
     /**
-     * The car answers a climate write by asking its own climate panel to open, full screen.
-     * Watch for that request for a moment and send the panel's close request, as the stock
-     * settings app does. Only called when the panel was not already up, so one the driver
-     * opened is left alone.
+     * A climate write, followed by a watch on the car's "show climate panel" item. Every change
+     * of that item is written to the debug log against the write that preceded it, so a test on
+     * the car shows exactly which command makes the car raise its panel.
      */
-    private suspend fun keepClimatePanelDown() {
+    private suspend fun writeClimate(id: Int, value: Int) {
+        val before = mutex.withLock { panelItem() }
+        DebugLog.add("climate-$id-${System.currentTimeMillis()}", "hvac $id=$value  panel=$before")
+        send(HVAC, id, value)
+        var last = before
+        val start = System.currentTimeMillis()
         repeat(PANEL_WATCH_POLLS) {
             delay(PANEL_WATCH_POLL_MS)
             mutex.withLock {
-                try {
-                    if (climatePanelShowing()) {
+                val now = panelItem()
+                if (now != last) {
+                    DebugLog.add("climate-$id-${System.currentTimeMillis()}", "  after $id=$value: panel $last->$now at +${System.currentTimeMillis() - start}ms")
+                    last = now
+                }
+                // Close a panel our write raised, as the stock settings app does; one the driver
+                // had open before is left alone.
+                if (!ClimatePanelSpec.isShowing(before) && ClimatePanelSpec.isShowing(now)) {
+                    try {
                         bus.sendItemValue(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE, ClimatePanelSpec.COMMAND_CLOSE)
+                    } catch (e: LinkageError) {
+                        // As above.
                     }
-                } catch (e: LinkageError) {
-                    // As above.
                 }
             }
         }
     }
 
+    private fun panelItem(): Int? = bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE)
+
     companion object {
         const val POLL_MS = 1_500L
+        private const val READ_TIMEOUT_MS = 5_000L
+        private const val TAG = "QsCar"
         const val WRITE_SETTLE_MS = 400L
-        private const val PANEL_WATCH_POLLS = 8
+        // About two seconds: long enough to see the car react, short enough between two writes.
+        private const val PANEL_WATCH_POLLS = 14
         private const val PANEL_WATCH_POLL_MS = 150L
+
+        /** How long the car's panel item is watched after a climate write. */
+        const val CLIMATE_WRITE_MS = PANEL_WATCH_POLLS * PANEL_WATCH_POLL_MS
     }
 }

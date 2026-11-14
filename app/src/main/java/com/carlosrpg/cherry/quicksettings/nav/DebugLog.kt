@@ -10,7 +10,7 @@ import java.util.Locale
  * refreshes its line), newest last.
  */
 object DebugLog {
-    private const val MAX_LINES = 14
+    private const val MAX_LINES = 24
     private val clock = SimpleDateFormat("HH:mm:ss", Locale.US)
     private val lines = LinkedHashMap<String, String>()
 
