@@ -42,16 +42,21 @@ import com.carlosrpg.cherry.quicksettings.nav.NavState
 @Composable
 fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, endInset: Dp) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(start = startInset, end = endInset)) {
-        if (nav == null) FullBar(car, media) else NavBar(car, media, nav, maxHeight)
+        // The full stats take their room first; where that would leave the song no room, the
+        // compact ones stand in, so the title always shows.
+        if (nav == null && maxWidth >= FULL_BAR_MIN_WIDTH) FullBar(car, media) else CompactBar(car, media, nav, maxHeight)
     }
 }
 
+/** Full stats need about 580 dp; the song keeps at least about 220 dp beside them. */
+private val FULL_BAR_MIN_WIDTH = 800.dp
+
 @Composable
-private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) {
+private fun CompactBar(car: CarState, media: MediaState, nav: NavState?, height: Dp) {
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         // Media and the next turn share the room equally; smaller art leaves the title its words.
-        NowPlaying(media, Modifier.weight(1f), art = 48.dp)
-        NextTurn(nav, Modifier.weight(1f))
+        NowPlaying(media, Modifier.weight(1f), art = if (nav != null) 48.dp else 64.dp)
+        nav?.let { NextTurn(it, Modifier.weight(1f)) }
         // Range: the drawer's two half rings, with the electric % over the fuel % inside.
         MirrorRing(car.batterySoc?.div(100f), car.fuelPercent?.div(100f), Qs.chargeColor(car.batterySoc), height * 0.86f, 4.dp) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
