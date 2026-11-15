@@ -10,6 +10,14 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import com.carlosrpg.cherry.quicksettings.automation.EngModeService
+import com.carlosrpg.cherry.quicksettings.automation.AutomationStore
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -146,6 +154,8 @@ class SettingsActivity : ComponentActivity() {
                 WidgetsPanel(config)
             }
             ClusterPanel(config)
+            // Re-read every tick: Wi-Fi and adb change elsewhere, and the service can come and go.
+            key(refresh) { AutomationPanels() }
             key(refresh) { Status() }
         }
     }
@@ -182,6 +192,14 @@ class SettingsActivity : ComponentActivity() {
             }
             Toggle(config.tapToOpen, tapLabel) { store.update { it.copy(tapToOpen = !it.tapToOpen) } }
         }
+        val handleLabel = stringResource(R.string.side_handle)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                QsText(handleLabel, 16.sp, weight = FontWeight.SemiBold)
+                Text(stringResource(R.string.side_handle_hint), color = Qs.Muted, fontSize = 13.sp)
+            }
+            Toggle(config.sideHandle, handleLabel) { store.update { it.copy(sideHandle = !it.sideHandle) } }
+        }
         val topBarLabel = stringResource(R.string.top_bar)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f)) {
@@ -189,6 +207,78 @@ class SettingsActivity : ComponentActivity() {
                 Text(stringResource(R.string.top_bar_hint), color = Qs.Muted, fontSize = 13.sp)
             }
             Toggle(config.topBar, topBarLabel) { store.update { it.copy(topBar = !it.topBar) } }
+        }
+    }
+
+    /**
+     * Wi-Fi and adb, both switched on through the car's engineering menu by [EngModeService].
+     * Each shows its live state, a switch for doing it on its own, and a button for now.
+     */
+    @Composable
+    private fun AutomationPanels() {
+        val store = remember { AutomationStore(this) }
+        val running = EngModeService.running.collectAsState().value
+        val busy = EngModeService.active.collectAsState().value
+        if (!running) Panel {
+            QsText(stringResource(R.string.auto_service_off), 14.sp, Qs.TextSoft)
+            Text(ADB_SECURE_SETTINGS, color = Qs.TextSoft, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            if (AutomationStore.canEnableItself(this@SettingsActivity)) {
+                GlassButton(null, stringResource(R.string.auto_service_start), { AutomationStore.enableService(this@SettingsActivity) }, label = stringResource(R.string.auto_service_start))
+            }
+        }
+        Panel {
+            val on = EngModeService.wifiOn(this@SettingsActivity)
+            CardLabel(stringResource(R.string.auto_wifi_title))
+            StatusRow(R.string.auto_wifi_title, on, stringResource(if (on) R.string.auto_wifi_on else R.string.auto_wifi_off))
+            QsText(stringResource(R.string.auto_wifi_why), 13.sp, Qs.Muted)
+            var auto by remember { mutableStateOf(store.autoWifi) }
+            SwitchRow(R.string.auto_wifi_auto, R.string.auto_wifi_auto_hint, auto) { auto = !auto; store.autoWifi = auto }
+            GlassButton(
+                Icons.Wifi, stringResource(R.string.auto_wifi_now),
+                { EngModeService.instance?.runNow(EngModeService.Flow.WIFI) },
+                label = stringResource(if (busy == EngModeService.Flow.WIFI) R.string.auto_opening_wifi else R.string.auto_wifi_now),
+                tint = if (running) Qs.Text else Qs.Dim,
+            )
+        }
+        Panel {
+            val on = EngModeService.adbOn(this@SettingsActivity)
+            CardLabel(stringResource(R.string.auto_adb_title))
+            StatusRow(R.string.auto_adb_title, on, stringResource(if (on) R.string.auto_adb_on else R.string.auto_adb_off))
+            QsText(stringResource(R.string.auto_adb_why), 13.sp, Qs.Muted)
+            var startup by remember { mutableStateOf(store.adbOnStartup) }
+            SwitchRow(R.string.auto_adb_startup, R.string.auto_adb_startup_hint, startup) { startup = !startup; store.adbOnStartup = startup }
+            QsText(stringResource(R.string.auto_password), 16.sp, weight = FontWeight.SemiBold)
+            var password by remember { mutableStateOf(store.password) }
+            BasicTextField(
+                value = password,
+                onValueChange = { password = it; store.password = it },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                textStyle = TextStyle(color = Qs.Text, fontSize = 16.sp),
+                cursorBrush = SolidColor(Qs.Route),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Qs.Button)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            )
+            Text(stringResource(R.string.auto_password_hint), color = Qs.Muted, fontSize = 13.sp)
+            GlassButton(
+                Icons.Terminal, stringResource(R.string.auto_adb_now),
+                { EngModeService.instance?.runNow(EngModeService.Flow.ADB) },
+                label = stringResource(if (busy == EngModeService.Flow.ADB) R.string.auto_enabling_adb else R.string.auto_adb_now),
+                tint = if (running) Qs.Text else Qs.Dim,
+            )
+        }
+    }
+
+    @Composable
+    private fun SwitchRow(@StringRes title: Int, @StringRes hint: Int, on: Boolean, onToggle: () -> Unit) {
+        val label = stringResource(title)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                QsText(label, 16.sp, weight = FontWeight.SemiBold)
+                Text(stringResource(hint), color = Qs.Muted, fontSize = 13.sp)
+            }
+            Toggle(on, label, onToggle)
         }
     }
 
@@ -562,6 +652,10 @@ fun WidgetType.subtitleRes(): Int = when (this) {
 }
 
 private const val STATUS_REFRESH_MS = 1_500L
+
+/** Lets the app switch its Wi-Fi and adb automation service on by itself. */
+const val ADB_SECURE_SETTINGS =
+    "adb shell pm grant com.carlosrpg.cherry.quicksettings android.permission.WRITE_SECURE_SETTINGS"
 
 /** Typed by hand on a PC with adb; kept identical to the README. */
 const val ADB_OVERLAY =

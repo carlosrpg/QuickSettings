@@ -562,34 +562,40 @@ private fun OpenDrawer(
 ) {
     val shape = RoundedCornerShape(Qs.DrawerRadius)
     val columns = if (portrait) 2 else 4
-    Column(
+    // The cards in the middle, with a column of vertical sliders on each side: climate on the
+    // driver's side (left: the car is left-hand drive), volume on the other.
+    Row(
         Modifier.fillMaxSize().clip(shape).background(Qs.GlassOpen).border(1.dp, Qs.Hairline, shape).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-            CardLabel(stringResource(R.string.quick_panel), Modifier.weight(1f))
-            GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
-            Spacer(Modifier.size(10.dp))
-            GlassButton(Icons.Close, stringResource(R.string.action_close), actions.close)
-            Spacer(Modifier.size(10.dp))
-            GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings)
-        }
-        packRows(config.open, columns).forEach { row ->
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                row.forEach { type ->
-                    val m = Modifier.weight(type.span().coerceAtMost(columns).toFloat()).fillMaxHeight()
-                    when (type) {
-                        WidgetType.MEDIA -> MediaCard(media, actions, listening, m)
-                        WidgetType.NAVIGATION -> NavCard(nav, actions, listening, m)
-                        WidgetType.ASSIST -> AssistCard(car, actions, m)
-                        WidgetType.CLIMATE -> ClimateCard(car, actions, m)
-                        WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)
-                        WidgetType.AUTONOMY -> RangeCard(car, m)
+        ClimateSliders(car, actions)
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+                CardLabel(stringResource(R.string.quick_panel), Modifier.weight(1f))
+                GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
+                Spacer(Modifier.size(10.dp))
+                GlassButton(Icons.Close, stringResource(R.string.action_close), actions.close)
+                Spacer(Modifier.size(10.dp))
+                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings)
+            }
+            packRows(config.open, columns).forEach { row ->
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    row.forEach { type ->
+                        val m = Modifier.weight(type.span().coerceAtMost(columns).toFloat()).fillMaxHeight()
+                        when (type) {
+                            WidgetType.MEDIA -> MediaCard(media, actions, listening, m)
+                            WidgetType.NAVIGATION -> NavCard(nav, actions, listening, m)
+                            WidgetType.ASSIST -> AssistCard(car, actions, m)
+                            WidgetType.CLIMATE -> ClimateCard(car, actions, m)
+                            WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)
+                            WidgetType.AUTONOMY -> RangeCard(car, m)
+                        }
                     }
+                    val used = row.sumOf { it.span().coerceAtMost(columns) }
+                    if (used < columns) Spacer(Modifier.weight((columns - used).toFloat()))
                 }
-                val used = row.sumOf { it.span().coerceAtMost(columns) }
-                if (used < columns) Spacer(Modifier.weight((columns - used).toFloat()))
             }
         }
+        VolumeSliders(actions)
     }
 }

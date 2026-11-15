@@ -18,6 +18,8 @@ enum class Side { LEFT, RIGHT }
  * @property clusterMediaSync while an app plays on its own (no car source behind it), write its
  *   track to the instrument cluster's media card. Off by default: it writes to the car.
  * @property tapToOpen touching the edge handle opens the drawer; off = swipe only.
+ * @property sideHandle show the side handle. Off only takes effect with [topBar] on, whose
+ *   swipe-down zone then is the one way in.
  * @property topBar keep a strip of car and media info in the status bar's area at the top of
  *   the screen, under the car's own clock and icons; display only (the car takes those touches).
  */
@@ -27,6 +29,7 @@ data class QsConfig(
     val semi: List<WidgetType> = WidgetType.entries,
     val open: List<WidgetType> = DEFAULT_OPEN,
     val tapToOpen: Boolean = true,
+    val sideHandle: Boolean = true,
     val topBar: Boolean = false,
     val clusterMediaSync: Boolean = false,
     val semiOrder: List<WidgetType> = withHidden(semi),
@@ -56,6 +59,7 @@ class SettingsStore(context: Context) {
             .putString(KEY_SEMI, encode(next.semi))
             .putString(KEY_OPEN, encode(next.open))
             .putBoolean(KEY_TAP_OPEN, next.tapToOpen)
+            .putBoolean(KEY_SIDE_HANDLE, next.sideHandle)
             .putBoolean(KEY_TOP_BAR, next.topBar)
             .putBoolean(KEY_CLUSTER_MEDIA, next.clusterMediaSync)
             .putString(KEY_SEMI_ORDER, encode(next.semiOrder))
@@ -73,6 +77,7 @@ class SettingsStore(context: Context) {
             semi = semi,
             open = open,
             tapToOpen = prefs.getBoolean(KEY_TAP_OPEN, true),
+            sideHandle = prefs.getBoolean(KEY_SIDE_HANDLE, true),
             topBar = prefs.getBoolean(KEY_TOP_BAR, false),
             clusterMediaSync = prefs.getBoolean(KEY_CLUSTER_MEDIA, false),
             // A saved order may predate a widget; withHidden appends whatever it lacks.
@@ -88,6 +93,7 @@ class SettingsStore(context: Context) {
         private const val KEY_OPEN = "open_widgets"
         private const val KEY_TAP_OPEN = "tap_to_open"
         private const val KEY_TOP_BAR = "top_bar"
+        private const val KEY_SIDE_HANDLE = "side_handle"
         private const val KEY_CLUSTER_MEDIA = "cluster_media_sync"
         private const val KEY_SEMI_ORDER = "semi_order"
         private const val KEY_OPEN_ORDER = "open_order"

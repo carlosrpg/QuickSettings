@@ -172,7 +172,9 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         val view = edgeView ?: return
         view.side = config.side
         view.tapOpens = config.tapToOpen
-        view.visibility = if (mode == null) View.VISIBLE else View.GONE
+        // Without the top bar the handle is the only way in, so it stays whatever the setting says.
+        val handle = config.sideHandle || !config.topBar
+        view.visibility = if (mode == null && handle) View.VISIBLE else View.GONE
         wm.updateViewLayout(view, edgeParams())
         view.invalidate()
     }

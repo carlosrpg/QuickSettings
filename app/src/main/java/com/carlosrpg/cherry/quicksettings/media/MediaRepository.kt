@@ -39,6 +39,57 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * A volume the side sliders set. The navigation voice is the text-to-speech stream, which the
+ * head unit's audio service maps to its navigation guidance volume group.
+ */
+enum class VolumeChannel(val stream: Int) {
+    MEDIA(AudioManager.STREAM_MUSIC),
+    NAVIGATION(STREAM_TTS),
+}
+
+data class VolumeLevel(val value: Int, val max: Int)
+
+/** `AudioSystem.STREAM_TTS`: not public, but a valid stream for the volume calls. */
+private const val STREAM_TTS = 9
+/**
+ * Moves a level to a target once the target has held still for [debounceMs], then one step per
+ * [write] every [stepMs], following the target if it moves meanwhile. Not thread-safe: call
+ * [moveTo] on [scope]'s (single) thread.
+ */
+internal class LevelStepper(
+    private val scope: CoroutineScope,
+    private val read: () -> Int,
+    private val write: (Int) -> Unit,
+    private val debounceMs: Long = 300L,
+    private val stepMs: Long = 100L,
+) {
+    private var target: Int? = null
+    private var job: Job? = null
+
+    val moving: Boolean get() = job?.isActive == true
+
+    fun moveTo(value: Int) {
+        target = value
+        if (moving) return
+        job = scope.launch {
+            var held: Int?
+            do {
+                held = target
+                delay(debounceMs)
+            } while (target != held)
+            var current = read()
+            while (true) {
+                val goal = target ?: break
+                if (goal == current) break
+                current += if (goal > current) 1 else -1
+                write(current)
+                delay(stepMs)
+            }
+        }
+    }
+}
+
 data class MediaState(
     /** Package that published the session: voice search and "open app" go to it. Null for a car source. */
     val packageName: String? = null,
@@ -395,6 +446,42 @@ class MediaRepository(
         if (simulateVolume) simulatedMute = !simulatedMute
         publish()
     }
+
+    /**
+     * The level of [channel], for the side sliders. On the head unit the stream volumes are fixed,
+     * but its audio service keeps each stream's level in step with the car's volume group (media,
+     * navigation guidance), so these read and set the car's own levels. Debug builds on a fixed-
+     * volume emulator simulate them.
+     */
+    fun level(channel: VolumeChannel): VolumeLevel {
+        val max = audio.getStreamMaxVolume(channel.stream)
+        val value = if (simulateVolume) simulatedLevels[channel] ?: (max / 2) else audio.getStreamVolume(channel.stream)
+        return VolumeLevel(value.coerceIn(0, max), max)
+    }
+
+    /** Sets [channel] to [value] without the car's own volume bar: the slider is the feedback. */
+    fun setLevel(channel: VolumeChannel, value: Int) {
+        val target = value.coerceIn(0, audio.getStreamMaxVolume(channel.stream))
+        if (simulateVolume) simulatedLevels[channel] = target
+        else runCatching { audio.setStreamVolume(channel.stream, target, 0) }
+        if (channel == VolumeChannel.MEDIA) {
+            if (simulateVolume) simulatedVolume = target
+            publish()
+        }
+    }
+
+    private val simulatedLevels = HashMap<VolumeChannel, Int>()
+
+    private val volumeSteppers = VolumeChannel.entries.associateWith { channel ->
+        LevelStepper(scope, read = { level(channel).value }, write = { setLevel(channel, it) })
+    }
+
+    /** True while [moveLevel] is still taking [channel] to its target. */
+    fun moving(channel: VolumeChannel): Boolean = volumeSteppers.getValue(channel).moving
+
+    /** Takes [channel] to [value] the way the climate sliders go: debounced, one step per command. */
+    fun moveLevel(channel: VolumeChannel, value: Int) =
+        volumeSteppers.getValue(channel).moveTo(value.coerceIn(0, level(channel).max))
 
     /** Brings the media app to the front. */
     fun openApp(): Boolean = launch(_state.value.packageName)

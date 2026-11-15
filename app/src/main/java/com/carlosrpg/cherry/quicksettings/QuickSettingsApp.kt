@@ -8,6 +8,7 @@ import app.jconfig.carbus.cluster.ClusterNavigation
 import app.jconfig.carbus.media.CarMedia
 import app.jconfig.carbus.media.VdbusCarMedia
 import app.jconfig.carbus.mock.MockCarMedia
+import com.carlosrpg.cherry.quicksettings.automation.AutomationStore
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
 import com.carlosrpg.cherry.quicksettings.cluster.ClusterProjection
 import com.carlosrpg.cherry.quicksettings.car.seededMockBus
@@ -51,6 +52,8 @@ class QuickSettingsApp : Application() {
         // notification listener after the process was killed, an app update) also brings the
         // drawer back. No-op until the overlay permission is granted.
         OverlayService.start(this)
+        // A force-stop switches the automation's accessibility service off; switch it back on.
+        AutomationStore.enableService(this)
     }
 }
 
