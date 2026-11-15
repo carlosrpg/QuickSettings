@@ -37,10 +37,7 @@ class CarRepositoryTest {
         repo.setCabinTemp(26)
         repo.setFan(7)
         // Debounce, four single steps each (side by side), the panel watch, then a read back.
-        delay(
-            CarRepository.CLIMATE_DEBOUNCE_MS + 4 * CarRepository.CLIMATE_STEP_MS +
-                CarRepository.CLIMATE_WRITE_MS + CarRepository.WRITE_SETTLE_MS + 600
-        )
+        awaitMoveDone(repo)
         repo.refresh()
         assertThat(repo.state.value.cabinTempC).isEqualTo(26)
         assertThat(repo.state.value.fanLevel).isEqualTo(7)
@@ -78,9 +75,22 @@ class CarRepositoryTest {
         repo.setCabinTemp(25)
         // The controls hold the target while it is applied, then follow the car's reading.
         assertThat(repo.cabinTempTarget.value).isEqualTo(25)
-        delay(CarRepository.CLIMATE_DEBOUNCE_MS + 3 * CarRepository.CLIMATE_STEP_MS + CarRepository.CLIMATE_WRITE_MS + 600)
+        awaitMoveDone(repo)
         assertThat(sent).containsExactly(23, 24, 25).inOrder()
         assertThat(repo.cabinTempTarget.value).isNull()
         assertThat(repo.state.value.cabinTempC).isEqualTo(25)
+    }
+
+    /**
+     * Waits for the climate moves to finish (their targets clear once the car is read back),
+     * instead of a fixed sleep: a slow CI runner takes longer than the nominal timings.
+     */
+    private suspend fun awaitMoveDone(repo: CarRepository) {
+        delay(CarRepository.CLIMATE_DEBOUNCE_MS)
+        val deadline = System.currentTimeMillis() + 10_000
+        while (repo.cabinTempTarget.value != null || repo.fanTarget.value != null) {
+            check(System.currentTimeMillis() < deadline) { "climate move did not finish within 10 s" }
+            delay(50)
+        }
     }
 }

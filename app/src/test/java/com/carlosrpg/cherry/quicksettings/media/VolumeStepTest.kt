@@ -20,9 +20,13 @@ class VolumeStepTest {
             stepper.moveTo(7)
             stepper.moveTo(13)
         }
-        delay(300 + 3 * 100 + 400)
+        // Wait for the move to end rather than a fixed sleep (slow CI runners).
+        val deadline = System.currentTimeMillis() + 10_000
+        do {
+            delay(50)
+            check(System.currentTimeMillis() < deadline) { "volume move did not finish within 10 s" }
+        } while (withContext(thread) { stepper.moving })
         assertThat(sent).containsExactly(11, 12, 13).inOrder()
-        assertThat(stepper.moving).isFalse()
         thread.close()
     }
 }
