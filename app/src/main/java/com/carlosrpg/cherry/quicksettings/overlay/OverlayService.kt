@@ -328,9 +328,12 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         relay(view, x, y) { touchable -> topZoneParams(touchable) }
     }
 
-    /** Centred under the top bar, narrower than the screen so the app keeps its corners. */
+    /** Height of the car's status bar: where the top bar draws and the hint sits under. */
+    private fun barHeight() = usable().top.takeIf { it > 0 } ?: px(TOP_BAR_FALLBACK_DP)
+
+    /** The whole width, just below the top bar. */
     private fun topZoneParams(touchable: Boolean = true) = WindowManager.LayoutParams(
-        (screenWidth() * TOP_ZONE_WIDTH_FRACTION).toInt(),
+        WindowManager.LayoutParams.MATCH_PARENT,
         px(TOP_ZONE_HEIGHT_DP),
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -339,7 +342,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         PixelFormat.TRANSLUCENT,
     ).apply {
         gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        y = usable().top.takeIf { it > 0 } ?: px(TOP_BAR_FALLBACK_DP)
+        y = barHeight()
         title = "QuickSettings top zone"
     }
 
@@ -350,7 +353,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
      */
     private fun topBarParams() = WindowManager.LayoutParams(
         WindowManager.LayoutParams.MATCH_PARENT,
-        usable().top.takeIf { it > 0 } ?: px(TOP_BAR_FALLBACK_DP),
+        barHeight(),
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -528,7 +531,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val WATCHDOG_EVERY = 5
         private const val STALE_MS = 10_000L
         private const val TOP_ZONE_HEIGHT_DP = 24
-        private const val TOP_ZONE_WIDTH_FRACTION = 0.6f
         private const val TAG = "QsTopBar"
         private const val SEMI_MAX_FRACTION = 0.8f
         private const val SEMI_IDLE_MS = 8_000L

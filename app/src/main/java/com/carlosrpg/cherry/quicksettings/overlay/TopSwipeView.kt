@@ -13,8 +13,9 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * The top bar's pull-down zone: an invisible strip just below the bar that draws only a small
- * centred hint. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
+ * The top bar's pull-down zone: an invisible strip across the whole width just below the bar
+ * (the car's status bar, a higher layer, takes touches on the bar itself) that draws only a
+ * small centred hint. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
  * position so it can be replayed on the app underneath (its toolbar often sits right here).
  */
 @SuppressLint("ViewConstructor")
@@ -23,6 +24,7 @@ class TopSwipeView(
     private val onOpen: () -> Unit,
     private val onTap: (rawX: Float, rawY: Float) -> Unit,
 ) : View(context) {
+
     private val density = resources.displayMetrics.density
     private val openDistance = 24 * density
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -35,7 +37,7 @@ class TopSwipeView(
     private var opened = false
 
     override fun onDraw(canvas: Canvas) {
-        val w = 72 * density
+        val w = 144 * density
         val h = 6 * density
         val left = (width - w) / 2
         val top = 4 * density

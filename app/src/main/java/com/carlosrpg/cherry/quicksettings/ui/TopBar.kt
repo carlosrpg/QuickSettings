@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,12 +69,12 @@ private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QsIcon(Icons.Thermometer, Qs.Warm, 20.dp)
                 Spacer(Modifier.width(4.dp))
-                QsText(car.cabinTempC?.let { "$it°" } ?: "–", 16.sp, Qs.Text, FontWeight.SemiBold)
+                Shadowed { QsText(car.cabinTempC?.let { "$it°" } ?: "–", 16.sp, Qs.Text, FontWeight.SemiBold) }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 QsIcon(Icons.Wind, Qs.Cool, 20.dp)
                 Spacer(Modifier.width(4.dp))
-                QsText(car.fanLevel?.toString() ?: "–", 16.sp, Qs.Text, FontWeight.SemiBold)
+                Shadowed { QsText(car.fanLevel?.toString() ?: "–", 16.sp, Qs.Text, FontWeight.SemiBold) }
             }
         }
     }
@@ -122,14 +127,16 @@ private fun Climate(car: CarState) {
         QsIcon(Icons.Thermometer, Qs.Warm, 24.dp)
         Spacer(Modifier.width(4.dp))
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                QsText(car.cabinTempC?.let { "$it°" } ?: "–", 20.sp, Qs.Text, FontWeight.SemiBold)
-                Spacer(Modifier.width(6.dp))
-                QsIcon(Icons.Wind, Qs.Cool, 20.dp)
-                Spacer(Modifier.width(4.dp))
-                QsText(car.fanLevel?.toString() ?: "–", 18.sp, Qs.Text, FontWeight.SemiBold)
+            Shadowed {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    QsText(car.cabinTempC?.let { "$it°" } ?: "–", 20.sp, Qs.Text, FontWeight.SemiBold)
+                    Spacer(Modifier.width(6.dp))
+                    QsIcon(Icons.Wind, Qs.Cool, 20.dp)
+                    Spacer(Modifier.width(4.dp))
+                    QsText(car.fanLevel?.toString() ?: "–", 18.sp, Qs.Text, FontWeight.SemiBold)
+                }
+                car.outsideTempC?.let { QsText(stringResource(R.string.outside_temp, it), 14.sp, Qs.Muted) }
             }
-            car.outsideTempC?.let { QsText(stringResource(R.string.outside_temp, it), 14.sp, Qs.Muted) }
         }
     }
 }
@@ -151,8 +158,10 @@ private fun NowPlaying(media: MediaState, modifier: Modifier, art: Dp = 48.dp) {
         }
         Spacer(Modifier.width(10.dp))
         Column {
-            QsText(media.title ?: stringResource(R.string.nothing_playing), 20.sp, weight = FontWeight.SemiBold)
-            listOfNotNull(media.artist, media.appLabel).firstOrNull()?.let { QsText(it, 15.sp, Qs.Muted) }
+            Shadowed {
+                QsText(media.title ?: stringResource(R.string.nothing_playing), 20.sp, weight = FontWeight.SemiBold)
+                listOfNotNull(media.artist, media.appLabel).firstOrNull()?.let { QsText(it, 15.sp, Qs.Muted) }
+            }
         }
     }
 }
@@ -167,4 +176,15 @@ private fun Stat(icon: String, tint: Color, value: String?, sub: String?) {
             sub?.let { QsText(it, 14.sp, Qs.Muted) }
         }
     }
+}
+
+/**
+ * White text over whatever the car's bar shows (a light map, a wallpaper) gets a tight black
+ * halo with a slight drop, so it reads on any background.
+ */
+@Composable
+private fun Shadowed(content: @Composable () -> Unit) {
+    // In dp, so the halo is as thick on the car's denser screen as on the emulator.
+    val shadow = with(LocalDensity.current) { Shadow(Color.Black, Offset(0f, 1.dp.toPx()), blurRadius = 3.dp.toPx()) }
+    CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(shadow = shadow), content = content)
 }
