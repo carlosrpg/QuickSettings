@@ -84,10 +84,18 @@ class EngModeService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
+    private var projectionPkg: String? = null
+    private val projectionRun = Runnable { projectionPkg?.let { autoWifi("projection $it", returnTo = it) } }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg in PROJECTION_PKGS) autoWifi("projection $pkg", returnTo = pkg)
+        if (pkg !in PROJECTION_PKGS) return
+        // Android Auto starting with the car comes to the front several times while it connects,
+        // and would push EngMode away mid-run. Run once it has stayed put for a moment.
+        projectionPkg = pkg
+        handler.removeCallbacks(projectionRun)
+        handler.postDelayed(projectionRun, PROJECTION_SETTLE_MS)
     }
 
     /** After a boot (armed by the boot receiver): adb first if asked for, then Wi-Fi. */
@@ -144,6 +152,9 @@ class EngModeService : AccessibilityService() {
             return
         }
         val launch = launchIntentFor(packageManager) ?: return toast(getString(R.string.auto_err_no_engmode))
+        launchIntent = launch
+        relaunches = 0
+        lostTicks = 0
         if (which == Flow.ADB) {
             password = SecurePassword.load(AutomationStore.prefs(this))?.takeIf { it.isNotEmpty() }
                 ?: return toast(getString(R.string.auto_err_no_password))
@@ -173,14 +184,38 @@ class EngModeService : AccessibilityService() {
         stepDeadline = SystemClock.uptimeMillis() + STEP_TIMEOUT_MS
     }
 
+    private var launchIntent: Intent? = null
+    private var relaunches = 0
+    private var lostTicks = 0
+
+    /**
+     * Something else (Android Auto connecting, typically) took the screen from EngMode mid-run:
+     * open EngMode again and start this run over, instead of waiting for the step to time out.
+     */
+    private fun reopenIfLost(root: AccessibilityNodeInfo?) {
+        if (root != null || step == Step.CLOSE || step == Step.IDLE) {
+            lostTicks = 0
+            return
+        }
+        if (++lostTicks < LOST_TICKS || relaunches >= MAX_RELAUNCHES) return
+        val launch = launchIntent ?: return
+        relaunches++
+        lostTicks = 0
+        Log.i(TAG, "EngMode lost the screen at $step: reopening it ($relaunches/$MAX_RELAUNCHES)")
+        if (runCatching { startActivity(Intent(launch).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) }.isSuccess) {
+            runDeadline = SystemClock.uptimeMillis() + TIMEOUT_MS
+            advance(if (flow == Flow.WIFI) Step.CLICK_WIFI else Step.CLICK_ENCRYPT)
+        }
+    }
+
     private fun tick() {
         val now = SystemClock.uptimeMillis()
         if (step != Step.CLOSE && (now > runDeadline || now > stepDeadline)) onStepTimeout()
         val root = engModeRoot()
+        reopenIfLost(root)
         when (step) {
             Step.IDLE -> return
-            // The "WIFI" item itself; only then the shortest label containing it.
-            Step.CLICK_WIFI -> if (root != null && (clickText(root, "WIFI", exact = true) || clickText(root, "WIFI", exact = false))) advance(Step.CLICK_OPEN)
+            Step.CLICK_WIFI -> if (root != null && clickText(root, "WIFI", exact = false)) advance(Step.CLICK_OPEN)
             Step.CLICK_ENCRYPT -> if (root != null && clickOrScroll(root, "Encryption") { it.contains("encryption", true) }) advance(Step.FILL_PW)
             Step.FILL_PW -> if (root != null && fillPassword(root)) advance(Step.CONFIRM_PW)
             Step.CONFIRM_PW -> if (root != null && (clickText(root, "Confirm", exact = true) || clickText(root, "OK", exact = true))) advance(Step.CLICK_ADB)
@@ -243,17 +278,10 @@ class EngModeService : AccessibilityService() {
     private fun engModeRoot(): AccessibilityNodeInfo? =
         windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName == ENGMODE_PKG } }
 
-    /**
-     * Clicks a node whose text is [text] ([exact]) or contains it (the shortest such label),
-     * through its nearest clickable ancestor.
-     */
+    /** Clicks the first node whose text matches, through its nearest clickable ancestor. */
     private fun clickText(root: AccessibilityNodeInfo, text: String, exact: Boolean): Boolean {
-        val matches = root.findAccessibilityNodeInfosByText(text)
-        val node = if (exact) {
-            matches.firstOrNull { it.text?.toString()?.trim().equals(text, ignoreCase = true) }
-        } else {
-            matches.filter { it.text != null }.minByOrNull { it.text.length }
-        } ?: return false
+        val node = root.findAccessibilityNodeInfosByText(text)
+            .firstOrNull { !exact || it.text?.toString()?.trim().equals(text, ignoreCase = true) } ?: return false
         return clickNode(node)
     }
 
@@ -282,22 +310,11 @@ class EngModeService : AccessibilityService() {
         return ok
     }
 
-    /**
-     * Types the password into the dialog's password field, or its only editable field. On any
-     * other screen (several fields, none of them a password) it types nothing. Never logged.
-     */
+    /** Types the password into the dialog's first editable field. Never logged. */
     private fun fillPassword(root: AccessibilityNodeInfo): Boolean {
-        val editable = allMatching(root) { it.isEditable }
-        val field = editable.firstOrNull { it.isPassword } ?: editable.singleOrNull() ?: return false
+        val field = firstMatching(root) { it.isEditable } ?: return false
         val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, password) }
         return field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-    }
-
-    private fun allMatching(node: AccessibilityNodeInfo?, test: (AccessibilityNodeInfo) -> Boolean): List<AccessibilityNodeInfo> {
-        if (node == null) return emptyList()
-        val found = if (test(node)) mutableListOf(node) else mutableListOf()
-        for (i in 0 until node.childCount) found += allMatching(node.getChild(i), test)
-        return found
     }
 
     private fun firstMatching(node: AccessibilityNodeInfo?, test: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
@@ -377,6 +394,10 @@ class EngModeService : AccessibilityService() {
         private const val QUEUE_GAP_MS = 1_500L
         private const val MAX_BACKS = 6
         private const val MAX_AUTO_RUNS = 3
+        private const val PROJECTION_SETTLE_MS = 3_000L
+        /** About 4 s without EngMode on screen during a step before it is reopened. */
+        private const val LOST_TICKS = 13
+        private const val MAX_RELAUNCHES = 2
         private const val SCROLL_EVERY_TICKS = 3
         private val ADB_ITEM = Regex("""ADB(\s*Switch)?""", RegexOption.IGNORE_CASE)
 

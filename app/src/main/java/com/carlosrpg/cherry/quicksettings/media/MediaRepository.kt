@@ -53,14 +53,14 @@ data class VolumeLevel(val value: Int, val max: Int)
 /** `AudioSystem.STREAM_TTS`: not public, but a valid stream for the volume calls. */
 private const val STREAM_TTS = 9
 /**
- * Moves a level to a target once the target has held still for [debounceMs], then one step per
- * [write] every [stepMs], following the target if it moves meanwhile. Not thread-safe: call
+ * Moves a level to a target once the target has held still for [debounceMs], then one [step]
+ * (+1 or -1) every [stepMs], following the target if it moves meanwhile. Not thread-safe: call
  * [moveTo] on [scope]'s (single) thread.
  */
 internal class LevelStepper(
     private val scope: CoroutineScope,
     private val read: () -> Int,
-    private val write: (Int) -> Unit,
+    private val step: (direction: Int) -> Unit,
     private val debounceMs: Long = 300L,
     private val stepMs: Long = 100L,
 ) {
@@ -82,8 +82,9 @@ internal class LevelStepper(
             while (true) {
                 val goal = target ?: break
                 if (goal == current) break
-                current += if (goal > current) 1 else -1
-                write(current)
+                val direction = if (goal > current) 1 else -1
+                current += direction
+                step(direction)
                 delay(stepMs)
             }
         }
@@ -459,21 +460,30 @@ class MediaRepository(
         return VolumeLevel(value.coerceIn(0, max), max)
     }
 
-    /** Sets [channel] to [value] without the car's own volume bar: the slider is the feedback. */
-    fun setLevel(channel: VolumeChannel, value: Int) {
-        val target = value.coerceIn(0, audio.getStreamMaxVolume(channel.stream))
-        if (simulateVolume) simulatedLevels[channel] = target
-        else runCatching { audio.setStreamVolume(channel.stream, target, 0) }
-        if (channel == VolumeChannel.MEDIA) {
-            if (simulateVolume) simulatedVolume = target
-            publish()
+    /**
+     * One step of [channel] up or down. Media goes through `adjustVolume`, the call the media
+     * card's - / + buttons use and that works on the car; the navigation voice through the same
+     * adjust on its own stream. No flag: no car volume bar, the slider is the feedback.
+     */
+    private fun stepLevel(channel: VolumeChannel, direction: Int) {
+        val adjust = if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+        if (simulateVolume) {
+            val now = simulatedLevels[channel] ?: (audio.getStreamMaxVolume(channel.stream) / 2)
+            simulatedLevels[channel] = (now + direction).coerceIn(0, audio.getStreamMaxVolume(channel.stream))
+            if (channel == VolumeChannel.MEDIA) simulatedVolume = simulatedLevels[channel]
+        } else {
+            runCatching {
+                if (channel == VolumeChannel.MEDIA) audio.adjustVolume(adjust, 0)
+                else audio.adjustStreamVolume(channel.stream, adjust, 0)
+            }
         }
+        if (channel == VolumeChannel.MEDIA) publish()
     }
 
     private val simulatedLevels = HashMap<VolumeChannel, Int>()
 
     private val volumeSteppers = VolumeChannel.entries.associateWith { channel ->
-        LevelStepper(scope, read = { level(channel).value }, write = { setLevel(channel, it) })
+        LevelStepper(scope, read = { level(channel).value }, step = { stepLevel(channel, it) })
     }
 
     /** True while [moveLevel] is still taking [channel] to its target. */

@@ -14,7 +14,7 @@ class VolumeStepTest {
         var level = 10
         val sent = mutableListOf<Int>()
         val thread = newSingleThreadContext("volume")
-        val stepper = LevelStepper(CoroutineScope(thread), read = { level }, write = { level = it; sent += it })
+        val stepper = LevelStepper(CoroutineScope(thread), read = { level }, step = { level += it; sent += level })
         withContext(thread) {
             stepper.moveTo(20)
             stepper.moveTo(7)
