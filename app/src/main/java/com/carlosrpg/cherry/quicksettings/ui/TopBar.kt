@@ -42,21 +42,16 @@ import com.carlosrpg.cherry.quicksettings.nav.NavState
 @Composable
 fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, endInset: Dp) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(start = startInset, end = endInset)) {
-        // The full stats take their room first; where that would leave the song no room, the
-        // compact ones stand in, so the title always shows.
-        if (nav == null && maxWidth >= FULL_BAR_MIN_WIDTH) FullBar(car, media) else CompactBar(car, media, nav, maxHeight)
+        if (nav == null) FullBar(car, media) else NavBar(car, media, nav, maxHeight)
     }
 }
 
-/** Full stats need about 580 dp; the song keeps at least about 220 dp beside them. */
-private val FULL_BAR_MIN_WIDTH = 800.dp
-
 @Composable
-private fun CompactBar(car: CarState, media: MediaState, nav: NavState?, height: Dp) {
+private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) {
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         // Media and the next turn share the room equally; smaller art leaves the title its words.
-        NowPlaying(media, Modifier.weight(1f), art = if (nav != null) 48.dp else 64.dp)
-        nav?.let { NextTurn(it, Modifier.weight(1f)) }
+        NowPlaying(media, Modifier.weight(1f))
+        NextTurn(nav, Modifier.weight(1f))
         // Range: the drawer's two half rings, with the electric % over the fuel % inside.
         MirrorRing(car.batterySoc?.div(100f), car.fuelPercent?.div(100f), Qs.chargeColor(car.batterySoc), height * 0.86f, 4.dp) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -98,19 +93,21 @@ private fun NextTurn(nav: NavState, modifier: Modifier) {
 
 @Composable
 private fun FullBar(car: CarState, media: MediaState) {
+    // The strip is about 547 dp wide. The stats are kept tight (24 dp icons, 8 dp gaps) so the
+    // song keeps about 100 dp of text beside them; looser spacing left it none.
     Row(
         Modifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         NowPlaying(media, Modifier.weight(1f))
         Stat(Icons.BatteryBolt, Qs.Energy, car.batterySoc?.let { "$it%" }, car.electricRangeKm?.let { "$it km" })
         Stat(Icons.Fuel, Qs.Fuel, car.fuelPercent?.let { "$it%" }, car.fuelRangeKm?.let { "$it km" })
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RegenDial(car.regen, 34.dp)
-            Spacer(Modifier.width(8.dp))
+            RegenDial(car.regen, 30.dp)
+            Spacer(Modifier.width(5.dp))
             Column {
-                QsText(car.regen?.label() ?: "–", 18.sp, Qs.Energy, FontWeight.SemiBold)
+                QsText(car.regen?.label() ?: "–", 17.sp, Qs.Energy, FontWeight.SemiBold)
                 QsText(stringResource(R.string.regeneration), 13.sp, Qs.Muted)
             }
         }
@@ -122,12 +119,12 @@ private fun FullBar(car: CarState, media: MediaState) {
 @Composable
 private fun Climate(car: CarState) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        QsIcon(Icons.Thermometer, Qs.Warm, 28.dp)
-        Spacer(Modifier.width(6.dp))
+        QsIcon(Icons.Thermometer, Qs.Warm, 24.dp)
+        Spacer(Modifier.width(4.dp))
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                QsText(car.cabinTempC?.let { "$it°" } ?: "–", 22.sp, Qs.Text, FontWeight.SemiBold)
-                Spacer(Modifier.width(10.dp))
+                QsText(car.cabinTempC?.let { "$it°" } ?: "–", 20.sp, Qs.Text, FontWeight.SemiBold)
+                Spacer(Modifier.width(6.dp))
                 QsIcon(Icons.Wind, Qs.Cool, 20.dp)
                 Spacer(Modifier.width(4.dp))
                 QsText(car.fanLevel?.toString() ?: "–", 18.sp, Qs.Text, FontWeight.SemiBold)
@@ -138,7 +135,7 @@ private fun Climate(car: CarState) {
 }
 
 @Composable
-private fun NowPlaying(media: MediaState, modifier: Modifier, art: Dp = 64.dp) {
+private fun NowPlaying(media: MediaState, modifier: Modifier, art: Dp = 48.dp) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         val cover = media.art ?: media.appIcon
         if (cover != null) {
@@ -163,10 +160,10 @@ private fun NowPlaying(media: MediaState, modifier: Modifier, art: Dp = 64.dp) {
 @Composable
 private fun Stat(icon: String, tint: Color, value: String?, sub: String?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        QsIcon(icon, tint, 28.dp)
-        Spacer(Modifier.width(8.dp))
+        QsIcon(icon, tint, 24.dp)
+        Spacer(Modifier.width(5.dp))
         Column {
-            QsText(value ?: "–", 22.sp, tint, FontWeight.SemiBold)
+            QsText(value ?: "–", 20.sp, tint, FontWeight.SemiBold)
             sub?.let { QsText(it, 14.sp, Qs.Muted) }
         }
     }
