@@ -217,4 +217,5 @@
     <string name="slider_nav_voice_hide">Hide the navigation voice volume</string>
     <string name="side_handle">Side drawer</string>
     <string name="side_handle_hint">The handle on the screen edge that opens the half drawer. Turned off, the drawer opens only by swiping down from the top, so the handle stays while the info bar is off.</string>
+    <string name="say_destination">Say where you want to go</string>
 </resources>

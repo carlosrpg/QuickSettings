@@ -206,4 +206,5 @@
     <string name="slider_nav_voice_hide">Ocultar o volume da voz da navegação</string>
     <string name="side_handle">Gaveta lateral</string>
     <string name="side_handle_hint">A alça na borda da tela que abre a meia gaveta. Desligada, a gaveta só abre deslizando para baixo a partir do topo, por isso a alça continua enquanto a barra de informações estiver desligada.</string>
+    <string name="say_destination">Diga para onde quer ir</string>
 </resources>

@@ -112,11 +112,23 @@ class DrawerActions(
     fun navAppLabel(): String? = NavStore.navPackage(context)?.let { AppInfo.label(context, it) }
     fun navAppIcon(): Bitmap? = NavStore.navPackage(context)?.let { AppInfo.icon(context, it) }
 
+    /** The card that started the current voice input, so only that one shows it listening. */
+    var voiceFor by mutableStateOf<WidgetType?>(null)
+        private set
+
     /** Speech goes to the app that owns the media session; no recognizer = open that app. */
-    fun voiceMedia() = voice.listen(onText = { media.playFromSearch(it) }, onUnavailable = ::openMediaApp)
+    fun voiceMedia() {
+        voiceFor = WidgetType.MEDIA
+        voice.listen(onText = { media.playFromSearch(it) }, onUnavailable = ::openMediaApp)
+    }
 
     /** Speech becomes a destination search in the nav app; no recognizer = open the nav app. */
-    fun voiceNav() = voice.listen(
+    fun voiceNav() {
+        voiceFor = WidgetType.NAVIGATION
+        voiceNavListen()
+    }
+
+    private fun voiceNavListen() = voice.listen(
         onText = { if (NavStore.searchDestination(context, it)) close() },
         onUnavailable = ::openNavApp,
     )
@@ -587,8 +599,8 @@ private fun OpenDrawer(
                     row.forEach { type ->
                         val m = Modifier.weight(type.span().coerceAtMost(columns).toFloat()).fillMaxHeight()
                         when (type) {
-                            WidgetType.MEDIA -> MediaCard(media, actions, listening, m)
-                            WidgetType.NAVIGATION -> NavCard(nav, actions, listening, m)
+                            WidgetType.MEDIA -> MediaCard(media, actions, listening && actions.voiceFor == WidgetType.MEDIA, m)
+                            WidgetType.NAVIGATION -> NavCard(nav, actions, listening && actions.voiceFor == WidgetType.NAVIGATION, m)
                             WidgetType.ASSIST -> AssistCard(car, actions, m)
                             WidgetType.CLIMATE -> ClimateCard(car, actions, m)
                             WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)

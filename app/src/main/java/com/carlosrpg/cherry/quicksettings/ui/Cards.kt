@@ -1,5 +1,17 @@
 package com.carlosrpg.cherry.quicksettings.ui
 
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -201,6 +213,7 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
                     Icons.Mic, stringResource(R.string.voice_search_in, appName), actions::voiceMedia,
                     label = stringResource(if (listening) R.string.listening else R.string.search),
                     tint = if (listening) Qs.Route else Qs.Text,
+                    modifier = Modifier.listeningBorder(listening),
                 )
             }
             val title = media.title
@@ -260,7 +273,10 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
     Row(verticalAlignment = Alignment.CenterVertically) {
         OpenAppChip(actions.navAppIcon(), Qs.Route, appName, actions::openNavApp, Modifier.weight(1f))
         Gap(10.dp)
-        GlassButton(Icons.Mic, stringResource(R.string.voice_destination), actions::voiceNav, tint = if (listening) Qs.Route else Qs.Text)
+        GlassButton(
+            Icons.Mic, stringResource(R.string.voice_destination), actions::voiceNav,
+            tint = if (listening) Qs.Route else Qs.Text, modifier = Modifier.listeningBorder(listening),
+        )
         // Send the nav app to the instrument cluster, or bring it back. Always shown; dimmed
         // and inert where the system reports no cluster display (looked up each time the card
         // is drawn, since a display can come and go).
@@ -281,14 +297,16 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
             background = if (onCluster) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
         )
     }
-    if (nav == null) {
+    // Without a route the whole middle is the mic; while listening it says so, route or not
+    // (a new destination is being asked for).
+    if (nav == null || listening) {
         Column(
             Modifier.weight(1f).fillMaxWidth().clickable(onClickLabel = stringResource(R.string.voice_destination), onClick = actions::voiceNav),
             verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            QsIcon(Icons.NavArrow, Qs.Route, 48.dp)
+            if (listening) ListeningMic(48.dp) else QsIcon(Icons.NavArrow, Qs.Route, 48.dp)
             QsText(stringResource(if (listening) R.string.listening_ellipsis else R.string.where_to), 18.sp, weight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-            QsText(stringResource(R.string.tap_say_destination), 13.sp, Qs.Muted)
+            QsText(stringResource(if (listening) R.string.say_destination else R.string.tap_say_destination), 13.sp, Qs.Muted)
         }
     } else {
         // The next manoeuvre takes all the room the card has; the ETA line only claims space
@@ -565,5 +583,44 @@ fun RangeCard(car: CarState, modifier: Modifier = Modifier) = QsCard(modifier) {
             car.batterySoc, car.electricRangeKm, car.fuelPercent, car.fuelRangeKm, car.chargeLimit,
             Qs.chargeColor(car.batterySoc), ring,
         )
+    }
+}
+
+/** A route-blue border that pulses while [active]: the button that is listening. */
+@Composable
+fun Modifier.listeningBorder(active: Boolean): Modifier {
+    if (!active) return this
+    val pulse by rememberInfiniteTransition(label = "listening").animateFloat(
+        0.3f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "border",
+    )
+    return drawWithContent {
+        drawContent()
+        val w = 2.5.dp.toPx()
+        val r = Qs.ButtonRadius.toPx()
+        drawRoundRect(
+            Qs.Route.copy(alpha = pulse), Offset(w / 2, w / 2), Size(size.width - w, size.height - w),
+            CornerRadius(r, r), style = Stroke(w),
+        )
+    }
+}
+
+/** A mic on a route-blue disc with rings spreading out of it: voice input is listening. */
+@Composable
+private fun ListeningMic(dot: Dp) {
+    val spread by rememberInfiniteTransition(label = "listening").animateFloat(
+        0f, 1f, infiniteRepeatable(tween(1_400, easing = LinearEasing)), label = "rings",
+    )
+    Box(Modifier.size(dot * 2), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.matchParentSize()) {
+            val base = dot.toPx() / 2
+            // Two rings half a cycle apart, each growing to twice the disc and fading out.
+            for (i in 0..1) {
+                val q = (spread + i * 0.5f) % 1f
+                drawCircle(Qs.Route.copy(alpha = (1f - q) * 0.45f), radius = base * (1f + q))
+            }
+        }
+        Box(Modifier.size(dot).clip(CircleShape).background(Qs.Route), contentAlignment = Alignment.Center) {
+            QsIcon(Icons.Mic, Color.White, dot * 0.55f)
+        }
     }
 }
