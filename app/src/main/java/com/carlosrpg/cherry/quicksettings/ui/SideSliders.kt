@@ -1,6 +1,7 @@
 package com.carlosrpg.cherry.quicksettings.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -50,6 +51,7 @@ import kotlin.math.roundToInt
 
 /** Width of one side slider in the open drawer. */
 private val SliderWidth = 76.dp
+private val SliderGap = 12.dp
 
 /**
  * The styleguide's slider, standing up: a tall rounded track filled from the bottom in [fill],
@@ -156,18 +158,21 @@ fun ClimateSliders(car: CarState, actions: DrawerActions, modifier: Modifier = M
 fun VolumeSliders(actions: DrawerActions, modifier: Modifier = Modifier) {
     var navOpen by remember { mutableStateOf(false) }
     Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(SliderGap)) {
             AnimatedVisibility(navOpen) {
-                ChannelSlider(VolumeChannel.NAVIGATION, Icons.NavArrow, stringResource(R.string.slider_nav_voice), Qs.Route, actions)
+                ChannelSlider(VolumeChannel.NAVIGATION, Icons.Voice, stringResource(R.string.slider_nav_voice), Qs.Route, actions)
             }
             ChannelSlider(VolumeChannel.MEDIA, Icons.Volume, stringResource(R.string.slider_volume), Qs.Mode, actions)
         }
+        // Spans whatever sliders are shown, so it widens along with the voice slider.
+        val buttonWidth by animateDpAsState(if (navOpen) SliderWidth * 2 + SliderGap else SliderWidth, label = "voiceButton")
         GlassButton(
-            Icons.NavArrow,
+            Icons.Voice,
             stringResource(if (navOpen) R.string.slider_nav_voice_hide else R.string.slider_nav_voice_show),
             { navOpen = !navOpen },
             tint = if (navOpen) Qs.Route else Qs.TextSoft,
             background = if (navOpen) Qs.Route.copy(alpha = 0.16f) else Qs.Button,
+            modifier = Modifier.width(buttonWidth),
         )
     }
 }

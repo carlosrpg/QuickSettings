@@ -103,8 +103,8 @@ fun GlassButton(
     filledIcon: Boolean = false,
     shape: RoundedCornerShape = RoundedCornerShape(Qs.ButtonRadius),
     leading: (@Composable () -> Unit)? = null,
+    square: Boolean = label == null && leading == null,
 ) {
-    val square = label == null && leading == null
     Row(
         modifier
             .height(size)
@@ -447,7 +447,7 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
     Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
             ClimateButton(ClimateSwitch.POWER, car.climateOn, Icons.Power, stringResource(R.string.climate_power), actions)
-            ClimateButton(ClimateSwitch.AUTO, car.autoClimate, Icons.AutoMode, stringResource(R.string.climate_auto), actions)
+            ClimateButton(ClimateSwitch.AUTO, car.autoClimate, null, stringResource(R.string.climate_auto), actions, text = "AUTO")
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
             val style = QuadrantStyle.scaled(minOf(maxWidth, maxHeight))
@@ -477,10 +477,11 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
 
 /** One of the climate panel's buttons, as a symbol: lit from the car's state, flipped on tap. */
 @Composable
-private fun ClimateButton(switch: ClimateSwitch, on: Boolean?, icon: String, name: String, actions: DrawerActions) {
+private fun ClimateButton(switch: ClimateSwitch, on: Boolean?, icon: String?, name: String, actions: DrawerActions, text: String? = null) {
     val state = onOffLabel(on)
+    // [text] stands in for the icon, as on the car's own panel (AUTO), in the same square.
     GlassButton(
-        icon, "$name, $state", { actions.car.toggleClimate(switch) },
+        icon, "$name, $state", { actions.car.toggleClimate(switch) }, label = text, square = true,
         tint = when (on) { true -> Qs.Energy; false -> Qs.TextSoft; null -> Qs.Dim },
         background = if (on == true) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
     )

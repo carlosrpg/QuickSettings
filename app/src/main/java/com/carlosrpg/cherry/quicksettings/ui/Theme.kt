@@ -87,6 +87,8 @@ object Icons {
     const val Tune = "M4 7h9M17 7h3M4 17h3M11 17h9M17 7a2 2 0 1 1-4 0a2 2 0 1 1 4 0M11 17a2 2 0 1 1-4 0a2 2 0 1 1 4 0"
     const val OpenApp = "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
     const val TurnRight = "M7 20v-6a4 4 0 0 1 4-4h7M14 6l4 4-4 4"
+    /** A speaking head: the navigation voice. */
+    const val Voice = "M4 21v-3.6A7 7 0 1 1 15 10l1.5 3h-2v2.5a2 2 0 0 1-2 2H10V21M18.5 7.5a4 4 0 0 1 0 5M21 5a7.5 7.5 0 0 1 0 10"
     const val NavArrow = "M12 2l7 19-7-4-7 4z"
     const val Pin = "M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11zM14.5 10a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0"
     const val Battery = "M4 7h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM21 10v4"
@@ -103,7 +105,6 @@ object Icons {
     const val Wifi = "M5 12.6a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0M12 19.5h.01"
     const val Terminal = "M4 6h16v12H4zM7.5 10l2.5 2l-2.5 2M12.5 14.5h4"
     const val Power = "M12 4v8M7.6 6.6a7 7 0 1 0 8.8 0"
-    const val AutoMode = "M7.5 18L12 6l4.5 12M9.2 13.8h5.6"
     const val SyncZones = "M4 9h13l-3.5-3.5M20 15H7l3.5 3.5"
     const val Recirculate = "M18.5 9A7 7 0 1 0 19 13.5M19 4.5V9h-4.5"
     const val Collision = "M12 4L21 19H3ZM12 10v4M12 16.5h.01"
