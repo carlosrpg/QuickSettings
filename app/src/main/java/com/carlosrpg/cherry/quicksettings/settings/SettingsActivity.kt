@@ -154,8 +154,9 @@ class SettingsActivity : ComponentActivity() {
                 WidgetsPanel(config)
             }
             ClusterPanel(config)
-            // Re-read every tick: Wi-Fi and adb change elsewhere, and the service can come and go.
-            key(refresh) { AutomationPanels() }
+            // Wi-Fi and adb change elsewhere: their state is re-read every tick. Not keyed, so the
+            // password field and switches keep their state (and focus) across ticks.
+            AutomationPanels(refresh)
             key(refresh) { Status() }
         }
     }
@@ -215,10 +216,15 @@ class SettingsActivity : ComponentActivity() {
      * Each shows its live state, a switch for doing it on its own, and a button for now.
      */
     @Composable
-    private fun AutomationPanels() {
+    private fun AutomationPanels(refresh: Int) {
         val store = remember { AutomationStore(this) }
         val running = EngModeService.running.collectAsState().value
         val busy = EngModeService.active.collectAsState().value
+        // Read here, once per tick ([refresh] changes), so the panels below get fresh values.
+        val wifiOn = remember(refresh) { EngModeService.wifiOn(this) }
+        val adbOn = remember(refresh) { EngModeService.adbOn(this) }
+        var auto by remember { mutableStateOf(store.autoWifi) }
+        var startup by remember { mutableStateOf(store.adbOnStartup) }
         if (!running) Panel {
             QsText(stringResource(R.string.auto_service_off), 14.sp, Qs.TextSoft)
             Text(ADB_SECURE_SETTINGS, color = Qs.TextSoft, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
@@ -227,11 +233,10 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Panel {
-            val on = EngModeService.wifiOn(this@SettingsActivity)
+            val on = wifiOn
             CardLabel(stringResource(R.string.auto_wifi_title))
             StatusRow(R.string.auto_wifi_title, on, stringResource(if (on) R.string.auto_wifi_on else R.string.auto_wifi_off))
             QsText(stringResource(R.string.auto_wifi_why), 13.sp, Qs.Muted)
-            var auto by remember { mutableStateOf(store.autoWifi) }
             SwitchRow(R.string.auto_wifi_auto, R.string.auto_wifi_auto_hint, auto) { auto = !auto; store.autoWifi = auto }
             GlassButton(
                 Icons.Wifi, stringResource(R.string.auto_wifi_now),
@@ -241,12 +246,13 @@ class SettingsActivity : ComponentActivity() {
             )
         }
         Panel {
-            val on = EngModeService.adbOn(this@SettingsActivity)
+            val on = adbOn
             CardLabel(stringResource(R.string.auto_adb_title))
             StatusRow(R.string.auto_adb_title, on, stringResource(if (on) R.string.auto_adb_on else R.string.auto_adb_off))
             QsText(stringResource(R.string.auto_adb_why), 13.sp, Qs.Muted)
-            var startup by remember { mutableStateOf(store.adbOnStartup) }
             SwitchRow(R.string.auto_adb_startup, R.string.auto_adb_startup_hint, startup) { startup = !startup; store.adbOnStartup = startup }
+            // Both on: adb is reachable over the head unit's Wi-Fi network.
+            if (auto && startup) Text(stringResource(R.string.auto_adb_wifi_warning), color = Qs.Warm, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             QsText(stringResource(R.string.auto_password), 16.sp, weight = FontWeight.SemiBold)
             var password by remember { mutableStateOf(store.password) }
             BasicTextField(

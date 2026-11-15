@@ -30,6 +30,8 @@ class AutomationStore(private val context: Context) {
     /** Set by the boot receiver, taken once by the service after it connects. */
     fun armBoot() = prefs.edit().putBoolean(KEY_BOOT_PENDING, true).apply()
 
+    val bootPending: Boolean get() = prefs.getBoolean(KEY_BOOT_PENDING, false)
+
     fun takeBootPending(): Boolean {
         if (!prefs.getBoolean(KEY_BOOT_PENDING, false)) return false
         prefs.edit().putBoolean(KEY_BOOT_PENDING, false).apply()

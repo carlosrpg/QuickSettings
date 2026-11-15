@@ -15,14 +15,15 @@ import kotlin.math.hypot
 /**
  * The top bar's pull-down zone: an invisible strip across the whole width just below the bar
  * (the car's status bar, a higher layer, takes touches on the bar itself) that draws only a
- * small centred hint. A tap on the hint opens the drawer too; a tap elsewhere goes to the app. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
+ * small centred hint. A pull down or a tap on the hint opens the drawer; anything else (a tap
+ * elsewhere, a long press, a sideways swipe) is handed to [onPass] to be replayed on the app. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
  * position so it can be replayed on the app underneath (its toolbar often sits right here).
  */
 @SuppressLint("ViewConstructor")
 class TopSwipeView(
     context: Context,
     private val onOpen: () -> Unit,
-    private val onTap: (rawX: Float, rawY: Float) -> Unit,
+    private val onPass: (x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long) -> Unit,
 ) : View(context) {
 
     private val density = resources.displayMetrics.density
@@ -62,8 +63,16 @@ class TopSwipeView(
                     onOpen()
                 }
             }
-            MotionEvent.ACTION_UP -> if (!opened && hypot(event.rawX - downX, event.rawY - downY) < touchSlop) {
-                if (abs(event.x - width / 2f) <= HINT_TAP_HALF_WIDTH_DP * density) onOpen() else onTap(event.rawX, event.rawY)
+            MotionEvent.ACTION_UP -> if (!opened) {
+                val still = hypot(event.rawX - downX, event.rawY - downY) < touchSlop
+                val held = event.eventTime - event.downTime
+                if (still && held < ViewConfiguration.getLongPressTimeout() && abs(event.x - width / 2f) <= HINT_TAP_HALF_WIDTH_DP * density) {
+                    onOpen()
+                } else if (still) {
+                    onPass(downX, downY, downX, downY, held)
+                } else {
+                    onPass(downX, downY, event.rawX, event.rawY, held)
+                }
             }
         }
         return true

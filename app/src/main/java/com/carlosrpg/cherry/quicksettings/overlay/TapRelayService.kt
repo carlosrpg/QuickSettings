@@ -45,10 +45,20 @@ class TapRelayService : AccessibilityService() {
     }
     override fun onInterrupt() = Unit
 
-    fun tap(x: Float, y: Float, done: () -> Unit) {
-        val path = Path().apply { moveTo(x, y) }
+    fun tap(x: Float, y: Float, done: () -> Unit) = replay(x, y, x, y, TAP_MS, done)
+
+    /**
+     * Replays one finger's stroke from (x0, y0) to (x1, y1) over [durationMs]: a tap, a long
+     * press (same point, held) or a swipe, as the app underneath would have got it.
+     */
+    fun replay(x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long, done: () -> Unit) {
+        val path = Path().apply {
+            moveTo(x0, y0)
+            if (x1 != x0 || y1 != y0) lineTo(x1, y1)
+        }
+        val duration = durationMs.coerceIn(1L, GestureDescription.getMaxGestureDuration())
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, TAP_MS))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
             .build()
         val callback = object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) = done()

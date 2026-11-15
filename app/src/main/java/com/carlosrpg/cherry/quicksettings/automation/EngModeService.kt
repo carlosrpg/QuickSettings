@@ -1,5 +1,6 @@
 package com.carlosrpg.cherry.quicksettings.automation
 
+import android.annotation.SuppressLint
 import android.accessibilityservice.AccessibilityService
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -92,26 +93,48 @@ class EngModeService : AccessibilityService() {
     /** After a boot (armed by the boot receiver): adb first if asked for, then Wi-Fi. */
     fun consumeBoot() {
         val store = AutomationStore(this)
-        if (!store.takeBootPending()) return
+        if (!store.bootPending) return
         handler.postDelayed({
+            // Cleared only now: if the service was rebound before this ran, the new instance
+            // still finds the flag and runs the after-boot tasks.
+            if (!store.takeBootPending()) return@postDelayed
             if (store.adbOnStartup) start(Flow.ADB, auto = true)
             autoWifi("startup")
         }, BOOT_DELAY_MS)
     }
 
     /** Settings buttons: run now, under the cover, whatever the state. */
-    fun runNow(which: Flow) = start(which, auto = false)
+    fun runNow(which: Flow) {
+        if (which == Flow.WIFI) autoRuns = 0
+        start(which, auto = false)
+    }
+
+    /**
+     * Automatic Wi-Fi runs since Wi-Fi was last seen on. Capped at [MAX_AUTO_RUNS]: if the runs
+     * don't work, they stop instead of covering the screen every minute while driving. Reset by
+     * Wi-Fi coming on, a run from Settings, or a restart.
+     */
+    private var autoRuns = 0
 
     private fun autoWifi(reason: String, returnTo: String? = null) {
-        if (!AutomationStore(this).autoWifi || wifiOn(this)) return
+        if (!AutomationStore(this).autoWifi) return
+        if (wifiOn(this)) {
+            autoRuns = 0
+            return
+        }
         val now = SystemClock.elapsedRealtime()
         if (lastWifiRun?.let { now - it < COOLDOWN_MS } == true) return
+        if (autoRuns >= MAX_AUTO_RUNS) {
+            Log.w(TAG, "Wi-Fi still off after $autoRuns runs ($reason): not trying again")
+            return
+        }
         Log.i(TAG, "Wi-Fi off ($reason): opening it")
         if (step != Step.IDLE) {
             queued = Flow.WIFI
             return
         }
         lastWifiRun = now
+        autoRuns++
         start(Flow.WIFI, auto = true, returnTo = returnTo)
     }
 
@@ -156,7 +179,8 @@ class EngModeService : AccessibilityService() {
         val root = engModeRoot()
         when (step) {
             Step.IDLE -> return
-            Step.CLICK_WIFI -> if (root != null && clickText(root, "WIFI", exact = false)) advance(Step.CLICK_OPEN)
+            // The "WIFI" item itself; only then the shortest label containing it.
+            Step.CLICK_WIFI -> if (root != null && (clickText(root, "WIFI", exact = true) || clickText(root, "WIFI", exact = false))) advance(Step.CLICK_OPEN)
             Step.CLICK_ENCRYPT -> if (root != null && clickOrScroll(root, "Encryption") { it.contains("encryption", true) }) advance(Step.FILL_PW)
             Step.FILL_PW -> if (root != null && fillPassword(root)) advance(Step.CONFIRM_PW)
             Step.CONFIRM_PW -> if (root != null && (clickText(root, "Confirm", exact = true) || clickText(root, "OK", exact = true))) advance(Step.CLICK_ADB)
@@ -206,7 +230,7 @@ class EngModeService : AccessibilityService() {
         returnPkg = null
         if (back != null && runCatching { startActivity(back.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) {
             // Keep the cover up while the projection app redraws, so the launcher never flashes.
-            handler.postDelayed(::hideOverlay, RETURN_OVERLAY_MS)
+            handler.postDelayed(hideOverlayLater, RETURN_OVERLAY_MS)
         } else {
             hideOverlay()
         }
@@ -219,10 +243,17 @@ class EngModeService : AccessibilityService() {
     private fun engModeRoot(): AccessibilityNodeInfo? =
         windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName == ENGMODE_PKG } }
 
-    /** Clicks the first node whose text matches, through its nearest clickable ancestor. */
+    /**
+     * Clicks a node whose text is [text] ([exact]) or contains it (the shortest such label),
+     * through its nearest clickable ancestor.
+     */
     private fun clickText(root: AccessibilityNodeInfo, text: String, exact: Boolean): Boolean {
-        val node = root.findAccessibilityNodeInfosByText(text)
-            .firstOrNull { !exact || it.text?.toString()?.trim().equals(text, ignoreCase = true) } ?: return false
+        val matches = root.findAccessibilityNodeInfosByText(text)
+        val node = if (exact) {
+            matches.firstOrNull { it.text?.toString()?.trim().equals(text, ignoreCase = true) }
+        } else {
+            matches.filter { it.text != null }.minByOrNull { it.text.length }
+        } ?: return false
         return clickNode(node)
     }
 
@@ -251,11 +282,22 @@ class EngModeService : AccessibilityService() {
         return ok
     }
 
-    /** Types the password into the dialog's first editable field. Never logged. */
+    /**
+     * Types the password into the dialog's password field, or its only editable field. On any
+     * other screen (several fields, none of them a password) it types nothing. Never logged.
+     */
     private fun fillPassword(root: AccessibilityNodeInfo): Boolean {
-        val field = firstMatching(root) { it.isEditable } ?: return false
+        val editable = allMatching(root) { it.isEditable }
+        val field = editable.firstOrNull { it.isPassword } ?: editable.singleOrNull() ?: return false
         val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, password) }
         return field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+    }
+
+    private fun allMatching(node: AccessibilityNodeInfo?, test: (AccessibilityNodeInfo) -> Boolean): List<AccessibilityNodeInfo> {
+        if (node == null) return emptyList()
+        val found = if (test(node)) mutableListOf(node) else mutableListOf()
+        for (i in 0 until node.childCount) found += allMatching(node.getChild(i), test)
+        return found
     }
 
     private fun firstMatching(node: AccessibilityNodeInfo?, test: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
@@ -265,9 +307,18 @@ class EngModeService : AccessibilityService() {
         return null
     }
 
-    /** Full-screen cover in the app's style. Clicks still reach EngMode underneath. */
+    private val hideOverlayLater = Runnable { hideOverlay() }
+
+    /**
+     * Full-screen cover in the app's style. It swallows touches, so a tap during a run never
+     * lands on the hidden menu; the service's own clicks are accessibility actions, not touches.
+     */
+    @SuppressLint("ClickableViewAccessibility")
     private fun showOverlay() {
-        if (overlay != null) return
+        // A run started just after the last one: drop the old cover and its pending removal,
+        // which would otherwise take this run's cover away mid-run.
+        handler.removeCallbacks(hideOverlayLater)
+        hideOverlay()
         val dp = resources.displayMetrics.density
         val view = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -282,14 +333,15 @@ class EngModeService : AccessibilityService() {
                 textSize = 24f
                 setPadding(0, (20 * dp).toInt(), 0, 0)
             })
+            setOnTouchListener { _, _ -> true }
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            // Not focusable and not touchable: EngMode must stay the active window.
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            // Not focusable, so EngMode stays the active window (Back goes to it); touchable, so
+            // stray taps stop here.
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.OPAQUE,
         )
         getSystemService(WindowManager::class.java).addView(view, params)
@@ -324,6 +376,7 @@ class EngModeService : AccessibilityService() {
         private const val RETURN_OVERLAY_MS = 800L
         private const val QUEUE_GAP_MS = 1_500L
         private const val MAX_BACKS = 6
+        private const val MAX_AUTO_RUNS = 3
         private const val SCROLL_EVERY_TICKS = 3
         private val ADB_ITEM = Regex("""ADB(\s*Switch)?""", RegexOption.IGNORE_CASE)
 
@@ -338,8 +391,16 @@ class EngModeService : AccessibilityService() {
         /** The run in progress, if any. */
         val active: StateFlow<Flow?> = _active.asStateFlow()
 
-        fun wifiOn(context: Context): Boolean =
-            context.applicationContext.getSystemService(WifiManager::class.java)?.isWifiEnabled == true
+        /**
+         * Wi-Fi client or hotspot on: the engineering menu's switch may turn on either, and
+         * wireless Android Auto / CarPlay use the hotspot. The hotspot check is a hidden API,
+         * read by reflection; where it is blocked it counts as off.
+         */
+        fun wifiOn(context: Context): Boolean {
+            val wifi = context.applicationContext.getSystemService(WifiManager::class.java) ?: return false
+            if (wifi.isWifiEnabled) return true
+            return runCatching { WifiManager::class.java.getMethod("isWifiApEnabled").invoke(wifi) as Boolean }.getOrDefault(false)
+        }
 
         fun adbOn(context: Context): Boolean =
             Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1

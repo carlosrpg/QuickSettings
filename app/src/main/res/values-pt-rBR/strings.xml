@@ -207,4 +207,6 @@
     <string name="side_handle">Gaveta lateral</string>
     <string name="side_handle_hint">A alça na borda da tela que abre a meia gaveta. Desligada, a gaveta só abre deslizando para baixo a partir do topo, por isso a alça continua enquanto a barra de informações estiver desligada.</string>
     <string name="say_destination">Diga para onde quer ir</string>
+    <string name="auto_adb_wifi_warning">Com o Wi-Fi abrindo automaticamente e o ADB ligado ao iniciar, qualquer aparelho no Wi-Fi da central pode acessar o ADB. Desligue um deles quando não precisar.</string>
+    <string name="open_drawer_label">Abrir a gaveta do QuickSettings</string>
 </resources>

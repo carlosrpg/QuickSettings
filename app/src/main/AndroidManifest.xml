@@ -47,6 +47,22 @@
             android:foregroundServiceType="microphone" />
 
         <!-- Blank, short-lived: started on the instrument cluster's display to wake it. -->
+        <!-- The package's launch intent (INFO wins over LAUNCHER there): apps that launch
+             QuickSettings by package, such as gesture actions, open the drawer. -->
+        <activity
+            android:name=".overlay.OpenDrawerActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/open_drawer_label"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.INFO" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".cluster.ClusterWakeActivity"
             android:excludeFromRecents="true"

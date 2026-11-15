@@ -246,8 +246,12 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
         val applying = MutableStateFlow<Int?>(null)
 
+        /** Counts [moveTo] calls, so a target set while a move is finishing is not dropped. */
+        @Volatile private var requests = 0
+
         fun moveTo(value: Int) {
             if (job?.isActive != true && value == read(state.value)) return
+            requests++
             target.value = value
             applying.value = value
             if (job?.isActive != true) job = scope.launch(Dispatchers.IO) { run() }
@@ -255,15 +259,19 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
         private suspend fun run() {
             try {
-                apply()
+                // A tap that lands while the last move settles or reads back (moveTo then sees
+                // this job still active and starts none) gets another pass here.
+                do {
+                    val seen = requests
+                    apply()
+                } while (requests != seen)
             } finally {
                 applying.value = null
             }
         }
 
         private suspend fun apply() {
-            var current = read(state.value) ?: return
-            val panelBefore = mutex.withLock { panelItem() }
+            var current: Int
             do {
                 // Debounce: wait until the target has held still.
                 var held: Int?
@@ -271,6 +279,11 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
                     held = target.value
                     delay(CLIMATE_DEBOUNCE_MS)
                 } while (target.value != held)
+                // Each batch starts from the car's own reading, so a turn of the car's knob or a
+                // step the car refused since the last batch is not overwritten from a stale value.
+                refresh()
+                current = read(state.value) ?: return
+                val panelBefore = mutex.withLock { panelItem() }
                 // One step at a time, following the target if it moves meanwhile.
                 while (true) {
                     val goal = target.value ?: break

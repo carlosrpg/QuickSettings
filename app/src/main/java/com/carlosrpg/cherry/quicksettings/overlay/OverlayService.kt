@@ -180,7 +180,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         view.invalidate()
     }
 
-    private fun edgeParams(touchable: Boolean = true) = WindowManager.LayoutParams(
+    private fun edgeParams(touchable: Boolean = !relayPending) = WindowManager.LayoutParams(
         // Tap to open: a handle-sized target, so it covers little of the app underneath.
         // Swipe only: a long, narrow zone.
         px(if (config.tapToOpen) EDGE_TAP_WIDTH_DP else EDGE_WIDTH_DP),
@@ -201,15 +201,36 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     /** Lets a tap in the zone reach the app below by replaying it while the zone is untouchable. */
     private fun relayTap(x: Float, y: Float) {
         val view = edgeView ?: return
-        relay(view, x, y) { touchable -> edgeParams(touchable) }
+        relay(view, x, y, x, y, TAP_RELAY_MS) { touchable -> edgeParams(touchable) }
     }
 
-    private fun relay(view: View, x: Float, y: Float, params: (touchable: Boolean) -> WindowManager.LayoutParams) {
+    /**
+     * True while a relayed gesture is on its way: the zones stay untouchable until it has
+     * landed, even if a layout update comes in meanwhile, so the replay can't hit them again.
+     */
+    private var relayPending = false
+
+    private fun relay(
+        view: View, x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long,
+        params: (touchable: Boolean) -> WindowManager.LayoutParams,
+    ) {
         val relay = TapRelayService.instance ?: return
+        relayPending = true
         wm.updateViewLayout(view, params(false))
         handler.postDelayed({
-            relay.tap(x, y) { handler.post { if (view.isAttachedToWindow) wm.updateViewLayout(view, params(true)) } }
+            relay.replay(x0, y0, x1, y1, durationMs) {
+                handler.post {
+                    relayPending = false
+                    if (view.isAttachedToWindow) wm.updateViewLayout(view, params(true))
+                }
+            }
         }, RELAY_DELAY_MS)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Sent by OpenDrawerActivity (a gesture app launching QuickSettings): the full drawer.
+        if (intent?.action == ACTION_OPEN_TOP) handler.post { if (mode == null) openFromTop() }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     // --- top bar window ----------------------------------------------------------------
@@ -307,7 +328,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         val view = topZoneView
         when {
             wanted && view == null -> {
-                topZoneView = TopSwipeView(this, onOpen = ::openFromTop, onTap = ::relayTopTap)
+                topZoneView = TopSwipeView(this, onOpen = ::openFromTop, onPass = ::relayTop)
                     .also { wm.addView(it, topZoneParams()) }
             }
             wanted && view != null -> wm.updateViewLayout(view, topZoneParams())
@@ -323,16 +344,16 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         show(DrawerMode.OPEN)
     }
 
-    private fun relayTopTap(x: Float, y: Float) {
+    private fun relayTop(x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long) {
         val view = topZoneView ?: return
-        relay(view, x, y) { touchable -> topZoneParams(touchable) }
+        relay(view, x0, y0, x1, y1, durationMs) { touchable -> topZoneParams(touchable) }
     }
 
     /** Height of the car's status bar: where the top bar draws and the hint sits under. */
     private fun barHeight() = usable().top.takeIf { it > 0 } ?: px(TOP_BAR_FALLBACK_DP)
 
     /** The whole width, just below the top bar. */
-    private fun topZoneParams(touchable: Boolean = true) = WindowManager.LayoutParams(
+    private fun topZoneParams(touchable: Boolean = !relayPending) = WindowManager.LayoutParams(
         WindowManager.LayoutParams.MATCH_PARENT,
         px(TOP_ZONE_HEIGHT_DP),
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -536,6 +557,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val SEMI_IDLE_MS = 8_000L
         private const val OPEN_IDLE_MS = 20_000L
         private const val RELAY_DELAY_MS = 60L
+        private const val TAP_RELAY_MS = 40L
+        private const val ACTION_OPEN_TOP = "com.carlosrpg.cherry.quicksettings.OPEN_TOP"
         // The slide-out takes 220 ms; past this the window goes regardless.
         private const val CLOSE_FALLBACK_MS = 600L
 
@@ -543,6 +566,11 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
         fun start(context: Context) {
             if (canDraw(context)) context.startForegroundService(Intent(context, OverlayService::class.java))
+        }
+
+        /** Opens the full drawer, as a pull down from the top does. Call from a foreground activity. */
+        fun openTop(context: Context) {
+            if (canDraw(context)) context.startService(Intent(context, OverlayService::class.java).setAction(ACTION_OPEN_TOP))
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.carlosrpg.cherry.quicksettings.ui
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Offset
@@ -250,7 +252,12 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
             }
         }
     }
-    Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    // The control row keeps its own gaps: a near miss between buttons does nothing, instead of
+    // falling through to the card and opening the media app.
+    Row(
+        Modifier.fillMaxWidth().padding(top = 14.dp).pointerInput(Unit) { detectTapGestures { } },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         GlassButton(
             Icons.Prev, stringResource(R.string.previous_track), actions.media::previous,
             shape = RoundedCornerShape(MEDIA_BUTTON / 2), filledIcon = true, size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
