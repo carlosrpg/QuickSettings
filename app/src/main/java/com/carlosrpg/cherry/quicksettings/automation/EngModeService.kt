@@ -151,6 +151,11 @@ class EngModeService : AccessibilityService() {
             if (auto) queued = which else toast(getString(R.string.auto_err_busy))
             return
         }
+        // Automatic Wi-Fi runs never open EngMode while Wi-Fi is on (or turning on).
+        if (auto && which == Flow.WIFI && wifiOn(this)) {
+            Log.i(TAG, "Wi-Fi already on: not running")
+            return
+        }
         val launch = launchIntentFor(packageManager) ?: return toast(getString(R.string.auto_err_no_engmode))
         launchIntent = launch
         relaunches = 0
@@ -198,6 +203,11 @@ class EngModeService : AccessibilityService() {
             return
         }
         if (++lostTicks < LOST_TICKS || relaunches >= MAX_RELAUNCHES) return
+        if (flow == Flow.WIFI && wifiOn(this)) {
+            Log.i(TAG, "Wi-Fi came on meanwhile: not reopening EngMode")
+            finishRun()
+            return
+        }
         val launch = launchIntent ?: return
         relaunches++
         lostTicks = 0
@@ -413,15 +423,20 @@ class EngModeService : AccessibilityService() {
         val active: StateFlow<Flow?> = _active.asStateFlow()
 
         /**
-         * Wi-Fi client or hotspot on: the engineering menu's switch may turn on either, and
-         * wireless Android Auto / CarPlay use the hotspot. The hotspot check is a hidden API,
-         * read by reflection; where it is blocked it counts as off.
+         * Wi-Fi client or hotspot on, or turning on: the engineering menu's switch may turn on
+         * either, and wireless Android Auto / CarPlay use the hotspot. The hotspot state is a
+         * hidden API, read by reflection; where it is blocked it counts as off.
          */
         fun wifiOn(context: Context): Boolean {
             val wifi = context.applicationContext.getSystemService(WifiManager::class.java) ?: return false
-            if (wifi.isWifiEnabled) return true
-            return runCatching { WifiManager::class.java.getMethod("isWifiApEnabled").invoke(wifi) as Boolean }.getOrDefault(false)
+            if (wifi.wifiState == WifiManager.WIFI_STATE_ENABLED || wifi.wifiState == WifiManager.WIFI_STATE_ENABLING) return true
+            val ap = runCatching { WifiManager::class.java.getMethod("getWifiApState").invoke(wifi) as Int }.getOrNull()
+            return ap == WIFI_AP_STATE_ENABLING || ap == WIFI_AP_STATE_ENABLED
         }
+
+        /** `WifiManager.WIFI_AP_STATE_ENABLING` / `_ENABLED`: hidden constants, stable since API 14. */
+        private const val WIFI_AP_STATE_ENABLING = 12
+        private const val WIFI_AP_STATE_ENABLED = 13
 
         fun adbOn(context: Context): Boolean =
             Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
