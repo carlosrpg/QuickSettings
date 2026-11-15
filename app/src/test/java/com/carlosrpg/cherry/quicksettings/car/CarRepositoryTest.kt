@@ -1,6 +1,7 @@
 package com.carlosrpg.cherry.quicksettings.car
 
 import app.jconfig.carbus.carinfo.BatteryMode
+import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.RegenLevel
 import com.google.common.truth.Truth.assertThat
@@ -35,8 +36,8 @@ class CarRepositoryTest {
         repo.refresh()
         repo.setCabinTemp(26)
         repo.setFan(7)
-        // Both go out at once; each read back after its watch on the car's panel.
-        delay(CarRepository.CLIMATE_WRITE_MS + CarRepository.WRITE_SETTLE_MS + 400)
+        // Debounce, four single steps each (side by side), the panel watch, then a read back.
+        awaitMoveDone(repo)
         repo.refresh()
         assertThat(repo.state.value.cabinTempC).isEqualTo(26)
         assertThat(repo.state.value.fanLevel).isEqualTo(7)
@@ -54,5 +55,42 @@ class CarRepositoryTest {
         repo.refresh()
         // A 0 would otherwise decode as regen High and battery mode Initial.
         assertThat(repo.state.value).isEqualTo(CarState())
+    }
+
+    @Test
+    fun `a climate jump goes out as single steps, debounced to the last target`() = runBlocking {
+        val bus = seededMockBus()
+        val sent = mutableListOf<Int>()
+        val recording = object : CarBus by bus {
+            override fun sendItemValue(module: Int, id: Int, value: Int) {
+                if (id == CabinTempSpec.ITEM_WRITE) sent += CabinTempSpec.toCelsius(value)
+                bus.sendItemValue(module, id, value)
+            }
+        }
+        val repo = CarRepository(recording, scope)
+        repo.refresh()
+        // Three quick targets: only the last one is followed, one degree per command.
+        repo.setCabinTemp(28)
+        repo.setCabinTemp(20)
+        repo.setCabinTemp(25)
+        // The controls hold the target while it is applied, then follow the car's reading.
+        assertThat(repo.cabinTempTarget.value).isEqualTo(25)
+        awaitMoveDone(repo)
+        assertThat(sent).containsExactly(23, 24, 25).inOrder()
+        assertThat(repo.cabinTempTarget.value).isNull()
+        assertThat(repo.state.value.cabinTempC).isEqualTo(25)
+    }
+
+    /**
+     * Waits for the climate moves to finish (their targets clear once the car is read back),
+     * instead of a fixed sleep: a slow CI runner takes longer than the nominal timings.
+     */
+    private suspend fun awaitMoveDone(repo: CarRepository) {
+        delay(CarRepository.CLIMATE_DEBOUNCE_MS)
+        val deadline = System.currentTimeMillis() + 10_000
+        while (repo.cabinTempTarget.value != null || repo.fanTarget.value != null) {
+            check(System.currentTimeMillis() < deadline) { "climate move did not finish within 10 s" }
+            delay(50)
+        }
     }
 }

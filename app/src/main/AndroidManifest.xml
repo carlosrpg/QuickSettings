@@ -15,6 +15,11 @@
          full-screen apps. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Wi-Fi and adb automation: Wi-Fi state is read to act only when it is off; the secure
+         settings grant (adb, optional) lets the app switch its own automation service on. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:name=".QuickSettingsApp"
@@ -42,6 +47,22 @@
             android:foregroundServiceType="microphone" />
 
         <!-- Blank, short-lived: started on the instrument cluster's display to wake it. -->
+        <!-- The package's launch intent (INFO wins over LAUNCHER there): apps that launch
+             QuickSettings by package, such as gesture actions, open the drawer. -->
+        <activity
+            android:name=".overlay.OpenDrawerActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/open_drawer_label"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.INFO" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".cluster.ClusterWakeActivity"
             android:excludeFromRecents="true"
@@ -59,6 +80,19 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+        </service>
+
+        <service
+            android:name=".automation.EngModeService"
+            android:exported="true"
+            android:label="@string/auto_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/engmode_automation" />
         </service>
 
         <service

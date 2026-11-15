@@ -202,22 +202,103 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     )
 
     fun stepCabinTemp(delta: Int) {
-        state.value.cabinTempC?.let { setCabinTemp(it + delta) }
+        (temperature.pending() ?: state.value.cabinTempC)?.let { setCabinTemp(it + delta) }
     }
 
     fun stepFan(delta: Int) {
-        state.value.fanLevel?.let { setFan(it + delta) }
+        (fan.pending() ?: state.value.fanLevel)?.let { setFan(it + delta) }
     }
 
-    /** Writes only when the clamped value differs from what the car last reported. */
-    fun setCabinTemp(celsius: Int) {
-        val target = celsius.coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX)
-        if (target != state.value.cabinTempC) write(HVAC, CabinTempSpec.ITEM_WRITE, CabinTempSpec.toRaw(target))
-    }
+    fun setCabinTemp(celsius: Int) = temperature.moveTo(celsius.coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX))
 
-    fun setFan(level: Int) {
-        val target = level.coerceIn(FanSpec.MIN, FanSpec.MAX)
-        if (target != state.value.fanLevel) write(HVAC, FanSpec.ITEM_WRITE, target)
+    fun setFan(level: Int) = fan.moveTo(level.coerceIn(FanSpec.MIN, FanSpec.MAX))
+
+    /**
+     * The temperature and fan level being applied, null once the car has been stepped there and
+     * read back. Controls show these meanwhile, so they don't snap back to the old reading.
+     */
+    val cabinTempTarget: StateFlow<Int?> get() = temperature.applying
+    val fanTarget: StateFlow<Int?> get() = fan.applying
+
+    private val temperature = ClimateStepper(CabinTempSpec.ITEM_WRITE, { it.cabinTempC }, CabinTempSpec::toRaw)
+    private val fan = ClimateStepper(FanSpec.ITEM_WRITE, { it.fanLevel }, { it })
+
+    /**
+     * Takes one climate value (temperature or fan) to a target the way the car's own controls
+     * and the other apps that change it quietly do: one step per command. A jump of several
+     * steps in one command is what makes the car raise its own full-screen climate panel.
+     *
+     * Debounced: a new target only starts moving once it has held still for
+     * [CLIMATE_DEBOUNCE_MS], and a target that changes while the value is still moving is
+     * simply followed, so a series of taps or a drag never queues up stale steps. Temperature
+     * and fan each have their own stepper and move side by side.
+     */
+    private inner class ClimateStepper(
+        private val item: Int,
+        private val read: (CarState) -> Int?,
+        private val raw: (Int) -> Int,
+    ) {
+        private val target = MutableStateFlow<Int?>(null)
+        private var job: Job? = null
+
+        /** The value being moved to, while a move is under way. */
+        fun pending(): Int? = target.value.takeIf { job?.isActive == true }
+
+        val applying = MutableStateFlow<Int?>(null)
+
+        /** Counts [moveTo] calls, so a target set while a move is finishing is not dropped. */
+        @Volatile private var requests = 0
+
+        fun moveTo(value: Int) {
+            if (job?.isActive != true && value == read(state.value)) return
+            requests++
+            target.value = value
+            applying.value = value
+            if (job?.isActive != true) job = scope.launch(Dispatchers.IO) { run() }
+        }
+
+        private suspend fun run() {
+            try {
+                // A tap that lands while the last move settles or reads back (moveTo then sees
+                // this job still active and starts none) gets another pass here.
+                do {
+                    val seen = requests
+                    apply()
+                } while (requests != seen)
+            } finally {
+                applying.value = null
+            }
+        }
+
+        private suspend fun apply() {
+            var current: Int
+            do {
+                // Debounce: wait until the target has held still.
+                var held: Int?
+                do {
+                    held = target.value
+                    delay(CLIMATE_DEBOUNCE_MS)
+                } while (target.value != held)
+                // Each batch starts from the car's own reading, so a turn of the car's knob or a
+                // step the car refused since the last batch is not overwritten from a stale value.
+                refresh()
+                current = read(state.value) ?: return
+                val panelBefore = mutex.withLock { panelItem() }
+                // One step at a time, following the target if it moves meanwhile.
+                while (true) {
+                    val goal = target.value ?: break
+                    if (goal == current) break
+                    current += if (goal > current) 1 else -1
+                    DebugLog.add("climate-$item-${System.currentTimeMillis()}", "hvac $item=${raw(current)}  panel=$panelBefore")
+                    send(HVAC, item, raw(current))
+                    delay(CLIMATE_STEP_MS)
+                }
+                watchClimatePanel(item, panelBefore)
+                // Settle inside the loop, so a target set meanwhile is still followed.
+                delay(WRITE_SETTLE_MS)
+            } while (target.value != current)
+            refresh()
+        }
     }
 
     /** Flips a climate panel button. The car's own panel applies no gate to these. */
@@ -309,7 +390,12 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     private fun write(module: Int, id: Int, value: Int) {
         scope.launch(Dispatchers.IO) {
-            if (module == HVAC) writeClimate(id, value) else send(module, id, value)
+            val panelBefore = if (module == HVAC) mutex.withLock { panelItem() } else null
+            send(module, id, value)
+            if (module == HVAC) {
+                DebugLog.add("climate-$id-${System.currentTimeMillis()}", "hvac $id=$value  panel=$panelBefore")
+                watchClimatePanel(id, panelBefore)
+            }
             delay(WRITE_SETTLE_MS)
             refresh()
         }
@@ -325,14 +411,12 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     }
 
     /**
-     * A climate write, followed by a watch on the car's "show climate panel" item. Every change
-     * of that item is written to the debug log against the write that preceded it, so a test on
-     * the car shows exactly which command makes the car raise its panel.
+     * After a climate write, watches the car's "show climate panel" item for about two seconds.
+     * Every change of it goes to the debug log against the write that preceded it, so a test on
+     * the car shows which command made the car raise its panel; a panel our write raised is
+     * closed again, as the stock settings app does, and one the driver had open is left alone.
      */
-    private suspend fun writeClimate(id: Int, value: Int) {
-        val before = mutex.withLock { panelItem() }
-        DebugLog.add("climate-$id-${System.currentTimeMillis()}", "hvac $id=$value  panel=$before")
-        send(HVAC, id, value)
+    private suspend fun watchClimatePanel(id: Int, before: Int?) {
         var last = before
         val start = System.currentTimeMillis()
         repeat(PANEL_WATCH_POLLS) {
@@ -340,16 +424,14 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
             mutex.withLock {
                 val now = panelItem()
                 if (now != last) {
-                    DebugLog.add("climate-$id-${System.currentTimeMillis()}", "  after $id=$value: panel $last->$now at +${System.currentTimeMillis() - start}ms")
+                    DebugLog.add("climate-$id-${System.currentTimeMillis()}", "  after $id: panel $last->$now at +${System.currentTimeMillis() - start}ms")
                     last = now
                 }
-                // Close a panel our write raised, as the stock settings app does; one the driver
-                // had open before is left alone.
                 if (!ClimatePanelSpec.isShowing(before) && ClimatePanelSpec.isShowing(now)) {
                     try {
                         bus.sendItemValue(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE, ClimatePanelSpec.COMMAND_CLOSE)
                     } catch (e: LinkageError) {
-                        // As above.
+                        // Vendor class mismatch on the device.
                     }
                 }
             }
@@ -363,6 +445,12 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         private const val READ_TIMEOUT_MS = 5_000L
         private const val TAG = "QsCar"
         const val WRITE_SETTLE_MS = 400L
+
+        /** A climate target must hold still this long before it starts moving. */
+        const val CLIMATE_DEBOUNCE_MS = 300L
+
+        /** Gap between two single-step climate commands. */
+        const val CLIMATE_STEP_MS = 100L
         // About two seconds: long enough to see the car react, short enough between two writes.
         private const val PANEL_WATCH_POLLS = 14
         private const val PANEL_WATCH_POLL_MS = 150L

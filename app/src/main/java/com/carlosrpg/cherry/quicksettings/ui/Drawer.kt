@@ -97,6 +97,16 @@ class DrawerActions(
         if (media.openApp()) close()
     }
 
+    /** The card's background tap: bring the media app up, unless it is showing on the cluster. */
+    fun mediaToFront() {
+        if (media.state.value.packageName != cluster.onCluster.value) openMediaApp()
+    }
+
+    /** The card's background tap: bring the nav app up, unless it is showing on the cluster. */
+    fun navToFront() {
+        if (cluster.onCluster.value == null) openNavApp()
+    }
+
     fun openNavApp() {
         if (NavStore.openApp(context)) close()
     }
@@ -112,11 +122,23 @@ class DrawerActions(
     fun navAppLabel(): String? = NavStore.navPackage(context)?.let { AppInfo.label(context, it) }
     fun navAppIcon(): Bitmap? = NavStore.navPackage(context)?.let { AppInfo.icon(context, it) }
 
+    /** The card that started the current voice input, so only that one shows it listening. */
+    var voiceFor by mutableStateOf<WidgetType?>(null)
+        private set
+
     /** Speech goes to the app that owns the media session; no recognizer = open that app. */
-    fun voiceMedia() = voice.listen(onText = { media.playFromSearch(it) }, onUnavailable = ::openMediaApp)
+    fun voiceMedia() {
+        voiceFor = WidgetType.MEDIA
+        voice.listen(onText = { media.playFromSearch(it) }, onUnavailable = ::openMediaApp)
+    }
 
     /** Speech becomes a destination search in the nav app; no recognizer = open the nav app. */
-    fun voiceNav() = voice.listen(
+    fun voiceNav() {
+        voiceFor = WidgetType.NAVIGATION
+        voiceNavListen()
+    }
+
+    private fun voiceNavListen() = voice.listen(
         onText = { if (NavStore.searchDestination(context, it)) close() },
         onUnavailable = ::openNavApp,
     )
@@ -144,7 +166,11 @@ fun DrawerRoot(
     onTouch: () -> Unit,
     fromTop: Boolean = false,
 ) {
-    val car by actions.car.state.collectAsState()
+    val read by actions.car.state.collectAsState()
+    val tempTarget by actions.car.cabinTempTarget.collectAsState()
+    val fanTarget by actions.car.fanTarget.collectAsState()
+    // While a climate change is applied, every control shows where it is going, not the old value.
+    val car = read.copy(cabinTempC = tempTarget ?: read.cabinTempC, fanLevel = fanTarget ?: read.fanLevel)
     val media by actions.media.state.collectAsState()
     val nav by NavStore.state.collectAsState()
     val listening by actions.voice.listening.collectAsState()
@@ -181,7 +207,7 @@ fun DrawerRoot(
     ) {
         when (mode) {
             DrawerMode.SEMI -> SemiDrawer(config, car, media, nav, actions, maxSemiHeight)
-            DrawerMode.OPEN -> OpenDrawer(config, car, media, nav, actions, listening, portrait)
+            DrawerMode.OPEN -> OpenDrawer(config, car, media, nav, actions, listening, portrait, fromTop)
         }
     }
 }
@@ -382,8 +408,8 @@ private fun SemiTile(
                 onTap = actions.toOpen,
                 onDragStart = {
                     val now = actions.car.state.value
-                    startTemp = now.cabinTempC ?: CabinTempSpec.MIN
-                    startFan = now.fanLevel ?: FanSpec.MIN
+                    startTemp = actions.car.cabinTempTarget.value ?: now.cabinTempC ?: CabinTempSpec.MIN
+                    startFan = actions.car.fanTarget.value ?: now.fanLevel ?: FanSpec.MIN
                     target = Hud.Climate(startTemp, startFan).also(setHud)
                 },
                 onDrag = { total ->
@@ -559,37 +585,47 @@ private fun OpenDrawer(
     actions: DrawerActions,
     listening: Boolean,
     portrait: Boolean,
+    fromTop: Boolean,
 ) {
     val shape = RoundedCornerShape(Qs.DrawerRadius)
     val columns = if (portrait) 2 else 4
-    Column(
+    // The cards in the middle, with a column of vertical sliders on each side: climate on the
+    // driver's side (left: the car is left-hand drive), volume on the other.
+    Row(
         Modifier.fillMaxSize().clip(shape).background(Qs.GlassOpen).border(1.dp, Qs.Hairline, shape).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-            CardLabel(stringResource(R.string.quick_panel), Modifier.weight(1f))
-            GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
-            Spacer(Modifier.size(10.dp))
-            GlassButton(Icons.Close, stringResource(R.string.action_close), actions.close)
-            Spacer(Modifier.size(10.dp))
-            GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings)
-        }
-        packRows(config.open, columns).forEach { row ->
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                row.forEach { type ->
-                    val m = Modifier.weight(type.span().coerceAtMost(columns).toFloat()).fillMaxHeight()
-                    when (type) {
-                        WidgetType.MEDIA -> MediaCard(media, actions, listening, m)
-                        WidgetType.NAVIGATION -> NavCard(nav, actions, listening, m)
-                        WidgetType.ASSIST -> AssistCard(car, actions, m)
-                        WidgetType.CLIMATE -> ClimateCard(car, actions, m)
-                        WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)
-                        WidgetType.AUTONOMY -> RangeCard(car, m)
-                    }
+        ClimateSliders(car, actions)
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+                CardLabel(stringResource(R.string.quick_panel), Modifier.weight(1f))
+                // Back to the half drawer only when it came from there (the side handle).
+                if (!fromTop) {
+                    GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
+                    Spacer(Modifier.size(10.dp))
                 }
-                val used = row.sumOf { it.span().coerceAtMost(columns) }
-                if (used < columns) Spacer(Modifier.weight((columns - used).toFloat()))
+                GlassButton(Icons.Close, stringResource(R.string.action_close), actions.close)
+                Spacer(Modifier.size(10.dp))
+                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings)
+            }
+            packRows(config.open, columns).forEach { row ->
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    row.forEach { type ->
+                        val m = Modifier.weight(type.span().coerceAtMost(columns).toFloat()).fillMaxHeight()
+                        when (type) {
+                            WidgetType.MEDIA -> MediaCard(media, actions, listening && actions.voiceFor == WidgetType.MEDIA, m)
+                            WidgetType.NAVIGATION -> NavCard(nav, actions, listening && actions.voiceFor == WidgetType.NAVIGATION, m)
+                            WidgetType.ASSIST -> AssistCard(car, actions, m)
+                            WidgetType.CLIMATE -> ClimateCard(car, actions, m)
+                            WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)
+                            WidgetType.AUTONOMY -> RangeCard(car, m)
+                        }
+                    }
+                    val used = row.sumOf { it.span().coerceAtMost(columns) }
+                    if (used < columns) Spacer(Modifier.weight((columns - used).toFloat()))
+                }
             }
         }
+        VolumeSliders(actions)
     }
 }

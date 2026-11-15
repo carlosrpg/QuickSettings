@@ -13,16 +13,19 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * The top bar's pull-down zone: an invisible strip just below the bar that draws only a small
- * centred hint. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
+ * The top bar's pull-down zone: an invisible strip across the whole width just below the bar
+ * (the car's status bar, a higher layer, takes touches on the bar itself) that draws only a
+ * small centred hint. A pull down or a tap on the hint opens the drawer; anything else (a tap
+ * elsewhere, a long press, a sideways swipe) is handed to [onPass] to be replayed on the app. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
  * position so it can be replayed on the app underneath (its toolbar often sits right here).
  */
 @SuppressLint("ViewConstructor")
 class TopSwipeView(
     context: Context,
     private val onOpen: () -> Unit,
-    private val onTap: (rawX: Float, rawY: Float) -> Unit,
+    private val onPass: (x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long) -> Unit,
 ) : View(context) {
+
     private val density = resources.displayMetrics.density
     private val openDistance = 24 * density
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -35,7 +38,7 @@ class TopSwipeView(
     private var opened = false
 
     override fun onDraw(canvas: Canvas) {
-        val w = 72 * density
+        val w = 144 * density
         val h = 6 * density
         val left = (width - w) / 2
         val top = 4 * density
@@ -60,10 +63,21 @@ class TopSwipeView(
                     onOpen()
                 }
             }
-            MotionEvent.ACTION_UP -> if (!opened && hypot(event.rawX - downX, event.rawY - downY) < touchSlop) {
-                onTap(event.rawX, event.rawY)
+            MotionEvent.ACTION_UP -> if (!opened) {
+                val still = hypot(event.rawX - downX, event.rawY - downY) < touchSlop
+                val held = event.eventTime - event.downTime
+                if (still && held < ViewConfiguration.getLongPressTimeout() && abs(event.x - width / 2f) <= HINT_TAP_HALF_WIDTH_DP * density) {
+                    onOpen()
+                } else if (still) {
+                    onPass(downX, downY, downX, downY, held)
+                } else {
+                    onPass(downX, downY, event.rawX, event.rawY, held)
+                }
             }
         }
         return true
     }
 }
+
+/** Half the width that counts as a tap on the hint: the 144 dp pill plus a finger's margin. */
+private const val HINT_TAP_HALF_WIDTH_DP = 96

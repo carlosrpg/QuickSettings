@@ -1,5 +1,7 @@
 package com.carlosrpg.cherry.quicksettings
 
+import android.os.Looper
+import android.os.Handler
 import android.app.Application
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.CarInfoProxy
@@ -8,6 +10,7 @@ import app.jconfig.carbus.cluster.ClusterNavigation
 import app.jconfig.carbus.media.CarMedia
 import app.jconfig.carbus.media.VdbusCarMedia
 import app.jconfig.carbus.mock.MockCarMedia
+import com.carlosrpg.cherry.quicksettings.automation.AutomationStore
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
 import com.carlosrpg.cherry.quicksettings.cluster.ClusterProjection
 import com.carlosrpg.cherry.quicksettings.car.seededMockBus
@@ -51,8 +54,15 @@ class QuickSettingsApp : Application() {
         // notification listener after the process was killed, an app update) also brings the
         // drawer back. No-op until the overlay permission is granted.
         OverlayService.start(this)
+        // A force-stop leaves the automation's accessibility service listed but unbound. Give the
+        // system time to bind it as usual (boot, an ordinary start) before forcing a rebind, which
+        // would otherwise cut off a service that was just connecting and its after-boot tasks.
+        Handler(Looper.getMainLooper()).postDelayed({ AutomationStore.enableService(this) }, SERVICE_BIND_GRACE_MS)
     }
 }
 
 val android.content.Context.app: QuickSettingsApp
     get() = applicationContext as QuickSettingsApp
+
+/** How long the system gets to bind the automation service itself after the app starts. */
+private const val SERVICE_BIND_GRACE_MS = 5_000L
