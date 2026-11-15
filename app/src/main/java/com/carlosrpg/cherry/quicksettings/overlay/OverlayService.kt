@@ -530,7 +530,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val TAG_CLUSTER = "QsClusterSync"
         private const val WATCHDOG_EVERY = 5
         private const val STALE_MS = 10_000L
-        private const val TOP_ZONE_HEIGHT_DP = 24
+        private const val TOP_ZONE_HEIGHT_DP = 48
         private const val TAG = "QsTopBar"
         private const val SEMI_MAX_FRACTION = 0.8f
         private const val SEMI_IDLE_MS = 8_000L

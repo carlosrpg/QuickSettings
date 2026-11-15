@@ -15,7 +15,7 @@ import kotlin.math.hypot
 /**
  * The top bar's pull-down zone: an invisible strip across the whole width just below the bar
  * (the car's status bar, a higher layer, takes touches on the bar itself) that draws only a
- * small centred hint. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
+ * small centred hint. A tap on the hint opens the drawer too; a tap elsewhere goes to the app. A swipe down calls [onOpen]; a plain tap is handed to [onTap] with its screen
  * position so it can be replayed on the app underneath (its toolbar often sits right here).
  */
 @SuppressLint("ViewConstructor")
@@ -63,9 +63,12 @@ class TopSwipeView(
                 }
             }
             MotionEvent.ACTION_UP -> if (!opened && hypot(event.rawX - downX, event.rawY - downY) < touchSlop) {
-                onTap(event.rawX, event.rawY)
+                if (abs(event.x - width / 2f) <= HINT_TAP_HALF_WIDTH_DP * density) onOpen() else onTap(event.rawX, event.rawY)
             }
         }
         return true
     }
 }
+
+/** Half the width that counts as a tap on the hint: the 144 dp pill plus a finger's margin. */
+private const val HINT_TAP_HALF_WIDTH_DP = 96
