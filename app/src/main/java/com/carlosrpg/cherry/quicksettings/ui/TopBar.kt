@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,23 +21,79 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.car.CarState
 import com.carlosrpg.cherry.quicksettings.media.MediaState
+import com.carlosrpg.cherry.quicksettings.nav.NavState
 
 /**
  * The info strip that lives in the status bar's area. The car draws its own voice avatar
  * (left) and clock and icons (right) over this strip, so content stays between [startInset]
  * and [endInset]. Display only: the car's status bar, a higher layer, takes the touches here.
+ * No background of its own: it sits on the car's bar. While a route is active the next turn
+ * joins it, and range, regeneration and climate shrink to make room.
  */
 @Composable
-fun TopBar(car: CarState, media: MediaState, startInset: Dp, endInset: Dp) {
+fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, endInset: Dp) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(start = startInset, end = endInset)) {
+        if (nav == null) FullBar(car, media) else NavBar(car, media, nav, maxHeight)
+    }
+}
+
+@Composable
+private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) {
+    Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        NowPlaying(media, Modifier.weight(1f))
+        NextTurn(nav, Modifier.weight(1.3f))
+        // Range: the drawer's two half rings, with the electric % over the fuel % inside.
+        MirrorRing(car.batterySoc?.div(100f), car.fuelPercent?.div(100f), Qs.chargeColor(car.batterySoc), height * 0.86f, 4.dp) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(car.batterySoc?.let { "$it%" } ?: "–", color = Qs.chargeColor(car.batterySoc), fontSize = 14.sp, lineHeight = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(car.fuelPercent?.let { "$it%" } ?: "–", color = Qs.Fuel, fontSize = 14.sp, lineHeight = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+        }
+        RegenDial(car.regen, 34.dp)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                QsIcon(Icons.Thermometer, Qs.Warm, 20.dp)
+                Spacer(Modifier.width(4.dp))
+                QsText(car.cabinTempC?.let { "$it°" } ?: "–", 16.sp, Qs.Text, FontWeight.SemiBold)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                QsIcon(Icons.Wind, Qs.Cool, 20.dp)
+                Spacer(Modifier.width(4.dp))
+                QsText(car.fanLevel?.toString() ?: "–", 16.sp, Qs.Text, FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+/** The next manoeuvre, as on the drawer's navigation card: arrow, distance, then the street. */
+@Composable
+private fun NextTurn(nav: NavState, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(Qs.Route), Alignment.Center) {
+            if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(40.dp))
+            else QsIcon(Icons.TurnRight, Color.White, 36.dp, strokeWidth = 2.6f)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            nav.title?.let { Text(it, color = Qs.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            nav.text?.let { Text(it, color = Qs.TextSoft, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        }
+    }
+}
+
+@Composable
+private fun FullBar(car: CarState, media: MediaState) {
     Row(
-        Modifier.fillMaxSize().background(Qs.Glass).padding(start = startInset, end = endInset),
+        Modifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {

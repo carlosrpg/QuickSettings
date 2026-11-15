@@ -41,6 +41,7 @@ import com.carlosrpg.cherry.quicksettings.ui.DrawerActions
 import com.carlosrpg.cherry.quicksettings.ui.DrawerMode
 import com.carlosrpg.cherry.quicksettings.ui.DrawerRoot
 import com.carlosrpg.cherry.quicksettings.ui.TopBar
+import com.carlosrpg.cherry.quicksettings.nav.NavStore
 import com.carlosrpg.cherry.quicksettings.voice.VoiceInput
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Dispatchers
@@ -224,7 +225,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                     setContent {
                         val car by app.car.state.collectAsState()
                         val media by app.media.state.collectAsState()
-                        if (!fullScreenApp) TopBar(car, media, TOP_BAR_START_DP.dp, TOP_BAR_END_DP.dp)
+                        val nav by NavStore.state.collectAsState()
+                        if (!fullScreenApp) TopBar(car, media, nav, TOP_BAR_START_DP.dp, TOP_BAR_END_DP.dp)
                         SideEffect {
                             drawnCar = car
                             drawnMedia = media
