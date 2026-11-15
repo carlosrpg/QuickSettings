@@ -97,6 +97,16 @@ class DrawerActions(
         if (media.openApp()) close()
     }
 
+    /** The card's background tap: bring the media app up, unless it is showing on the cluster. */
+    fun mediaToFront() {
+        if (media.state.value.packageName != cluster.onCluster.value) openMediaApp()
+    }
+
+    /** The card's background tap: bring the nav app up, unless it is showing on the cluster. */
+    fun navToFront() {
+        if (cluster.onCluster.value == null) openNavApp()
+    }
+
     fun openNavApp() {
         if (NavStore.openApp(context)) close()
     }
