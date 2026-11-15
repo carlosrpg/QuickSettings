@@ -76,7 +76,11 @@ class CarRepositoryTest {
         repo.setCabinTemp(28)
         repo.setCabinTemp(20)
         repo.setCabinTemp(25)
+        // The controls hold the target while it is applied, then follow the car's reading.
+        assertThat(repo.cabinTempTarget.value).isEqualTo(25)
         delay(CarRepository.CLIMATE_DEBOUNCE_MS + 3 * CarRepository.CLIMATE_STEP_MS + CarRepository.CLIMATE_WRITE_MS + 600)
         assertThat(sent).containsExactly(23, 24, 25).inOrder()
+        assertThat(repo.cabinTempTarget.value).isNull()
+        assertThat(repo.state.value.cabinTempC).isEqualTo(25)
     }
 }

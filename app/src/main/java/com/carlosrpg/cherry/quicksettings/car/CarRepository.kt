@@ -213,6 +213,13 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     fun setFan(level: Int) = fan.moveTo(level.coerceIn(FanSpec.MIN, FanSpec.MAX))
 
+    /**
+     * The temperature and fan level being applied, null once the car has been stepped there and
+     * read back. Controls show these meanwhile, so they don't snap back to the old reading.
+     */
+    val cabinTempTarget: StateFlow<Int?> get() = temperature.applying
+    val fanTarget: StateFlow<Int?> get() = fan.applying
+
     private val temperature = ClimateStepper(CabinTempSpec.ITEM_WRITE, { it.cabinTempC }, CabinTempSpec::toRaw)
     private val fan = ClimateStepper(FanSpec.ITEM_WRITE, { it.fanLevel }, { it })
 
@@ -237,13 +244,24 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         /** The value being moved to, while a move is under way. */
         fun pending(): Int? = target.value.takeIf { job?.isActive == true }
 
+        val applying = MutableStateFlow<Int?>(null)
+
         fun moveTo(value: Int) {
             if (job?.isActive != true && value == read(state.value)) return
             target.value = value
+            applying.value = value
             if (job?.isActive != true) job = scope.launch(Dispatchers.IO) { run() }
         }
 
         private suspend fun run() {
+            try {
+                apply()
+            } finally {
+                applying.value = null
+            }
+        }
+
+        private suspend fun apply() {
             var current = read(state.value) ?: return
             val panelBefore = mutex.withLock { panelItem() }
             do {
@@ -263,8 +281,9 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
                     delay(CLIMATE_STEP_MS)
                 }
                 watchClimatePanel(item, panelBefore)
+                // Settle inside the loop, so a target set meanwhile is still followed.
+                delay(WRITE_SETTLE_MS)
             } while (target.value != current)
-            delay(WRITE_SETTLE_MS)
             refresh()
         }
     }

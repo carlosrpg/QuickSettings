@@ -144,7 +144,11 @@ fun DrawerRoot(
     onTouch: () -> Unit,
     fromTop: Boolean = false,
 ) {
-    val car by actions.car.state.collectAsState()
+    val read by actions.car.state.collectAsState()
+    val tempTarget by actions.car.cabinTempTarget.collectAsState()
+    val fanTarget by actions.car.fanTarget.collectAsState()
+    // While a climate change is applied, every control shows where it is going, not the old value.
+    val car = read.copy(cabinTempC = tempTarget ?: read.cabinTempC, fanLevel = fanTarget ?: read.fanLevel)
     val media by actions.media.state.collectAsState()
     val nav by NavStore.state.collectAsState()
     val listening by actions.voice.listening.collectAsState()
@@ -382,8 +386,8 @@ private fun SemiTile(
                 onTap = actions.toOpen,
                 onDragStart = {
                     val now = actions.car.state.value
-                    startTemp = now.cabinTempC ?: CabinTempSpec.MIN
-                    startFan = now.fanLevel ?: FanSpec.MIN
+                    startTemp = actions.car.cabinTempTarget.value ?: now.cabinTempC ?: CabinTempSpec.MIN
+                    startFan = actions.car.fanTarget.value ?: now.fanLevel ?: FanSpec.MIN
                     target = Hud.Climate(startTemp, startFan).also(setHud)
                 },
                 onDrag = { total ->
