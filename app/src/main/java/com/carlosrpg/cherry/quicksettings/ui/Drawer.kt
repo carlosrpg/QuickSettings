@@ -197,7 +197,7 @@ fun DrawerRoot(
     ) {
         when (mode) {
             DrawerMode.SEMI -> SemiDrawer(config, car, media, nav, actions, maxSemiHeight)
-            DrawerMode.OPEN -> OpenDrawer(config, car, media, nav, actions, listening, portrait)
+            DrawerMode.OPEN -> OpenDrawer(config, car, media, nav, actions, listening, portrait, fromTop)
         }
     }
 }
@@ -575,6 +575,7 @@ private fun OpenDrawer(
     actions: DrawerActions,
     listening: Boolean,
     portrait: Boolean,
+    fromTop: Boolean,
 ) {
     val shape = RoundedCornerShape(Qs.DrawerRadius)
     val columns = if (portrait) 2 else 4
@@ -588,8 +589,11 @@ private fun OpenDrawer(
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 CardLabel(stringResource(R.string.quick_panel), Modifier.weight(1f))
-                GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
-                Spacer(Modifier.size(10.dp))
+                // Back to the half drawer only when it came from there (the side handle).
+                if (!fromTop) {
+                    GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
+                    Spacer(Modifier.size(10.dp))
+                }
                 GlassButton(Icons.Close, stringResource(R.string.action_close), actions.close)
                 Spacer(Modifier.size(10.dp))
                 GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings)
