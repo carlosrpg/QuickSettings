@@ -104,6 +104,7 @@ fun GlassButton(
     shape: RoundedCornerShape = RoundedCornerShape(Qs.ButtonRadius),
     leading: (@Composable () -> Unit)? = null,
     square: Boolean = label == null && leading == null,
+    iconSize: Dp = 22.dp,
 ) {
     Row(
         modifier
@@ -119,7 +120,7 @@ fun GlassButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         leading?.invoke()
-        if (icon != null) QsIcon(icon, tint, 22.dp, filled = filledIcon)
+        if (icon != null) QsIcon(icon, tint, iconSize, filled = filledIcon)
         if (label != null) QsText(label, 15.sp, tint, FontWeight.SemiBold)
     }
 }

@@ -173,6 +173,7 @@ fun VolumeSliders(actions: DrawerActions, modifier: Modifier = Modifier) {
             tint = if (navOpen) Qs.Route else Qs.TextSoft,
             background = if (navOpen) Qs.Route.copy(alpha = 0.16f) else Qs.Button,
             modifier = Modifier.width(buttonWidth),
+            iconSize = 30.dp,
         )
     }
 }
