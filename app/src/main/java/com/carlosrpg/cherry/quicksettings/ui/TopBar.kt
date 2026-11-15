@@ -48,9 +48,10 @@ fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, end
 
 @Composable
 private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) {
-    Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        NowPlaying(media, Modifier.weight(1f))
-        NextTurn(nav, Modifier.weight(1.3f))
+    Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        // Media and the next turn share the room equally; smaller art leaves the title its words.
+        NowPlaying(media, Modifier.weight(1f), art = 48.dp)
+        NextTurn(nav, Modifier.weight(1f))
         // Range: the drawer's two half rings, with the electric % over the fuel % inside.
         MirrorRing(car.batterySoc?.div(100f), car.fuelPercent?.div(100f), Qs.chargeColor(car.batterySoc), height * 0.86f, 4.dp) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -78,11 +79,11 @@ private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) 
 @Composable
 private fun NextTurn(nav: NavState, modifier: Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(Qs.Route), Alignment.Center) {
-            if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(40.dp))
-            else QsIcon(Icons.TurnRight, Color.White, 36.dp, strokeWidth = 2.6f)
+        Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Qs.Route), Alignment.Center) {
+            if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(34.dp))
+            else QsIcon(Icons.TurnRight, Color.White, 30.dp, strokeWidth = 2.6f)
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(10.dp))
         Column {
             nav.title?.let { Text(it, color = Qs.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             nav.text?.let { Text(it, color = Qs.TextSoft, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -132,21 +133,21 @@ private fun Climate(car: CarState) {
 }
 
 @Composable
-private fun NowPlaying(media: MediaState, modifier: Modifier) {
+private fun NowPlaying(media: MediaState, modifier: Modifier, art: Dp = 64.dp) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        val art = media.art ?: media.appIcon
-        if (art != null) {
+        val cover = media.art ?: media.appIcon
+        if (cover != null) {
             Image(
-                art.asImageBitmap(), null,
-                Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+                cover.asImageBitmap(), null,
+                Modifier.size(art).clip(RoundedCornerShape(12.dp)),
                 contentScale = ContentScale.Crop,
             )
         } else {
-            Box(Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)).background(Qs.Tile), Alignment.Center) {
+            Box(Modifier.size(art).clip(RoundedCornerShape(12.dp)).background(Qs.Tile), Alignment.Center) {
                 QsIcon(if (media.playing) Icons.Pause else Icons.Play, Qs.Muted, 28.dp, filled = true)
             }
         }
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(10.dp))
         Column {
             QsText(media.title ?: stringResource(R.string.nothing_playing), 20.sp, weight = FontWeight.SemiBold)
             listOfNotNull(media.artist, media.appLabel).firstOrNull()?.let { QsText(it, 15.sp, Qs.Muted) }
