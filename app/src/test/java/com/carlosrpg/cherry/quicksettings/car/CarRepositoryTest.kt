@@ -81,6 +81,26 @@ class CarRepositoryTest {
         assertThat(repo.state.value.cabinTempC).isEqualTo(25)
     }
 
+    @Test
+    fun `a fan jump goes out as single steps on the set item, never on the panel's own`() = runBlocking {
+        val bus = seededMockBus()
+        val sent = mutableListOf<Pair<Int, Int>>()
+        val recording = object : CarBus by bus {
+            override fun sendItemValue(module: Int, id: Int, value: Int) {
+                sent += id to value
+                bus.sendItemValue(module, id, value)
+            }
+        }
+        val repo = CarRepository(recording, scope)
+        repo.refresh()
+        val start = repo.state.value.fanLevel!!
+        repo.setFan(start + 3)
+        awaitMoveDone(repo)
+        // HVAC 77 sets the level quietly; a write on 12 (where it is read) raises the car's panel.
+        assertThat(sent).containsExactly(77 to start + 1, 77 to start + 2, 77 to start + 3).inOrder()
+        assertThat(repo.state.value.fanLevel).isEqualTo(start + 3)
+    }
+
     /**
      * Waits for the climate moves to finish (their targets clear once the car is read back),
      * instead of a fixed sleep: a slow CI runner takes longer than the nominal timings.

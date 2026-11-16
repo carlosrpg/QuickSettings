@@ -221,6 +221,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     val fanTarget: StateFlow<Int?> get() = fan.applying
 
     private val temperature = ClimateStepper(CabinTempSpec.ITEM_WRITE, { it.cabinTempC }, CabinTempSpec::toRaw)
+    // The fan's set item, not the one it is read from: a write there raises the car's panel.
     private val fan = ClimateStepper(FanSpec.ITEM_WRITE, { it.fanLevel }, { it })
 
     /**
