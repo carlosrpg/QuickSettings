@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalDensity
@@ -22,6 +23,8 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -38,27 +41,27 @@ import com.carlosrpg.cherry.quicksettings.media.MediaState
 import com.carlosrpg.cherry.quicksettings.nav.NavState
 
 /**
- * The info strip that lives in the status bar's area. The car draws its own voice avatar
- * (left) and clock and icons (right) over this strip, so content stays between [startInset]
- * and [endInset]. Display only: the car's status bar, a higher layer, takes the touches here.
+ * The info strip that lives in the status bar's area. The car draws its own icons (Bluetooth,
+ * wireless, clock) over both ends of this strip, so content stays between [startInset] and
+ * [endInset]. Display only: the car's status bar, a higher layer, takes the touches here.
  * No background of its own: it sits on the car's bar. While a route is active the next turn
  * joins it, and range, regeneration and climate shrink to make room.
  */
 @Composable
 fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, endInset: Dp) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(start = startInset, end = endInset)) {
-        if (nav == null) FullBar(car, media) else NavBar(car, media, nav, maxHeight)
+        if (nav == null) FullBar(car, media) else NavBar(car, media, nav, maxWidth, maxHeight)
     }
 }
 
 @Composable
-private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) {
+private fun NavBar(car: CarState, media: MediaState, nav: NavState, width: Dp, height: Dp) {
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        // Media and the next turn share the room equally; smaller art leaves the title its words.
+        // The next turn takes only the room its fields need (up to half), media gets the rest.
         NowPlaying(media, Modifier.weight(1f))
-        NextTurn(nav, Modifier.weight(1f))
+        NextTurn(nav, Modifier.widthIn(max = width / 2), height)
         // Range: the drawer's two half rings, with the electric % over the fuel % inside.
-        MirrorRing(car.batterySoc?.div(100f), car.fuelPercent?.div(100f), Qs.chargeColor(car.batterySoc), height * 0.86f, 4.dp) {
+        MirrorRing(car.batterySoc?.div(100f), car.fuelPercent?.div(100f), Qs.chargeColor(car.batterySoc), height * 0.7f, 4.dp) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(car.batterySoc?.let { "$it%" } ?: "–", color = Qs.chargeColor(car.batterySoc), fontSize = 14.sp, lineHeight = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 Text(car.fuelPercent?.let { "$it%" } ?: "–", color = Qs.Fuel, fontSize = 14.sp, lineHeight = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -80,25 +83,44 @@ private fun NavBar(car: CarState, media: MediaState, nav: NavState, height: Dp) 
     }
 }
 
-/** The next manoeuvre, as on the drawer's navigation card: arrow, distance, then the street. */
+/**
+ * The next manoeuvre with everything the drawer's navigation card shows: the arrow tile, the
+ * distance, the street, and the ETA line (pin icon) when the app sends one. Lines are packed
+ * tight so all three fit the bar's height.
+ */
 @Composable
-private fun NextTurn(nav: NavState, modifier: Modifier) {
+private fun NextTurn(nav: NavState, modifier: Modifier, height: Dp) {
+    val tile = (height * 0.7f).coerceIn(40.dp, 56.dp)
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Qs.Route), Alignment.Center) {
-            if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(34.dp))
-            else QsIcon(Icons.TurnRight, Color.White, 30.dp, strokeWidth = 2.6f)
+        // Drop shadow and dark rim, like the text halo, so the tile stands out on a light map.
+        val shape = RoundedCornerShape(tile * 0.26f)
+        Box(
+            Modifier.size(tile).shadow(4.dp, shape).border(1.dp, Color.Black.copy(alpha = 0.35f), shape).clip(shape).background(Qs.Route),
+            Alignment.Center,
+        ) {
+            if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(tile * 0.7f))
+            else QsIcon(Icons.TurnRight, Color.White, tile * 0.64f, strokeWidth = 2.6f)
         }
         Spacer(Modifier.width(10.dp))
-        Column {
-            nav.title?.let { Text(it, color = Qs.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            nav.text?.let { Text(it, color = Qs.TextSoft, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        Shadowed {
+            Column {
+                nav.title?.let { Text(it, color = Qs.Text, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                nav.text?.let { Text(it, color = Qs.TextSoft, fontSize = 14.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                nav.subText?.let {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        QsIcon(Icons.Pin, Qs.Muted, 12.dp)
+                        Spacer(Modifier.width(3.dp))
+                        Text(it, color = Qs.Muted, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun FullBar(car: CarState, media: MediaState) {
-    // The strip is about 547 dp wide. The stats are kept tight (24 dp icons, 8 dp gaps) so the
+    // The strip is narrow (about 550 dp). The stats are kept tight (24 dp icons, 8 dp gaps) so the
     // song keeps about 100 dp of text beside them; looser spacing left it none.
     Row(
         Modifier.fillMaxSize(),

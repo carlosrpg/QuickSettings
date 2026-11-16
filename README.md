@@ -47,9 +47,11 @@ builds).
 - **Navigation**: the navigation app's turn-by-turn notification (title, text, arrow). When
   an app draws its directions with a layout of its own and leaves the standard fields empty,
   the texts and the arrow are read from that layout.
-- **Climate**: the car answers a temperature or fan write by asking its own full-screen climate
-  panel to open. The app watches for that request for about a second after its write and sends
-  the panel's close request, unless the panel was already open.
+- **Climate**: temperature and fan move one step per command, on the car's "set" items (HVAC
+  76 and 77); the fan is never written on the item it is read from (12), because the car
+  answers that by opening its own full-screen climate panel. As a fallback the app still
+  watches for the panel's open request for about two seconds after a write and sends the
+  panel's close request, unless the panel was already open.
 
 **Always on.** The drawer runs as a foreground service that starts at boot, and again whenever
 the app's process starts for any reason. If the process is killed, the system re-binds the
