@@ -120,6 +120,73 @@ fun VerticalSlider(
 }
 
 /**
+ * [VerticalSlider] laid flat and slimmer, for inside a card: the fill grows from the left and
+ * ends at the grip, [icon] sits in the track's start and [label] beside the track.
+ */
+@Composable
+fun HorizontalSlider(
+    value: Int?,
+    range: IntRange,
+    icon: String,
+    label: String,
+    description: String,
+    fill: Brush,
+    onChange: (Int) -> Unit,
+    onFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val change by rememberUpdatedState(onChange)
+    val finished by rememberUpdatedState(onFinished)
+    val span = (range.last - range.first).coerceAtLeast(1)
+    val fraction = value?.let { ((it - range.first).toFloat() / span).coerceIn(0f, 1f) } ?: 0f
+    val height = 36.dp
+    val shape = RoundedCornerShape(height / 2)
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        BoxWithConstraints(
+            Modifier.weight(1f).height(height).clip(shape).background(Qs.Button).border(1.dp, Qs.Hairline, shape)
+                .semantics {
+                    contentDescription = description
+                    if (value != null) {
+                        progressBarRangeInfo = ProgressBarRangeInfo(value.toFloat(), range.first.toFloat()..range.last.toFloat())
+                        setProgress { change(it.roundToInt().coerceIn(range)); finished(); true }
+                    }
+                }
+                .pointerInput(range) {
+                    // The fill never shrinks below a circle, so the scale runs between the two half-heights.
+                    fun at(x: Float) {
+                        val f = ((x - size.height / 2f) / (size.width - size.height).coerceAtLeast(1)).coerceIn(0f, 1f)
+                        change((range.first + f * span).roundToInt().coerceIn(range))
+                    }
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        down.consume()
+                        at(down.position.x)
+                        while (true) {
+                            val c = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            c.consume()
+                            if (!c.pressed) break
+                            at(c.position.x)
+                        }
+                        finished()
+                    }
+                },
+        ) {
+            if (value != null) {
+                val filled = height + (maxWidth - height) * fraction
+                Box(Modifier.fillMaxHeight().width(filled).clip(shape).background(fill))
+                // At the minimum the fill is just a knob around the icon: no grip over it.
+                if (fraction > 0f) Box(
+                    Modifier.align(Alignment.CenterStart).offset(x = filled - 13.dp)
+                        .width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White)
+                )
+            }
+            QsIcon(icon, Color.White, 18.dp, modifier = Modifier.align(Alignment.CenterStart).padding(start = 9.dp))
+        }
+        QsText(label, 18.sp, weight = FontWeight.Bold, modifier = Modifier.width(52.dp))
+    }
+}
+
+/**
  * The driver's side of the open drawer: temperature over fan. Both follow the car while
  * untouched and send the new value once, on release (the car is then stepped to it).
  */

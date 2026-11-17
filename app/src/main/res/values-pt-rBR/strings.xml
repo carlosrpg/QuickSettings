@@ -84,6 +84,10 @@
     <string name="climate_auto">Modo automático</string>
     <string name="climate_sync">Sincronizar zonas</string>
     <string name="climate_recirculation">Recircular o ar</string>
+    <string name="climate_ac">Ar-condicionado</string>
+    <string name="climate_power_short">Liga</string>
+    <string name="climate_sync_short">Sincr.</string>
+    <string name="climate_recirculation_short">Recirc.</string>
     <string name="debug_log">Log de depuração</string>
     <string name="assist_confirm_off">Toque de novo para desligar</string>
     <string name="assist_block_ignition">Ignição desligada</string>
@@ -163,7 +167,7 @@
     <string name="widget_media">Mídia</string>
     <string name="widget_media_sub">Capa e reproduzir / pausar; arraste para trocar a faixa</string>
     <string name="widget_climate">Clima</string>
-    <string name="widget_climate_sub">Quadrante temperatura × ventilação</string>
+    <string name="widget_climate_sub">Banco com fluxo de ar, controles de temperatura e ventilação</string>
     <string name="widget_car_mode">Modo do carro</string>
     <string name="widget_car_mode_sub">Modo da bateria e recuperação de energia; arraste para mudar</string>
     <string name="widget_autonomy">Autonomia</string>

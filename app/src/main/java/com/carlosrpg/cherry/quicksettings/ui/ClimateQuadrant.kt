@@ -1,20 +1,10 @@
 package com.carlosrpg.cherry.quicksettings.ui
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.composed
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -64,39 +54,6 @@ data class QuadrantStyle(
             axisIcon = size * 0.09f,
             mark = size * 0.42f,
         )
-    }
-}
-
-/**
- * Touch anywhere on the quadrant to put the marker there, then drag it: [onMove] gets the
- * temperature and fan under the finger as it moves, [onEnd] fires when the finger lifts.
- */
-fun Modifier.quadrantPicker(style: QuadrantStyle, onMove: (temp: Int, fan: Int) -> Unit, onEnd: () -> Unit): Modifier = composed {
-    val move by rememberUpdatedState(onMove)
-    val end by rememberUpdatedState(onEnd)
-    pointerInput(style) {
-        val inset = style.axisInset.toPx()
-        val plot = (style.size - style.axisInset - style.topRightInset).toPx()
-        val top = style.topRightInset.toPx()
-        fun pick(p: Offset) {
-            val fx = ((p.x - inset) / plot).coerceIn(0f, 1f)
-            val fy = (1f - (p.y - top) / plot).coerceIn(0f, 1f)
-            val temp = CabinTempSpec.MIN + (fy * (CabinTempSpec.MAX - CabinTempSpec.MIN)).roundToInt()
-            val fan = (fx * FanSpec.MAX).roundToInt().coerceIn(FanSpec.MIN, FanSpec.MAX)
-            move(temp, fan)
-        }
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            down.consume()
-            pick(down.position)
-            while (true) {
-                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                change.consume()
-                if (!change.pressed) break
-                pick(change.position)
-            }
-            end()
-        }
     }
 }
 

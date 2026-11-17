@@ -56,6 +56,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import app.jconfig.carbus.carinfo.FanSpec
+import app.jconfig.carbus.carinfo.CabinTempSpec
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -492,58 +498,152 @@ private fun AssistRowFrame(
 
 @Composable
 fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        CardLabel(stringResource(R.string.climate_driver), Modifier.weight(1f, fill = false))
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        CardLabel(stringResource(R.string.climate_driver), Modifier.weight(1f))
         car.outsideTempC?.let { QsText(stringResource(R.string.outside_temp, it), 13.sp, Qs.Muted) }
+        ClimateButton(ClimateSwitch.AC, car.acOn, Icons.AirConditioner, stringResource(R.string.climate_ac), "A/C", actions, compact = true)
     }
-    val temp = car.cabinTempC
-    val fan = car.fanLevel
-    // The quadrant is the control: touch anywhere to place the marker and drag it. Values update
-    // live under the finger; the car gets them once, on release. It takes all the room the card
-    // has; the panel's buttons stand in two pairs on either side of it.
-    var picked by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    val description = stringResource(R.string.desc_climate, (picked?.first ?: temp)?.toString() ?: "--", (picked?.second ?: fan)?.toString() ?: "--")
-    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // The sliders follow the car while untouched and send their value once, on release.
+    var temp by remember { mutableStateOf<Int?>(null) }
+    var fan by remember { mutableStateOf<Int?>(null) }
+    val shownTemp = temp ?: car.cabinTempC
+    val shownFan = fan ?: car.fanLevel
+    Row(Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
-            ClimateButton(ClimateSwitch.POWER, car.climateOn, Icons.Power, stringResource(R.string.climate_power), actions)
-            ClimateButton(ClimateSwitch.AUTO, car.autoClimate, null, stringResource(R.string.climate_auto), actions, text = "AUTO")
+            ClimateButton(ClimateSwitch.POWER, car.climateOn, Icons.Power, stringResource(R.string.climate_power), stringResource(R.string.climate_power_short), actions)
+            ClimateButton(ClimateSwitch.AUTO, car.autoClimate, null, stringResource(R.string.climate_auto), "AUTO", actions)
         }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            val style = QuadrantStyle.scaled(minOf(maxWidth, maxHeight))
-            ClimateQuadrant(
-                picked?.first ?: temp, picked?.second ?: fan, style, acOn = car.acOn,
-                modifier = Modifier.clip(RoundedCornerShape(18.dp))
-                    .semantics { contentDescription = description }
-                    .quadrantPicker(
-                        style,
-                        onMove = { t, f -> picked = t to f },
-                        onEnd = {
-                            picked?.let { (t, f) ->
-                                actions.car.setCabinTemp(t)
-                                actions.car.setFan(f)
-                            }
-                            picked = null
-                        },
-                    ),
-            )
-        }
+        SeatAirflow(
+            shownTemp, shownFan, airOn = car.climateOn != false,
+            description = stringResource(R.string.desc_climate, shownTemp?.toString() ?: "--", shownFan?.toString() ?: "--"),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
         Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
-            ClimateButton(ClimateSwitch.SYNC, car.sync, Icons.SyncZones, stringResource(R.string.climate_sync), actions)
-            ClimateButton(ClimateSwitch.RECIRCULATION, car.recirculation, Icons.Recirculate, stringResource(R.string.climate_recirculation), actions)
+            ClimateButton(ClimateSwitch.SYNC, car.sync, Icons.SyncZones, stringResource(R.string.climate_sync), stringResource(R.string.climate_sync_short), actions)
+            ClimateButton(ClimateSwitch.RECIRCULATION, car.recirculation, Icons.Recirculate, stringResource(R.string.climate_recirculation), stringResource(R.string.climate_recirculation_short), actions)
         }
+    }
+    // The temperature fill walks the scale from the coldest setting, so its end shows the chosen one.
+    val tempColors = shownTemp?.let { t -> (CabinTempSpec.MIN..t).map { Qs.tempColor(it) } }.orEmpty()
+    HorizontalSlider(
+        shownTemp, CabinTempSpec.MIN..CabinTempSpec.MAX, Icons.Thermometer,
+        shownTemp?.let { "$it°" } ?: "--", stringResource(R.string.slider_temperature),
+        Brush.horizontalGradient(if (tempColors.size > 1) tempColors else List(2) { Qs.tempColor(shownTemp) }),
+        onChange = { temp = it },
+        onFinished = { temp?.let(actions.car::setCabinTemp); temp = null },
+    )
+    Spacer(Modifier.height(8.dp))
+    HorizontalSlider(
+        shownFan, FanSpec.MIN..FanSpec.MAX, Icons.Wind,
+        shownFan?.toString() ?: "--", stringResource(R.string.slider_fan),
+        Brush.horizontalGradient(listOf(Qs.Route.copy(alpha = 0.55f), Qs.Route)),
+        onChange = { fan = it },
+        onFinished = { fan?.let(actions.car::setFan); fan = null },
+    )
+}
+
+/** Fan 1..10 drawn as four airflow strengths: face, then chest, lap and legs join in. */
+private val AIRFLOW_BANDS = intArrayOf(1, 1, 2, 2, 2, 3, 3, 3, 4, 4)
+
+/** Where each band ends, as fractions of the seat image (face, chest, lap, legs), and how it bows. */
+private val BAND_ENDS = listOf(Offset(0.79f, 0.09f), Offset(0.68f, 0.35f), Offset(0.45f, 0.50f), Offset(0.20f, 0.76f))
+private val BAND_BOW = floatArrayOf(-0.16f, -0.04f, 0.06f, 0.20f)
+
+/** Width over height of the seat image. */
+private const val SEAT_ASPECT = 480f / 551f
+
+/**
+ * The seated occupant, with airflow from the vent on the left: its colour follows the
+ * temperature, its strength the fan. The ribbons run in under the body, which is drawn on top.
+ */
+@Composable
+private fun SeatAirflow(temp: Int?, fan: Int?, airOn: Boolean, description: String, modifier: Modifier = Modifier) {
+    val level = fan?.takeIf { airOn && it in 1..AIRFLOW_BANDS.size }?.let { AIRFLOW_BANDS[it - 1] } ?: 0
+    val color = Qs.tempColor(temp)
+    // One 3.6 s cycle; level n moves the dashes n periods per cycle, so faster air never jumps at the wrap.
+    val cycle by rememberInfiniteTransition(label = "airflow").animateFloat(
+        0f, 1f, infiniteRepeatable(tween(3_600, easing = LinearEasing)), label = "airflowPhase",
+    )
+    BoxWithConstraints(modifier.semantics { contentDescription = description }) {
+        val seatHeight = maxHeight * 0.96f
+        val seatWidth = seatHeight * SEAT_ASPECT
+        if (level > 0) Canvas(Modifier.fillMaxSize()) {
+            val seatLeft = size.width - seatWidth.toPx()
+            val seatTop = size.height - seatHeight.toPx()
+            val strands = 2 + level
+            val width = (1.2f + 0.4f * level).dp.toPx()
+            val dash = 35.dp.toPx()
+            val gap = 25.dp.toPx()
+            val phase = -cycle * level * (dash + gap)
+            val start = Offset(0f, size.height * 0.5f)
+            val brush = Brush.horizontalGradient(0f to color.copy(alpha = 0f), 0.2f to color, startX = 0f, endX = size.width)
+            for (band in 0 until level) {
+                val end = BAND_ENDS[band]
+                val tip = Offset(seatLeft + end.x * seatWidth.toPx(), seatTop + end.y * seatHeight.toPx())
+                for (k in 0 until strands) {
+                    val dy = (k - (strands - 1) / 2f) * 3.dp.toPx()
+                    val path = Path().apply {
+                        moveTo(start.x, start.y + dy * 0.4f)
+                        cubicTo(
+                            size.width * 0.24f, start.y + BAND_BOW[band] * size.height + dy * 1.6f,
+                            size.width * 0.43f, tip.y + dy,
+                            tip.x, tip.y + dy * 1.2f,
+                        )
+                    }
+                    val effect = PathEffect.dashPathEffect(floatArrayOf(dash, gap), phase + k * 0.3f * (dash + gap))
+                    val alpha = 0.5f + 0.1f * (k % 3)
+                    // A wide faint stroke under each strand stands in for a glow.
+                    drawPath(path, brush, alpha = alpha * 0.18f, style = Stroke(width * 4, cap = StrokeCap.Round, pathEffect = effect))
+                    drawPath(path, brush, alpha = alpha, style = Stroke(width, cap = StrokeCap.Round, pathEffect = effect))
+                }
+            }
+        }
+        Image(
+            painterResource(R.drawable.climate_seat), contentDescription = null,
+            modifier = Modifier.align(Alignment.BottomEnd).width(seatWidth).height(seatHeight),
+        )
     }
 }
 
-/** One of the climate panel's buttons, as a symbol: lit from the car's state, flipped on tap. */
+/**
+ * One of the climate panel's buttons: a symbol over a short [label] (or the label alone when
+ * there is no [icon], as AUTO on the car's own panel), lit from the car's state with a dot in its
+ * corner, flipped on tap. [compact] is a small pill for the card's header.
+ */
 @Composable
-private fun ClimateButton(switch: ClimateSwitch, on: Boolean?, icon: String?, name: String, actions: DrawerActions, text: String? = null) {
+private fun ClimateButton(
+    switch: ClimateSwitch, on: Boolean?, icon: String?, name: String, label: String,
+    actions: DrawerActions, compact: Boolean = false,
+) {
     val state = onOffLabel(on)
-    // [text] stands in for the icon, as on the car's own panel (AUTO), in the same square.
-    GlassButton(
-        icon, "$name, $state", { actions.car.toggleClimate(switch) }, label = text, square = true,
-        tint = when (on) { true -> Qs.Energy; false -> Qs.TextSoft; null -> Qs.Dim },
-        background = if (on == true) Qs.Energy.copy(alpha = 0.16f) else Qs.Button,
-    )
+    val tint = when (on) { true -> Qs.Energy; false -> Qs.TextSoft; null -> Qs.Dim }
+    val shape = RoundedCornerShape(if (compact) 16.dp else Qs.ButtonRadius)
+    Box(
+        Modifier.then(if (compact) Modifier.height(32.dp) else Modifier.size(68.dp, 58.dp))
+            .clip(shape)
+            .background(if (on == true) Qs.Energy.copy(alpha = 0.16f) else Qs.Button)
+            .border(1.dp, if (on == true) Qs.Energy.copy(alpha = 0.45f) else Qs.Hairline, shape)
+            .clickable(role = Role.Button, onClickLabel = name) { actions.car.toggleClimate(switch) }
+            .semantics { contentDescription = "$name, $state" },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (compact) {
+            Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                icon?.let { QsIcon(it, tint, 16.dp) }
+                QsText(label, 13.sp, tint, FontWeight.Bold)
+            }
+        } else {
+            Box(Modifier.align(Alignment.TopEnd).padding(7.dp).size(6.dp).clip(CircleShape).background(if (on == true) Qs.Energy else Qs.Hairline))
+            if (icon == null) {
+                QsText(label, 15.sp, tint, FontWeight.Bold)
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    QsIcon(icon, tint, 22.dp)
+                    QsText(label, 11.sp, tint)
+                }
+            }
+        }
+    }
 }
 
 @Composable
