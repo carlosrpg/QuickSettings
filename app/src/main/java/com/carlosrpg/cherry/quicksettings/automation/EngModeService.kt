@@ -38,9 +38,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * off again on its own.
  *
  * Runs when asked from settings, and on its own when the owner switched it on there: adb once
- * after each boot; Wi-Fi only while the Bluetooth device chosen in settings is connected and
- * only if Wi-Fi is off: once [WIFI_AFTER_BT_MS] after that device connects, and when Android
- * Auto or CarPlay comes to the front (at most once a minute).
+ * after each boot; Wi-Fi on startup, when the Bluetooth device chosen in settings connects, or
+ * when Android Auto or CarPlay comes to the front. Each trigger does nothing while Wi-Fi is on or
+ * the chosen device is not connected; otherwise one run [WIFI_DELAY_MS] later, if Wi-Fi is still
+ * off then (Android Auto and CarPlay at most once a minute).
  */
 class EngModeService : AccessibilityService() {
 
@@ -62,26 +63,30 @@ class EngModeService : AccessibilityService() {
     private var returnPkg: String? = null
     private var lastProjectionRun: Long? = null
 
-    /**
-     * The chosen device connecting or dropping. A connect arms one Wi-Fi attempt
-     * [WIFI_AFTER_BT_MS] later (the phone and the car settle first); a drop before then
-     * cancels it, so a link that flaps never stacks runs.
-     */
+    /** The chosen device connecting or dropping. A drop cancels a pending attempt, so a link that flaps never stacks runs. */
     private val btChanges = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
             if (!device.address.equals(AutomationStore(context).wifiDevice, ignoreCase = true)) return
             when (intent.action) {
-                BluetoothDevice.ACTION_ACL_CONNECTED -> armWifi("${device.address} connected")
+                // The broadcast itself proves the link: no need for the hidden isConnected().
+                BluetoothDevice.ACTION_ACL_CONNECTED -> armWifi("${device.address} connected", connected = true)
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     Log.i(TAG, "${device.address} disconnected: Wi-Fi attempt cancelled")
-                    handler.removeCallbacks(wifiAfterBt)
+                    handler.removeCallbacks(wifiAttempt)
                 }
             }
         }
     }
 
-    private val wifiAfterBt = Runnable { autoWifi("Bluetooth device") }
+    private var wifiReturnTo: String? = null
+    private var wifiArmedFor: String? = null
+    private val wifiAttempt = Runnable {
+        // The owner picked another phone (or none) in settings while this was pending.
+        if (AutomationStore(this).wifiDevice != wifiArmedFor) {
+            Log.i(TAG, "chosen device changed: Wi-Fi attempt dropped")
+        } else autoWifi("after ${WIFI_DELAY_MS / 1000} s", returnTo = wifiReturnTo.also { wifiReturnTo = null })
+    }
 
     override fun onServiceConnected() {
         instance = this
@@ -92,7 +97,7 @@ class EngModeService : AccessibilityService() {
         })
         // The phone often links up with the car before this service binds (after a boot or a
         // restart of the app): the broadcast is gone by then, so look at the link itself.
-        if (chosenDeviceConnected()) armWifi("already connected")
+        armWifi("startup", connected = chosenDeviceConnected())
         consumeBoot()
     }
 
@@ -107,50 +112,38 @@ class EngModeService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    private var projectionPkg: String? = null
-    private val projectionRun = Runnable { projectionPkg?.let(::projectionWifi) }
-
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         if (pkg !in PROJECTION_PKGS) return
-        // Android Auto starting with the car comes to the front several times while it connects,
-        // and would push EngMode away mid-run. Run once it has stayed put for a moment.
-        projectionPkg = pkg
-        handler.removeCallbacks(projectionRun)
-        handler.postDelayed(projectionRun, PROJECTION_SETTLE_MS)
-    }
-
-    /** Android Auto or CarPlay in front: Wi-Fi, if the chosen phone is connected, then back to it. */
-    private fun projectionWifi(pkg: String) {
-        if (!AutomationStore(this).autoWifi) return
-        if (wifiOn(this)) {
-            Log.i(TAG, "projection $pkg: Wi-Fi already on")
-            return
-        }
-        if (!chosenDeviceConnected()) {
-            Log.i(TAG, "projection $pkg, but the chosen device is not connected: not opening Wi-Fi")
-            return
-        }
+        // Android Auto comes to the front several times while it connects: the cooldown keeps
+        // that to one attempt, and the delay lets it settle so it doesn't push EngMode away mid-run.
         val now = SystemClock.elapsedRealtime()
-        if (lastProjectionRun?.let { now - it < PROJECTION_COOLDOWN_MS } == true) {
-            Log.i(TAG, "projection $pkg: last run under a minute ago, skipping")
-            return
-        }
-        lastProjectionRun = now
-        // The Bluetooth attempt would only repeat this one.
-        handler.removeCallbacks(wifiAfterBt)
-        autoWifi("projection $pkg", returnTo = pkg)
+        if (lastProjectionRun?.let { now - it < PROJECTION_COOLDOWN_MS } == true) return
+        if (armWifi("projection $pkg", connected = chosenDeviceConnected(), returnTo = pkg)) lastProjectionRun = now
     }
 
-    private fun armWifi(reason: String) {
-        if (!AutomationStore(this).autoWifi) {
-            Log.i(TAG, "$reason: automatic Wi-Fi is off in settings")
-            return
+    /**
+     * A Wi-Fi trigger: nothing while Wi-Fi is on or the chosen device is not connected; otherwise
+     * one attempt [WIFI_DELAY_MS] from now, replacing any pending one. True when armed.
+     */
+    private fun armWifi(reason: String, connected: Boolean, returnTo: String? = null): Boolean {
+        val skip = when {
+            !AutomationStore(this).autoWifi -> "automatic Wi-Fi is off in settings"
+            wifiOn(this) -> "Wi-Fi already on"
+            !connected -> "the chosen device is not connected"
+            else -> null
         }
-        Log.i(TAG, "$reason: Wi-Fi attempt in ${WIFI_AFTER_BT_MS / 1000} s")
-        handler.removeCallbacks(wifiAfterBt)
-        handler.postDelayed(wifiAfterBt, WIFI_AFTER_BT_MS)
+        if (skip != null) {
+            Log.i(TAG, "$reason: $skip")
+            return false
+        }
+        Log.i(TAG, "$reason: Wi-Fi attempt in ${WIFI_DELAY_MS / 1000} s")
+        wifiReturnTo = returnTo
+        wifiArmedFor = AutomationStore(this).wifiDevice
+        handler.removeCallbacks(wifiAttempt)
+        handler.postDelayed(wifiAttempt, WIFI_DELAY_MS)
+        return true
     }
 
     /** Whether the device chosen in settings has a Bluetooth link with the car right now. */
@@ -384,12 +377,12 @@ class EngModeService : AccessibilityService() {
         return null
     }
 
+    private val hideOverlayLater = Runnable { hideOverlay() }
+
     /**
      * Full-screen cover in the app's style. It swallows touches, so a tap during a run never
      * lands on the hidden menu; the service's own clicks are accessibility actions, not touches.
      */
-    private val hideOverlayLater = Runnable { hideOverlay() }
-
     @SuppressLint("ClickableViewAccessibility")
     private fun showOverlay() {
         // A run started just after the last one: drop the old cover and its pending removal,
@@ -441,9 +434,8 @@ class EngModeService : AccessibilityService() {
         /** The head unit's engineering app. */
         const val ENGMODE_PKG = "com.desaysv.engmode"
 
-        /** From the chosen Bluetooth device connecting to the one Wi-Fi attempt. */
-        const val WIFI_AFTER_BT_MS = 15_000L
-        private const val PROJECTION_SETTLE_MS = 3_000L
+        /** From a Wi-Fi trigger to its one attempt (the phone and the car settle first). */
+        const val WIFI_DELAY_MS = 15_000L
         private const val PROJECTION_COOLDOWN_MS = 60_000L
         private const val RETURN_OVERLAY_MS = 800L
 

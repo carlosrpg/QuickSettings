@@ -453,24 +453,25 @@ class MediaRepository(
      * Voice search in the playing app. YouTube and YouTube Music (and their patched builds) ignore
      * `playFromSearch`, so they get their own search page as a link instead (checked on the car:
      * YouTube's `ACTION_SEARCH` only brings back the open video). True when the query reached an
-     * app (the link opened, or the session took `playFromSearch`): the drawer then closes.
+     * app (the link opened, or the session took `playFromSearch`): the drawer then closes. Car
+     * sources have no search, and the hidden background session must not get it either.
      */
     fun playFromSearch(query: String): Boolean {
-        val pkg = _state.value.packageName
+        val pkg = _state.value.packageName ?: return false
         val url = youtubeSearchUrl(pkg, query)
-        if (pkg != null && url != null) {
+        if (url != null) {
             val opened = runCatching {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }.onFailure { Log.w(TAG, "voice search link in $pkg failed", it) }.isSuccess
             if (opened) return true
         }
-        val controls = controller?.transportControls ?: return false
+        val controls = controller?.takeIf { it.packageName == pkg }?.transportControls ?: return false
         controls.playFromSearch(query, Bundle())
         // The session plays the result in the background (Motion does): bring its app up so the
         // video shows. The launch intent resumes the app's task, it doesn't restart it.
-        val shown = runCatching { launch(controller?.packageName) }
-            .onFailure { Log.w(TAG, "voice search: could not bring ${controller?.packageName} up", it) }.getOrDefault(false)
-        Log.i(TAG, "voice search: playFromSearch in ${controller?.packageName}, brought up: $shown")
+        val shown = runCatching { launch(pkg) }
+            .onFailure { Log.w(TAG, "voice search: could not bring $pkg up", it) }.getOrDefault(false)
+        Log.i(TAG, "voice search: playFromSearch in $pkg, brought up: $shown")
         return true
     }
 

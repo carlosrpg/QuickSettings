@@ -1,8 +1,8 @@
 package com.carlosrpg.cherry.quicksettings.ui
 
-import android.util.Log
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -618,16 +618,15 @@ private fun OpenDrawer(
     ) {
         ClimateSliders(car, actions)
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(Qs.TouchMin * 2), verticalAlignment = Alignment.CenterVertically) {
                 CardLabel(stringResource(R.string.quick_panel), Modifier.weight(1f))
                 // Back to the half drawer only when it came from there (the side handle).
                 if (!fromTop) {
                     GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
                     Spacer(Modifier.size(10.dp))
                 }
-                GlassButton(Icons.Close, stringResource(R.string.action_close), actions.close)
-                Spacer(Modifier.size(10.dp))
-                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings)
+                // No close button: a swipe back closes the open drawer. Settings at twice the size.
+                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings, size = Qs.TouchMin * 2, iconSize = 44.dp)
             }
             packRows(config.open, columns).forEach { row ->
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

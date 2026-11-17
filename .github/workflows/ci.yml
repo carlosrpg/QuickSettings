@@ -107,6 +107,9 @@ jobs:
           mkdir -p release-apks
           cp app/build/renamedApks/release/*.apk release-apks/
 
+      - name: Package first-install kit
+        run: (cd install && zip -r ../release-apks/QuickSettings-FirstInstall.zip .)
+
       - name: Verify APK signature
         run: |
           for apk in release-apks/*.apk; do
@@ -117,7 +120,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: QuickSettings-${{ env.APP_VERSION }}
-          path: release-apks/*.apk
+          path: |
+            release-apks/*.apk
+            release-apks/QuickSettings-FirstInstall.zip
           if-no-files-found: error
 
       - name: Create GitHub release
@@ -128,6 +133,7 @@ jobs:
         run: >-
           gh release create "$RELEASE_TAG"
           release-apks/*.apk
+          release-apks/QuickSettings-FirstInstall.zip
           --target "$GITHUB_SHA"
           --title "QuickSettings $RELEASE_TAG"
           --generate-notes

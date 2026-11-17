@@ -12,7 +12,7 @@ import android.provider.Settings
 class AutomationStore(private val context: Context) {
     private val prefs = prefs(context)
 
-    /** Open Wi-Fi once, a little after [wifiDevice] connects over Bluetooth, if it is off then. */
+    /** Open Wi-Fi 15 s after startup, [wifiDevice] connecting, or Android Auto / CarPlay, while that device is connected and Wi-Fi is off. */
     var autoWifi: Boolean
         get() = prefs.getBoolean(KEY_AUTO_WIFI, false)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_WIFI, value).apply()
