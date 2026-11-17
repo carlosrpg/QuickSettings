@@ -187,7 +187,7 @@
     <string name="auto_wifi_on">aberto</string>
     <string name="auto_wifi_off">fechado</string>
     <string name="auto_wifi_auto">Abrir automaticamente</string>
-    <string name="auto_wifi_auto_hint">Enquanto o celular escolhido abaixo estiver conectado por Bluetooth e o Wi-Fi desligado: 15 s depois da partida, depois que o celular conectar ou depois que o Android Auto ou o CarPlay abrir (no máximo uma vez por minuto).</string>
+    <string name="auto_wifi_auto_hint">Enquanto o celular escolhido abaixo estiver conectado por Bluetooth e o Wi-Fi desligado: 5 s depois da partida, depois que o celular conectar ou depois que o Android Auto ou o CarPlay abrir (no máximo uma vez por minuto).</string>
     <string name="auto_wifi_now">Abrir o Wi-Fi agora</string>
     <string name="auto_wifi_device">Celular que abre o Wi-Fi</string>
     <string name="auto_wifi_device_hint">Um dos dispositivos Bluetooth pareados com o carro.</string>

@@ -618,15 +618,15 @@ private fun OpenDrawer(
     ) {
         ClimateSliders(car, actions)
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(Modifier.fillMaxWidth().height(Qs.TouchMin * 2), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 CardLabel(stringResource(R.string.quick_panel), Modifier.weight(1f))
                 // Back to the half drawer only when it came from there (the side handle).
                 if (!fromTop) {
                     GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
                     Spacer(Modifier.size(10.dp))
                 }
-                // No close button: a swipe back closes the open drawer. Settings at twice the size.
-                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings, size = Qs.TouchMin * 2, iconSize = 44.dp)
+                // No close button: a swipe back closes the open drawer. Settings twice as wide.
+                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings, Modifier.width(Qs.TouchMin * 2))
             }
             packRows(config.open, columns).forEach { row ->
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

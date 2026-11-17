@@ -198,7 +198,7 @@
     <string name="auto_wifi_on">open</string>
     <string name="auto_wifi_off">closed</string>
     <string name="auto_wifi_auto">Open automatically</string>
-    <string name="auto_wifi_auto_hint">While the phone chosen below is connected over Bluetooth and Wi-Fi is off: 15 s after startup, after the phone connects, or after Android Auto or CarPlay comes up (at most once a minute).</string>
+    <string name="auto_wifi_auto_hint">While the phone chosen below is connected over Bluetooth and Wi-Fi is off: 5 s after startup, after the phone connects, or after Android Auto or CarPlay comes up (at most once a minute).</string>
     <string name="auto_wifi_now">Open Wi-Fi now</string>
     <string name="auto_wifi_device">Phone that opens Wi-Fi</string>
     <string name="auto_wifi_device_hint">One of the car\'s paired Bluetooth devices.</string>
