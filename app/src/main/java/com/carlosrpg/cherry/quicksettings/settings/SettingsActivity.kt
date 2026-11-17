@@ -124,6 +124,7 @@ class SettingsActivity : ComponentActivity() {
         // Grants also arrive over adb while this screen stays open, so re-check on a timer too.
         LaunchedEffect(Unit) {
             var couldDraw = OverlayService.canDraw(this@SettingsActivity)
+            var couldAutomate = AutomationStore.canEnableItself(this@SettingsActivity)
             while (true) {
                 delay(STATUS_REFRESH_MS)
                 app.media.refresh()
@@ -132,6 +133,10 @@ class SettingsActivity : ComponentActivity() {
                 val canDraw = OverlayService.canDraw(this@SettingsActivity)
                 if (canDraw && !couldDraw) OverlayService.start(this@SettingsActivity)
                 couldDraw = canDraw
+                // Same for the automation service, the moment WRITE_SECURE_SETTINGS lands.
+                val canAutomate = AutomationStore.canEnableItself(this@SettingsActivity)
+                if (canAutomate && !couldAutomate) AutomationStore.enableService(this@SettingsActivity)
+                couldAutomate = canAutomate
             }
         }
         val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -226,13 +231,6 @@ class SettingsActivity : ComponentActivity() {
         val adbOn = remember(refresh) { EngModeService.adbOn(this) }
         var auto by remember { mutableStateOf(store.autoWifi) }
         var startup by remember { mutableStateOf(store.adbOnStartup) }
-        if (!running) Panel {
-            QsText(stringResource(R.string.auto_service_off), 14.sp, Qs.TextSoft)
-            Text(ADB_SECURE_SETTINGS, color = Qs.TextSoft, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-            if (AutomationStore.canEnableItself(this@SettingsActivity)) {
-                GlassButton(null, stringResource(R.string.auto_service_start), { AutomationStore.enableService(this@SettingsActivity) }, label = stringResource(R.string.auto_service_start))
-            }
-        }
         Panel {
             val on = wifiOn
             CardLabel(stringResource(R.string.auto_wifi_title))
@@ -241,7 +239,7 @@ class SettingsActivity : ComponentActivity() {
             SwitchRow(R.string.auto_wifi_auto, R.string.auto_wifi_auto_hint, auto) { auto = !auto; store.autoWifi = auto }
             GlassButton(
                 Icons.Wifi, stringResource(R.string.auto_wifi_now),
-                { EngModeService.instance?.runNow(EngModeService.Flow.WIFI) },
+                { EngModeService.instance?.runNow(EngModeService.Flow.WIFI) ?: AutomationStore.enableService(this@SettingsActivity) },
                 label = stringResource(if (busy == EngModeService.Flow.WIFI) R.string.auto_opening_wifi else R.string.auto_wifi_now),
                 tint = if (running) Qs.Text else Qs.Dim,
             )
@@ -270,7 +268,7 @@ class SettingsActivity : ComponentActivity() {
             Text(stringResource(R.string.auto_password_hint), color = Qs.Muted, fontSize = 13.sp)
             GlassButton(
                 Icons.Terminal, stringResource(R.string.auto_adb_now),
-                { EngModeService.instance?.runNow(EngModeService.Flow.ADB) },
+                { EngModeService.instance?.runNow(EngModeService.Flow.ADB) ?: AutomationStore.enableService(this@SettingsActivity) },
                 label = stringResource(if (busy == EngModeService.Flow.ADB) R.string.auto_enabling_adb else R.string.auto_adb_now),
                 tint = if (running) Qs.Text else Qs.Dim,
             )
@@ -377,8 +375,10 @@ class SettingsActivity : ComponentActivity() {
         val tapRelay = !needsRelay || TapRelayService.instance != null
         // Optional, for the top bar only: the foreground activity, one of its full-screen signals.
         val usage = !topBar || hasUsageAccess()
+        // The Wi-Fi and adb buttons do nothing until this service is connected.
+        val automation by EngModeService.running.collectAsState()
         // Nothing to ask for: keep the screen about the drawer.
-        if (overlay && notifications && mic && location && tapRelay && usage) return
+        if (overlay && notifications && mic && location && tapRelay && usage && automation) return
         Panel {
             CardLabel(stringResource(R.string.permissions))
             // The car has no settings page for the overlay, notification access or accessibility,
@@ -400,6 +400,10 @@ class SettingsActivity : ComponentActivity() {
             }
             if (needsRelay) PermissionRow(R.string.perm_tap, R.string.perm_tap_why, tapRelay, ADB_TAP_RELAY) {
                 open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            // Once WRITE_SECURE_SETTINGS is granted the app lists the service itself.
+            PermissionRow(R.string.perm_automation, R.string.perm_automation_why, automation, ADB_SECURE_SETTINGS) {
+                if (!AutomationStore.enableService(this@SettingsActivity)) open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
     }
