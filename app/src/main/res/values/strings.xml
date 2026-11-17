@@ -129,6 +129,8 @@
     <string name="perm_usage_why">Helps the top bar notice full-screen apps such as Android Auto and step aside.</string>
     <string name="perm_tap">Tap pass-through (optional)</string>
     <string name="perm_tap_why">Lets taps in the edge swipe zone reach the app behind.</string>
+    <string name="perm_automation">Wi-Fi and ADB automation</string>
+    <string name="perm_automation_why">Lets the Wi-Fi and ADB buttons below work: the app switches its accessibility service on once this is granted.</string>
     <string name="grant">Grant</string>
     <string name="grant_desc">Grant %1$s</string>
     <string name="status">Status</string>
@@ -207,8 +209,6 @@
     <string name="auto_adb_now">Enable ADB now</string>
     <string name="auto_password">EngMode password</string>
     <string name="auto_password_hint">The engineering menu asks for it before its ADB switch. Stored encrypted on the head unit.</string>
-    <string name="auto_service_off">The automation service is off. Grant this once from a computer, then it switches itself on:</string>
-    <string name="auto_service_start">Start</string>
     <string name="slider_temperature">Cabin temperature</string>
     <string name="slider_fan">Fan speed</string>
     <string name="slider_volume">Media volume</string>
@@ -220,4 +220,22 @@
     <string name="say_destination">Say where you want to go</string>
     <string name="auto_adb_wifi_warning">With Wi-Fi opening automatically and ADB on at startup, any device on the head unit\'s Wi-Fi can reach ADB. Turn one off when you don\'t need it.</string>
     <string name="open_drawer_label">Open the QuickSettings drawer</string>
+    <string name="widget_weather">Weather</string>
+    <string name="widget_weather_sub">Time, temperature and the week ahead</string>
+    <string name="perm_location">Location</string>
+    <string name="perm_location_why">Local weather for the weather widget.</string>
+    <string name="weather_today">Today</string>
+    <string name="weather_loading">Loading weather…</string>
+    <string name="weather_no_permission">Allow location in Settings</string>
+    <string name="weather_no_location">Waiting for location</string>
+    <string name="weather_unavailable">Weather unavailable</string>
+    <string name="weather_clear">Clear</string>
+    <string name="weather_partly_cloudy">Partly cloudy</string>
+    <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_fog">Fog</string>
+    <string name="weather_drizzle">Drizzle</string>
+    <string name="weather_rain">Rain</string>
+    <string name="weather_snow">Snow</string>
+    <string name="weather_thunder">Thunderstorm</string>
+    <string name="desc_weather">Weather: %1$d°, %2$s</string>
 </resources>

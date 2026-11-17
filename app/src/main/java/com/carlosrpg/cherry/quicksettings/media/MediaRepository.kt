@@ -428,8 +428,23 @@ class MediaRepository(
     }
 
     /** Hands a spoken query to the app that owns the session. Car sources have no search. */
-    fun playFromSearch(query: String) =
+    /**
+     * Voice search in the playing app. YouTube and YouTube Music (and their patched builds) ignore
+     * `playFromSearch`, so they get their own search page as a link instead. True when that app
+     * was brought to the front.
+     */
+    fun playFromSearch(query: String): Boolean {
+        val pkg = _state.value.packageName
+        val url = youtubeSearchUrl(pkg, query)
+        if (pkg != null && url != null) {
+            val opened = runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.isSuccess
+            if (opened) return true
+        }
         controller?.transportControls?.playFromSearch(query, Bundle())
+        return false
+    }
 
     /**
      * One step up or down. `adjustVolume`, not a stream volume: on Android Automotive stream
@@ -508,4 +523,15 @@ class MediaRepository(
         private const val TAG = "QsMedia"
         private const val CAR_SETTLE_MS = 300L
     }
+}
+
+/**
+ * The search page for [query] in a YouTube app, or null when [pkg] is not one. Matches by name so
+ * patched builds (ReVanced, Morphe: `app.morphe.android.youtube`, ...) count too.
+ */
+fun youtubeSearchUrl(pkg: String?, query: String): String? {
+    val name = pkg?.lowercase() ?: return null
+    if ("youtube" !in name) return null
+    val q = java.net.URLEncoder.encode(query, "UTF-8")
+    return if ("music" in name) "https://music.youtube.com/search?q=$q" else "https://www.youtube.com/results?search_query=$q"
 }

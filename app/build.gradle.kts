@@ -124,6 +124,7 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.truth)
+    testImplementation(libs.org.json)
 }
 
 abstract class RenameApkTask : DefaultTask() {

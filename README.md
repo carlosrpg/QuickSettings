@@ -109,6 +109,13 @@ adb shell 'settings --user current put secure enabled_accessibility_services "$(
 adb shell settings --user current put secure accessibility_enabled 1
 ```
 
+**Wi-Fi and ADB automation** (for the Wi-Fi and ADB buttons in settings). Lets the app switch
+its own accessibility service on, now and after every force-stop:
+
+```
+adb shell pm grant com.carlosrpg.cherry.quicksettings android.permission.WRITE_SECURE_SETTINGS
+```
+
 Until a permission is granted, the app's settings screen lists it with the same command.
 
 ## Build

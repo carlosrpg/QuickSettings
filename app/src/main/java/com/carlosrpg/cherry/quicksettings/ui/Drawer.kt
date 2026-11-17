@@ -112,6 +112,7 @@ class DrawerActions(
     }
 
     val cluster get() = context.app.cluster
+    val weather get() = context.app.weather
 
     /** Sends the navigation app to the instrument cluster, or brings it back if it is there. */
     fun toggleNavOnCluster() {
@@ -129,7 +130,7 @@ class DrawerActions(
     /** Speech goes to the app that owns the media session; no recognizer = open that app. */
     fun voiceMedia() {
         voiceFor = WidgetType.MEDIA
-        voice.listen(onText = { media.playFromSearch(it) }, onUnavailable = ::openMediaApp)
+        voice.listen(onText = { if (media.playFromSearch(it)) close() }, onUnavailable = ::openMediaApp)
     }
 
     /** Speech becomes a destination search in the nav app; no recognizer = open the nav app. */
@@ -279,6 +280,7 @@ private fun SemiDrawer(
 }
 
 private val HUD_HEIGHT = 230.dp
+private val SWIPE_CLOSE = 96.dp
 private const val MEDIA_DEAD_DP = 16
 // Slow zone 16–100 dp: wide enough to land in on purpose; fast beyond.
 private const val MEDIA_BAND_DP = 100
@@ -436,6 +438,7 @@ private fun SemiTile(
         WidgetType.AUTONOMY -> AutonomyTile(car, Modifier.tap(actions.toOpen))
         WidgetType.NAVIGATION -> NavTile(nav, Modifier.tap { if (nav == null) actions.voiceNav() else actions.toOpen() })
         WidgetType.ASSIST -> AssistTile(car, Modifier.tap(actions.toOpen))
+        WidgetType.WEATHER -> WeatherTile(actions.weather, Modifier.tap(actions.toOpen))
     }
 }
 
@@ -558,7 +561,7 @@ private fun Indicator(active: Boolean, enabled: Boolean, modifier: Modifier, con
 }
 
 /** Wide cards span two columns. */
-fun WidgetType.span(): Int = if (this == WidgetType.MEDIA || this == WidgetType.AUTONOMY) 2 else 1
+fun WidgetType.span(): Int = if (this == WidgetType.MEDIA) 2 else 1
 
 /** Packs widgets into rows of [columns] in order; a widget that doesn't fit starts a new row. */
 fun packRows(items: List<WidgetType>, columns: Int): List<List<WidgetType>> {
@@ -589,10 +592,18 @@ private fun OpenDrawer(
 ) {
     val shape = RoundedCornerShape(Qs.DrawerRadius)
     val columns = if (portrait) 2 else 4
+    // A swipe back toward where the drawer came from closes it: up from the top, else to its side.
+    val (dx, dy) = when {
+        fromTop -> 0f to -1f
+        config.side == Side.LEFT -> -1f to 0f
+        else -> 1f to 0f
+    }
+    val swipePx = with(LocalDensity.current) { SWIPE_CLOSE.toPx() }
     // The cards in the middle, with a column of vertical sliders on each side: climate on the
     // driver's side (left: the car is left-hand drive), volume on the other.
     Row(
-        Modifier.fillMaxSize().clip(shape).background(Qs.GlassOpen).border(1.dp, Qs.Hairline, shape).padding(24.dp),
+        Modifier.fillMaxSize().swipeToClose(dx, dy, swipePx, actions.close)
+            .clip(shape).background(Qs.GlassOpen).border(1.dp, Qs.Hairline, shape).padding(24.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ClimateSliders(car, actions)
@@ -619,6 +630,7 @@ private fun OpenDrawer(
                             WidgetType.CLIMATE -> ClimateCard(car, actions, m)
                             WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)
                             WidgetType.AUTONOMY -> RangeCard(car, m)
+                            WidgetType.WEATHER -> WeatherCard(actions.weather, m)
                         }
                     }
                     val used = row.sumOf { it.span().coerceAtMost(columns) }

@@ -98,6 +98,7 @@ import kotlin.math.roundToInt
 
 class SettingsActivity : ComponentActivity() {
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val locationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -123,6 +124,7 @@ class SettingsActivity : ComponentActivity() {
         // Grants also arrive over adb while this screen stays open, so re-check on a timer too.
         LaunchedEffect(Unit) {
             var couldDraw = OverlayService.canDraw(this@SettingsActivity)
+            var couldAutomate = AutomationStore.canEnableItself(this@SettingsActivity)
             while (true) {
                 delay(STATUS_REFRESH_MS)
                 app.media.refresh()
@@ -131,6 +133,10 @@ class SettingsActivity : ComponentActivity() {
                 val canDraw = OverlayService.canDraw(this@SettingsActivity)
                 if (canDraw && !couldDraw) OverlayService.start(this@SettingsActivity)
                 couldDraw = canDraw
+                // Same for the automation service, the moment WRITE_SECURE_SETTINGS lands.
+                val canAutomate = AutomationStore.canEnableItself(this@SettingsActivity)
+                if (canAutomate && !couldAutomate) AutomationStore.enableService(this@SettingsActivity)
+                couldAutomate = canAutomate
             }
         }
         val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -143,7 +149,7 @@ class SettingsActivity : ComponentActivity() {
                 QsText(stringResource(R.string.app_name), 26.sp, weight = FontWeight.Bold)
             }
             // Re-checked on every resume and every tick: grants happen in system settings or over adb.
-            key(refresh) { Permissions(config.tapToOpen, config.topBar) }
+            key(refresh) { Permissions(config.tapToOpen, config.topBar, WidgetType.WEATHER in config.open || WidgetType.WEATHER in config.semi) }
             if (wide) {
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     Box(Modifier.weight(0.42f)) { PositionPanel(config) }
@@ -225,13 +231,6 @@ class SettingsActivity : ComponentActivity() {
         val adbOn = remember(refresh) { EngModeService.adbOn(this) }
         var auto by remember { mutableStateOf(store.autoWifi) }
         var startup by remember { mutableStateOf(store.adbOnStartup) }
-        if (!running) Panel {
-            QsText(stringResource(R.string.auto_service_off), 14.sp, Qs.TextSoft)
-            Text(ADB_SECURE_SETTINGS, color = Qs.TextSoft, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-            if (AutomationStore.canEnableItself(this@SettingsActivity)) {
-                GlassButton(null, stringResource(R.string.auto_service_start), { AutomationStore.enableService(this@SettingsActivity) }, label = stringResource(R.string.auto_service_start))
-            }
-        }
         Panel {
             val on = wifiOn
             CardLabel(stringResource(R.string.auto_wifi_title))
@@ -240,7 +239,7 @@ class SettingsActivity : ComponentActivity() {
             SwitchRow(R.string.auto_wifi_auto, R.string.auto_wifi_auto_hint, auto) { auto = !auto; store.autoWifi = auto }
             GlassButton(
                 Icons.Wifi, stringResource(R.string.auto_wifi_now),
-                { EngModeService.instance?.runNow(EngModeService.Flow.WIFI) },
+                { EngModeService.instance?.runNow(EngModeService.Flow.WIFI) ?: AutomationStore.enableService(this@SettingsActivity) },
                 label = stringResource(if (busy == EngModeService.Flow.WIFI) R.string.auto_opening_wifi else R.string.auto_wifi_now),
                 tint = if (running) Qs.Text else Qs.Dim,
             )
@@ -269,7 +268,7 @@ class SettingsActivity : ComponentActivity() {
             Text(stringResource(R.string.auto_password_hint), color = Qs.Muted, fontSize = 13.sp)
             GlassButton(
                 Icons.Terminal, stringResource(R.string.auto_adb_now),
-                { EngModeService.instance?.runNow(EngModeService.Flow.ADB) },
+                { EngModeService.instance?.runNow(EngModeService.Flow.ADB) ?: AutomationStore.enableService(this@SettingsActivity) },
                 label = stringResource(if (busy == EngModeService.Flow.ADB) R.string.auto_enabling_adb else R.string.auto_adb_now),
                 tint = if (running) Qs.Text else Qs.Dim,
             )
@@ -364,18 +363,22 @@ class SettingsActivity : ComponentActivity() {
     ) == android.app.AppOpsManager.MODE_ALLOWED
 
     @Composable
-    private fun Permissions(tapToOpen: Boolean, topBar: Boolean) {
+    private fun Permissions(tapToOpen: Boolean, topBar: Boolean, weather: Boolean) {
         val overlay = OverlayService.canDraw(this)
         val notifications = hasNotificationAccess()
         val mic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        // Only for the weather widget, so only asked while it is shown.
+        val location = !weather || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         // The relay matters in swipe-only mode (with tap to open a touch opens the drawer) and
         // for the top bar, which learns from it when a full-screen app is up.
         val needsRelay = !tapToOpen || topBar
         val tapRelay = !needsRelay || TapRelayService.instance != null
         // Optional, for the top bar only: the foreground activity, one of its full-screen signals.
         val usage = !topBar || hasUsageAccess()
+        // The Wi-Fi and adb buttons do nothing until this service is connected.
+        val automation by EngModeService.running.collectAsState()
         // Nothing to ask for: keep the screen about the drawer.
-        if (overlay && notifications && mic && tapRelay && usage) return
+        if (overlay && notifications && mic && location && tapRelay && usage && automation) return
         Panel {
             CardLabel(stringResource(R.string.permissions))
             // The car has no settings page for the overlay, notification access or accessibility,
@@ -389,11 +392,18 @@ class SettingsActivity : ComponentActivity() {
             PermissionRow(R.string.perm_mic, R.string.perm_mic_why, mic, null) {
                 micPermission.launch(Manifest.permission.RECORD_AUDIO)
             }
+            if (weather) PermissionRow(R.string.perm_location, R.string.perm_location_why, location, null) {
+                locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
             if (topBar) PermissionRow(R.string.perm_usage, R.string.perm_usage_why, usage, ADB_USAGE) {
                 open(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
             }
             if (needsRelay) PermissionRow(R.string.perm_tap, R.string.perm_tap_why, tapRelay, ADB_TAP_RELAY) {
                 open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            // Once WRITE_SECURE_SETTINGS is granted the app lists the service itself.
+            PermissionRow(R.string.perm_automation, R.string.perm_automation_why, automation, ADB_SECURE_SETTINGS) {
+                if (!AutomationStore.enableService(this@SettingsActivity)) open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
     }
@@ -599,6 +609,7 @@ class SettingsActivity : ComponentActivity() {
             WidgetType.AUTONOMY -> Triple<Any, String?, Color>(Qs.Energy.copy(alpha = 0.18f), Icons.Battery, Qs.Energy)
             WidgetType.NAVIGATION -> Triple<Any, String?, Color>(Qs.Route.copy(alpha = 0.18f), Icons.TurnRight, Qs.Route)
             WidgetType.ASSIST -> Triple<Any, String?, Color>(Qs.Energy.copy(alpha = 0.18f), Icons.AutoHold, Qs.Energy)
+            WidgetType.WEATHER -> Triple<Any, String?, Color>(Qs.Fuel.copy(alpha = 0.18f), Icons.Sun, Qs.Fuel)
         }
         val bg = when (background) {
             is Brush -> Modifier.background(background)
@@ -645,6 +656,7 @@ fun WidgetType.titleRes(): Int = when (this) {
     WidgetType.AUTONOMY -> R.string.widget_autonomy
     WidgetType.NAVIGATION -> R.string.widget_navigation
     WidgetType.ASSIST -> R.string.widget_assist
+    WidgetType.WEATHER -> R.string.widget_weather
 }
 
 @StringRes
@@ -655,6 +667,7 @@ fun WidgetType.subtitleRes(): Int = when (this) {
     WidgetType.AUTONOMY -> R.string.widget_autonomy_sub
     WidgetType.NAVIGATION -> R.string.widget_navigation_sub
     WidgetType.ASSIST -> R.string.widget_assist_sub
+    WidgetType.WEATHER -> R.string.widget_weather_sub
 }
 
 private const val STATUS_REFRESH_MS = 1_500L
