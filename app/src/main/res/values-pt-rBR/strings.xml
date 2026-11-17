@@ -118,6 +118,8 @@
     <string name="perm_usage_why">Ajuda a barra superior a perceber apps em tela cheia, como o Android Auto, e sair da frente.</string>
     <string name="perm_tap">Repasse de toques (opcional)</string>
     <string name="perm_tap_why">Deixa os toques na zona de deslize da borda chegarem ao app de trás.</string>
+    <string name="perm_automation">Automação de Wi-Fi e ADB</string>
+    <string name="perm_automation_why">Faz os botões de Wi-Fi e ADB abaixo funcionarem: o app liga o próprio serviço de acessibilidade depois desta permissão.</string>
     <string name="grant">Permitir</string>
     <string name="grant_desc">Permitir %1$s</string>
     <string name="status">Status</string>
@@ -196,8 +198,6 @@
     <string name="auto_adb_now">Ativar o ADB agora</string>
     <string name="auto_password">Senha do EngMode</string>
     <string name="auto_password_hint">O menu de engenharia a pede antes do seu botão de ADB. Guardada criptografada na central.</string>
-    <string name="auto_service_off">O serviço de automação está desligado. Conceda isto uma vez de um computador e ele passa a se ligar sozinho:</string>
-    <string name="auto_service_start">Iniciar</string>
     <string name="slider_temperature">Temperatura da cabine</string>
     <string name="slider_fan">Velocidade do ventilador</string>
     <string name="slider_volume">Volume da mídia</string>
