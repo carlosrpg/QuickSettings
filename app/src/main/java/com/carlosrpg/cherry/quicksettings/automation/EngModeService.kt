@@ -62,6 +62,8 @@ class EngModeService : AccessibilityService() {
     private var queued: Flow? = null
     private var returnPkg: String? = null
     private var lastProjectionRun: Long? = null
+    private var lastAutoWifiRun: Long? = null
+    private var queuedReturn: String? = null
 
     /** The chosen device connecting or dropping. A drop cancels a pending attempt, so a link that flaps never stacks runs. */
     private val btChanges = object : BroadcastReceiver() {
@@ -74,6 +76,7 @@ class EngModeService : AccessibilityService() {
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     Log.i(TAG, "${device.address} disconnected: Wi-Fi attempt cancelled")
                     handler.removeCallbacks(wifiAttempt)
+                    wifiReturnTo = null
                 }
             }
         }
@@ -139,7 +142,8 @@ class EngModeService : AccessibilityService() {
             return false
         }
         Log.i(TAG, "$reason: Wi-Fi attempt in ${WIFI_DELAY_MS / 1000} s")
-        wifiReturnTo = returnTo
+        // A Bluetooth reconnect while an Android Auto attempt waits keeps the way back to it.
+        wifiReturnTo = returnTo ?: wifiReturnTo
         wifiArmedFor = AutomationStore(this).wifiDevice
         handler.removeCallbacks(wifiAttempt)
         handler.postDelayed(wifiAttempt, WIFI_DELAY_MS)
@@ -180,12 +184,21 @@ class EngModeService : AccessibilityService() {
             Log.i(TAG, "Wi-Fi already on ($reason): nothing to do")
             return
         }
+        // At most one automatic run a minute, whatever the trigger: a phone that keeps reconnecting
+        // (or a switch that doesn't stick) never keeps covering the screen.
+        val now = SystemClock.elapsedRealtime()
+        if (lastAutoWifiRun?.let { now - it < WIFI_COOLDOWN_MS } == true) {
+            Log.i(TAG, "Wi-Fi off ($reason): last automatic run under a minute ago, skipping")
+            return
+        }
         if (step != Step.IDLE) {
             Log.i(TAG, "Wi-Fi off ($reason): queued behind the run in progress")
             queued = Flow.WIFI
+            queuedReturn = returnTo
             return
         }
         Log.i(TAG, "Wi-Fi off ($reason): opening it")
+        lastAutoWifiRun = now
         start(Flow.WIFI, auto = true, returnTo = returnTo)
     }
 
@@ -324,7 +337,7 @@ class EngModeService : AccessibilityService() {
         }
         queued?.let { next ->
             queued = null
-            handler.postDelayed({ if (next == Flow.WIFI) autoWifi("queued") else start(next, auto = true) }, QUEUE_GAP_MS)
+            handler.postDelayed({ if (next == Flow.WIFI) autoWifi("queued", returnTo = queuedReturn.also { queuedReturn = null }) else start(next, auto = true) }, QUEUE_GAP_MS)
         }
     }
 
@@ -437,6 +450,7 @@ class EngModeService : AccessibilityService() {
         /** From a Wi-Fi trigger to its one attempt (the phone and the car settle first). */
         const val WIFI_DELAY_MS = 5_000L
         private const val PROJECTION_COOLDOWN_MS = 60_000L
+        private const val WIFI_COOLDOWN_MS = 60_000L
         private const val RETURN_OVERLAY_MS = 800L
 
         /** Android Auto receiver and CarPlay app on this head unit. */

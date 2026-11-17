@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -157,16 +159,22 @@ fun HorizontalSlider(
                         val f = ((x - size.height / 2f) / (size.width - size.height).coerceAtLeast(1)).coerceIn(0f, 1f)
                         change((range.first + f * span).roundToInt().coerceIn(range))
                     }
+                    // Nothing is taken until the finger lifts (a tap) or moves sideways past the touch
+                    // slop: a swipe that only crosses the slider, or one the drawer takes, changes nothing.
                     awaitEachGesture {
-                        val down = awaitFirstDown()
-                        down.consume()
-                        at(down.position.x)
-                        while (true) {
-                            val c = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                            c.consume()
-                            if (!c.pressed) break
-                            at(c.position.x)
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { c, _ -> c.consume() }
+                        if (drag == null) {
+                            val up = currentEvent.changes.firstOrNull { it.id == down.id }
+                            if (up != null && !up.pressed && !up.isConsumed) {
+                                up.consume()
+                                at(up.position.x)
+                                finished()
+                            }
+                            return@awaitEachGesture
                         }
+                        at(drag.position.x)
+                        horizontalDrag(drag.id) { at(it.position.x); it.consume() }
                         finished()
                     }
                 },

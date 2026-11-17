@@ -233,7 +233,8 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
                         QsText(appName, 15.sp, Qs.TextSoft, FontWeight.SemiBold)
                     }
                 }
-                GlassButton(
+                // Search goes to the app's media session; the car's own sources have none.
+                if (media.packageName != null) GlassButton(
                     Icons.Mic, stringResource(R.string.voice_search_in, appName), actions::voiceMedia,
                     label = stringResource(if (listening) R.string.listening else R.string.search),
                     tint = if (listening) Qs.Route else Qs.Text,
@@ -530,7 +531,7 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
         shownTemp?.let { "$it°" } ?: "--", stringResource(R.string.slider_temperature),
         Brush.horizontalGradient(if (tempColors.size > 1) tempColors else List(2) { Qs.tempColor(shownTemp) }),
         onChange = { temp = it },
-        onFinished = { temp?.let(actions.car::setCabinTemp); temp = null },
+        onFinished = { temp?.takeIf { it != car.cabinTempC }?.let(actions.car::setCabinTemp); temp = null },
     )
     Spacer(Modifier.height(8.dp))
     HorizontalSlider(
@@ -538,7 +539,7 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
         shownFan?.toString() ?: "--", stringResource(R.string.slider_fan),
         Brush.horizontalGradient(listOf(Qs.Route.copy(alpha = 0.55f), Qs.Route)),
         onChange = { fan = it },
-        onFinished = { fan?.let(actions.car::setFan); fan = null },
+        onFinished = { fan?.takeIf { it != car.fanLevel }?.let(actions.car::setFan); fan = null },
     )
 }
 
@@ -560,14 +561,26 @@ private const val SEAT_ASPECT = 480f / 551f
 private fun SeatAirflow(temp: Int?, fan: Int?, airOn: Boolean, description: String, modifier: Modifier = Modifier) {
     val level = fan?.takeIf { airOn && it in 1..AIRFLOW_BANDS.size }?.let { AIRFLOW_BANDS[it - 1] } ?: 0
     val color = Qs.tempColor(temp)
+    BoxWithConstraints(modifier.semantics { contentDescription = description }) {
+        // The seat keeps its shape: as tall as the box allows, unless the box is too narrow for that.
+        val seatHeight = minOf(maxHeight * 0.96f, maxWidth / SEAT_ASPECT)
+        val seatWidth = seatHeight * SEAT_ASPECT
+        if (level > 0) Airflow(level, color, seatWidth, seatHeight)
+        Image(
+            painterResource(R.drawable.climate_seat), contentDescription = null,
+            modifier = Modifier.align(Alignment.BottomEnd).width(seatWidth).height(seatHeight),
+        )
+    }
+}
+
+/** The ribbons, in their own composable so the frame loop only runs while air is flowing. */
+@Composable
+private fun Airflow(level: Int, color: Color, seatWidth: Dp, seatHeight: Dp) {
     // One 3.6 s cycle; level n moves the dashes n periods per cycle, so faster air never jumps at the wrap.
     val cycle by rememberInfiniteTransition(label = "airflow").animateFloat(
         0f, 1f, infiniteRepeatable(tween(3_600, easing = LinearEasing)), label = "airflowPhase",
     )
-    BoxWithConstraints(modifier.semantics { contentDescription = description }) {
-        val seatHeight = maxHeight * 0.96f
-        val seatWidth = seatHeight * SEAT_ASPECT
-        if (level > 0) Canvas(Modifier.fillMaxSize()) {
+    Canvas(Modifier.fillMaxSize()) {
             val seatLeft = size.width - seatWidth.toPx()
             val seatTop = size.height - seatHeight.toPx()
             val strands = 2 + level
@@ -597,11 +610,6 @@ private fun SeatAirflow(temp: Int?, fan: Int?, airOn: Boolean, description: Stri
                     drawPath(path, brush, alpha = alpha, style = Stroke(width, cap = StrokeCap.Round, pathEffect = effect))
                 }
             }
-        }
-        Image(
-            painterResource(R.drawable.climate_seat), contentDescription = null,
-            modifier = Modifier.align(Alignment.BottomEnd).width(seatWidth).height(seatHeight),
-        )
     }
 }
 
