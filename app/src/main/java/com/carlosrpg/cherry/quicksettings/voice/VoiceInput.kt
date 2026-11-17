@@ -8,6 +8,10 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
+import android.widget.Toast
+import androidx.annotation.StringRes
+import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,7 +46,12 @@ class VoiceInput(private val context: Context) {
                 results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     ?.firstOrNull()?.takeIf { it.isNotBlank() }?.let(onText)
             }
-            override fun onError(error: Int) = finish()
+            override fun onError(error: Int) {
+                Log.w(TAG, "speech recognition error $error")
+                finish()
+                // Said on screen: otherwise the card just stops listening and nothing happens.
+                Toast.makeText(context, context.getString(errorMessage(error), error), Toast.LENGTH_LONG).show()
+            }
             override fun onReadyForSpeech(params: Bundle?) = Unit
             override fun onBeginningOfSpeech() = Unit
             override fun onRmsChanged(rmsdB: Float) = Unit
@@ -68,5 +77,20 @@ class VoiceInput(private val context: Context) {
         _listening.value = false
         recognizer?.destroy()
         recognizer = null
+    }
+
+    private companion object {
+        const val TAG = "QsVoice"
+
+        /** The recognizer here is Google's, which needs the internet: the car offline is the usual cause. */
+        @StringRes
+        fun errorMessage(error: Int): Int = when (error) {
+            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SERVER ->
+                R.string.voice_error_network
+            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> R.string.voice_error_no_match
+            SpeechRecognizer.ERROR_AUDIO, SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> R.string.voice_error_mic
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> R.string.voice_error_busy
+            else -> R.string.voice_error_other
+        }
     }
 }

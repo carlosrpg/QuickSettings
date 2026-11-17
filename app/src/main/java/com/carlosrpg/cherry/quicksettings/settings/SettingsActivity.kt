@@ -237,6 +237,7 @@ class SettingsActivity : ComponentActivity() {
             StatusRow(R.string.auto_wifi_title, on, stringResource(if (on) R.string.auto_wifi_on else R.string.auto_wifi_off))
             QsText(stringResource(R.string.auto_wifi_why), 13.sp, Qs.Muted)
             SwitchRow(R.string.auto_wifi_auto, R.string.auto_wifi_auto_hint, auto) { auto = !auto; store.autoWifi = auto }
+            if (auto) WifiDevicePicker(store, refresh)
             GlassButton(
                 Icons.Wifi, stringResource(R.string.auto_wifi_now),
                 { EngModeService.instance?.runNow(EngModeService.Flow.WIFI) ?: AutomationStore.enableService(this@SettingsActivity) },
@@ -272,6 +273,35 @@ class SettingsActivity : ComponentActivity() {
                 label = stringResource(if (busy == EngModeService.Flow.ADB) R.string.auto_enabling_adb else R.string.auto_adb_now),
                 tint = if (running) Qs.Text else Qs.Dim,
             )
+        }
+    }
+
+    /**
+     * The paired Bluetooth devices, one switch each, at most one on: the chosen device's
+     * connection is what opens Wi-Fi. Re-read every tick, so a phone connecting shows up.
+     */
+    @Composable
+    private fun WifiDevicePicker(store: AutomationStore, refresh: Int) {
+        val devices = remember(refresh) { EngModeService.pairedDevices() }
+        var chosen by remember { mutableStateOf(store.wifiDevice) }
+        QsText(stringResource(R.string.auto_wifi_device), 16.sp, weight = FontWeight.SemiBold)
+        Text(stringResource(R.string.auto_wifi_device_hint), color = Qs.Muted, fontSize = 13.sp)
+        if (devices.isEmpty()) Text(stringResource(R.string.auto_wifi_no_devices), color = Qs.Warm, fontSize = 13.sp)
+        else if (devices.none { it.address.equals(chosen, ignoreCase = true) }) {
+            Text(stringResource(R.string.auto_wifi_pick_device), color = Qs.Warm, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        devices.forEach { device ->
+            val on = device.address.equals(chosen, ignoreCase = true)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    QsText(device.name, 16.sp, weight = FontWeight.SemiBold)
+                    if (device.connected) Text(stringResource(R.string.auto_wifi_device_connected), color = Qs.Muted, fontSize = 13.sp)
+                }
+                Toggle(on, device.name) {
+                    chosen = if (on) null else device.address
+                    store.wifiDevice = chosen
+                }
+            }
         }
     }
 

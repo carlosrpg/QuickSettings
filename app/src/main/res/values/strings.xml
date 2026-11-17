@@ -92,6 +92,10 @@
     <string name="climate_auto">Automatic mode</string>
     <string name="climate_sync">Sync zones</string>
     <string name="climate_recirculation">Recirculate air</string>
+    <string name="climate_ac">Air conditioning</string>
+    <string name="climate_power_short">Power</string>
+    <string name="climate_sync_short">Sync</string>
+    <string name="climate_recirculation_short">Recirc.</string>
     <string name="debug_log">Debug log</string>
     <string name="assist_confirm_off">Tap again to turn off</string>
     <string name="assist_block_ignition">Ignition is off</string>
@@ -174,7 +178,7 @@
     <string name="widget_media">Media</string>
     <string name="widget_media_sub">Art and play / pause; drag for track</string>
     <string name="widget_climate">Climate</string>
-    <string name="widget_climate_sub">Temperature × fan quadrant</string>
+    <string name="widget_climate_sub">Seat with airflow, temperature and fan sliders</string>
     <string name="widget_car_mode">Car mode</string>
     <string name="widget_car_mode_sub">Battery mode and regeneration; drag to change</string>
     <string name="widget_autonomy">Autonomy</string>
@@ -198,8 +202,13 @@
     <string name="auto_wifi_on">open</string>
     <string name="auto_wifi_off">closed</string>
     <string name="auto_wifi_auto">Open automatically</string>
-    <string name="auto_wifi_auto_hint">Whenever it is off: after the car starts, when it goes off, and when Android Auto or CarPlay comes up. At most once a minute.</string>
+    <string name="auto_wifi_auto_hint">While the phone chosen below is connected over Bluetooth and Wi-Fi is off: 5 s after startup, after the phone connects, or after Android Auto or CarPlay comes up (at most once a minute).</string>
     <string name="auto_wifi_now">Open Wi-Fi now</string>
+    <string name="auto_wifi_device">Phone that opens Wi-Fi</string>
+    <string name="auto_wifi_device_hint">One of the car\'s paired Bluetooth devices.</string>
+    <string name="auto_wifi_device_connected">connected now</string>
+    <string name="auto_wifi_no_devices">No paired Bluetooth devices (or Bluetooth is off).</string>
+    <string name="auto_wifi_pick_device">Choose a phone: nothing opens Wi-Fi until one is chosen.</string>
     <string name="auto_adb_title">ADB</string>
     <string name="auto_adb_why">Needed to send the grant commands from a computer.</string>
     <string name="auto_adb_on">enabled</string>
@@ -238,4 +247,9 @@
     <string name="weather_snow">Snow</string>
     <string name="weather_thunder">Thunderstorm</string>
     <string name="desc_weather">Weather: %1$d°, %2$s</string>
+    <string name="voice_error_network">Voice search needs the internet: the car is offline (error %1$d).</string>
+    <string name="voice_error_no_match">Didn\'t catch that. Tap the mic and try again (error %1$d).</string>
+    <string name="voice_error_mic">The microphone could not be used (error %1$d).</string>
+    <string name="voice_error_busy">Voice input is busy with another app. Try again (error %1$d).</string>
+    <string name="voice_error_other">Voice search failed (error %1$d).</string>
 </resources>

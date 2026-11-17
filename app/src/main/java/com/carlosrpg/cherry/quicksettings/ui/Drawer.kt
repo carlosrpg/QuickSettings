@@ -2,6 +2,7 @@ package com.carlosrpg.cherry.quicksettings.ui
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -82,6 +83,8 @@ enum class DrawerMode { SEMI, OPEN }
 /** Gap between the drawer and the screen edge; the overlay window itself starts at the edge. */
 val DRAWER_EDGE_MARGIN = 16.dp
 
+private const val DRAWER_TAG = "QsDrawer"
+
 /** Everything the drawer can do; the overlay service supplies the navigation callbacks. */
 class DrawerActions(
     private val context: Context,
@@ -99,7 +102,8 @@ class DrawerActions(
 
     /** The card's background tap: bring the media app up, unless it is showing on the cluster. */
     fun mediaToFront() {
-        if (media.state.value.packageName != cluster.onCluster.value) openMediaApp()
+        val app = media.state.value.openPackage ?: return
+        if (app != cluster.onCluster.value) openMediaApp()
     }
 
     /** The card's background tap: bring the nav app up, unless it is showing on the cluster. */
@@ -130,7 +134,13 @@ class DrawerActions(
     /** Speech goes to the app that owns the media session; no recognizer = open that app. */
     fun voiceMedia() {
         voiceFor = WidgetType.MEDIA
-        voice.listen(onText = { if (media.playFromSearch(it)) close() }, onUnavailable = ::openMediaApp)
+        voice.listen(onText = { query -> closeIf(media.playFromSearch(query), "media") }, onUnavailable = ::openMediaApp)
+    }
+
+    /** A voice search that reached its app closes the drawer, so the app shows. */
+    private fun closeIf(sent: Boolean, card: String) {
+        Log.i(DRAWER_TAG, "voice search ($card): ${if (sent) "sent, closing the drawer" else "no app took it, drawer stays"}")
+        if (sent) close()
     }
 
     /** Speech becomes a destination search in the nav app; no recognizer = open the nav app. */
@@ -140,7 +150,7 @@ class DrawerActions(
     }
 
     private fun voiceNavListen() = voice.listen(
-        onText = { if (NavStore.searchDestination(context, it)) close() },
+        onText = { query -> closeIf(NavStore.searchDestination(context, query), "navigation") },
         onUnavailable = ::openNavApp,
     )
 }
@@ -615,9 +625,8 @@ private fun OpenDrawer(
                     GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
                     Spacer(Modifier.size(10.dp))
                 }
-                GlassButton(Icons.Close, stringResource(R.string.action_close), actions.close)
-                Spacer(Modifier.size(10.dp))
-                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings)
+                // No close button: a swipe back closes the open drawer. Settings twice as wide.
+                GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings, Modifier.width(Qs.TouchMin * 2))
             }
             packRows(config.open, columns).forEach { row ->
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

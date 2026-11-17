@@ -69,6 +69,12 @@ them either.
 
 ## Install on the car
 
+**Easy path (Windows):** download `QuickSettings-FirstInstall.zip` from the latest
+[release](../../releases), unzip it, enable ADB on the car, connect the cable and double-click
+`First-Install.cmd`. It fetches adb if needed, copies the APK to the car's Download folder when
+the app is missing (you install it from a file manager there), then applies every grant below
+that is still missing. The manual steps follow.
+
 1. Download the signed APK from the latest [release](../../releases) and copy it to a USB stick.
 2. Install it on the car with a file manager.
 3. Open QuickSettings. Its settings screen lists what is still missing and updates by itself

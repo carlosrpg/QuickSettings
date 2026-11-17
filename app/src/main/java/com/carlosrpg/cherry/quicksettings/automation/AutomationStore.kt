@@ -12,10 +12,15 @@ import android.provider.Settings
 class AutomationStore(private val context: Context) {
     private val prefs = prefs(context)
 
-    /** Open Wi-Fi on its own whenever it is off (after boot, when it goes off, for Android Auto / CarPlay). */
+    /** Open Wi-Fi 5 s after startup, [wifiDevice] connecting, or Android Auto / CarPlay, while that device is connected and Wi-Fi is off. */
     var autoWifi: Boolean
         get() = prefs.getBoolean(KEY_AUTO_WIFI, false)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_WIFI, value).apply()
+
+    /** Address of the paired Bluetooth device whose connection opens Wi-Fi; null = none chosen. */
+    var wifiDevice: String?
+        get() = prefs.getString(KEY_WIFI_DEVICE, null)
+        set(value) = prefs.edit().putString(KEY_WIFI_DEVICE, value).apply()
 
     /** Enable adb once after every boot. */
     var adbOnStartup: Boolean
@@ -40,6 +45,7 @@ class AutomationStore(private val context: Context) {
 
     companion object {
         private const val KEY_AUTO_WIFI = "auto_wifi"
+        private const val KEY_WIFI_DEVICE = "wifi_bt_device"
         private const val KEY_ADB_ON_STARTUP = "adb_on_startup"
         private const val KEY_BOOT_PENDING = "boot_pending"
         private const val RELIST_STEP_MS = 1_000L

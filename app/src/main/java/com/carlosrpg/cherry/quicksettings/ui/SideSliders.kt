@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -116,6 +118,79 @@ fun VerticalSlider(
             }
             QsIcon(icon, Color.White, 26.dp, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp))
         }
+    }
+}
+
+/**
+ * [VerticalSlider] laid flat and slimmer, for inside a card: the fill grows from the left and
+ * ends at the grip, [icon] sits in the track's start and [label] beside the track.
+ */
+@Composable
+fun HorizontalSlider(
+    value: Int?,
+    range: IntRange,
+    icon: String,
+    label: String,
+    description: String,
+    fill: Brush,
+    onChange: (Int) -> Unit,
+    onFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val change by rememberUpdatedState(onChange)
+    val finished by rememberUpdatedState(onFinished)
+    val span = (range.last - range.first).coerceAtLeast(1)
+    val fraction = value?.let { ((it - range.first).toFloat() / span).coerceIn(0f, 1f) } ?: 0f
+    val height = 36.dp
+    val shape = RoundedCornerShape(height / 2)
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        BoxWithConstraints(
+            Modifier.weight(1f).height(height).clip(shape).background(Qs.Button).border(1.dp, Qs.Hairline, shape)
+                .semantics {
+                    contentDescription = description
+                    if (value != null) {
+                        progressBarRangeInfo = ProgressBarRangeInfo(value.toFloat(), range.first.toFloat()..range.last.toFloat())
+                        setProgress { change(it.roundToInt().coerceIn(range)); finished(); true }
+                    }
+                }
+                .pointerInput(range) {
+                    // The fill never shrinks below a circle, so the scale runs between the two half-heights.
+                    fun at(x: Float) {
+                        val f = ((x - size.height / 2f) / (size.width - size.height).coerceAtLeast(1)).coerceIn(0f, 1f)
+                        change((range.first + f * span).roundToInt().coerceIn(range))
+                    }
+                    // Nothing is taken until the finger lifts (a tap) or moves sideways past the touch
+                    // slop: a swipe that only crosses the slider, or one the drawer takes, changes nothing.
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { c, _ -> c.consume() }
+                        if (drag == null) {
+                            val up = currentEvent.changes.firstOrNull { it.id == down.id }
+                            if (up != null && !up.pressed && !up.isConsumed) {
+                                up.consume()
+                                at(up.position.x)
+                                finished()
+                            }
+                            return@awaitEachGesture
+                        }
+                        at(drag.position.x)
+                        horizontalDrag(drag.id) { at(it.position.x); it.consume() }
+                        finished()
+                    }
+                },
+        ) {
+            if (value != null) {
+                val filled = height + (maxWidth - height) * fraction
+                Box(Modifier.fillMaxHeight().width(filled).clip(shape).background(fill))
+                // At the minimum the fill is just a knob around the icon: no grip over it.
+                if (fraction > 0f) Box(
+                    Modifier.align(Alignment.CenterStart).offset(x = filled - 13.dp)
+                        .width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White)
+                )
+            }
+            QsIcon(icon, Color.White, 18.dp, modifier = Modifier.align(Alignment.CenterStart).padding(start = 9.dp))
+        }
+        QsText(label, 18.sp, weight = FontWeight.Bold, modifier = Modifier.width(52.dp))
     }
 }
 

@@ -2,6 +2,8 @@ package com.carlosrpg.cherry.quicksettings.automation
 
 import android.annotation.SuppressLint
 import android.accessibilityservice.AccessibilityService
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -36,8 +38,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * off again on its own.
  *
  * Runs when asked from settings, and on its own when the owner switched it on there: adb once
- * after each boot; Wi-Fi after boot, when it goes off, and when Android Auto or CarPlay comes to
- * the front, each time only while it is off and at most once a minute.
+ * after each boot; Wi-Fi on startup, when the Bluetooth device chosen in settings connects, or
+ * when Android Auto or CarPlay comes to the front. Each trigger does nothing while Wi-Fi is on or
+ * the chosen device is not connected; otherwise one run [WIFI_DELAY_MS] later, if Wi-Fi is still
+ * off then (Android Auto and CarPlay at most once a minute).
  */
 class EngModeService : AccessibilityService() {
 
@@ -55,28 +59,55 @@ class EngModeService : AccessibilityService() {
     private var scrollForward = true
     private var overlay: View? = null
     private var password = ""
-    private var returnPkg: String? = null
     private var queued: Flow? = null
-    private var lastWifiRun: Long? = null
+    private var returnPkg: String? = null
+    private var lastProjectionRun: Long? = null
+    private var lastAutoWifiRun: Long? = null
+    private var queuedReturn: String? = null
 
-    private val wifiChanges = object : BroadcastReceiver() {
+    /** The chosen device connecting or dropping. A drop cancels a pending attempt, so a link that flaps never stacks runs. */
+    private val btChanges = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN)
-            if (state == WifiManager.WIFI_STATE_DISABLED) handler.postDelayed({ autoWifi("wifi went off") }, WIFI_OFF_GRACE_MS)
+            val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
+            if (!device.address.equals(AutomationStore(context).wifiDevice, ignoreCase = true)) return
+            when (intent.action) {
+                // The broadcast itself proves the link: no need for the hidden isConnected().
+                BluetoothDevice.ACTION_ACL_CONNECTED -> armWifi("${device.address} connected", connected = true)
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    Log.i(TAG, "${device.address} disconnected: Wi-Fi attempt cancelled")
+                    handler.removeCallbacks(wifiAttempt)
+                    wifiReturnTo = null
+                }
+            }
         }
+    }
+
+    private var wifiReturnTo: String? = null
+    private var wifiArmedFor: String? = null
+    private val wifiAttempt = Runnable {
+        // The owner picked another phone (or none) in settings while this was pending.
+        if (AutomationStore(this).wifiDevice != wifiArmedFor) {
+            Log.i(TAG, "chosen device changed: Wi-Fi attempt dropped")
+        } else autoWifi("after ${WIFI_DELAY_MS / 1000} s", returnTo = wifiReturnTo.also { wifiReturnTo = null })
     }
 
     override fun onServiceConnected() {
         instance = this
         _running.value = true
-        registerReceiver(wifiChanges, IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION))
+        registerReceiver(btChanges, IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        })
+        // The phone often links up with the car before this service binds (after a boot or a
+        // restart of the app): the broadcast is gone by then, so look at the link itself.
+        armWifi("startup", connected = chosenDeviceConnected())
         consumeBoot()
     }
 
     override fun onDestroy() {
         instance = null
         _running.value = false
-        runCatching { unregisterReceiver(wifiChanges) }
+        runCatching { unregisterReceiver(btChanges) }
         handler.removeCallbacksAndMessages(null)
         hideOverlay()
         super.onDestroy()
@@ -84,21 +115,54 @@ class EngModeService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    private var projectionPkg: String? = null
-    private val projectionRun = Runnable { projectionPkg?.let { autoWifi("projection $it", returnTo = it) } }
-
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         if (pkg !in PROJECTION_PKGS) return
-        // Android Auto starting with the car comes to the front several times while it connects,
-        // and would push EngMode away mid-run. Run once it has stayed put for a moment.
-        projectionPkg = pkg
-        handler.removeCallbacks(projectionRun)
-        handler.postDelayed(projectionRun, PROJECTION_SETTLE_MS)
+        // Android Auto comes to the front several times while it connects: the cooldown keeps
+        // that to one attempt, and the delay lets it settle so it doesn't push EngMode away mid-run.
+        val now = SystemClock.elapsedRealtime()
+        if (lastProjectionRun?.let { now - it < PROJECTION_COOLDOWN_MS } == true) return
+        if (armWifi("projection $pkg", connected = chosenDeviceConnected(), returnTo = pkg)) lastProjectionRun = now
     }
 
-    /** After a boot (armed by the boot receiver): adb first if asked for, then Wi-Fi. */
+    /**
+     * A Wi-Fi trigger: nothing while Wi-Fi is on or the chosen device is not connected; otherwise
+     * one attempt [WIFI_DELAY_MS] from now, replacing any pending one. True when armed.
+     */
+    private fun armWifi(reason: String, connected: Boolean, returnTo: String? = null): Boolean {
+        val skip = when {
+            !AutomationStore(this).autoWifi -> "automatic Wi-Fi is off in settings"
+            wifiOn(this) -> "Wi-Fi already on"
+            !connected -> "the chosen device is not connected"
+            else -> null
+        }
+        if (skip != null) {
+            Log.i(TAG, "$reason: $skip")
+            return false
+        }
+        Log.i(TAG, "$reason: Wi-Fi attempt in ${WIFI_DELAY_MS / 1000} s")
+        // A Bluetooth reconnect while an Android Auto attempt waits keeps the way back to it.
+        wifiReturnTo = returnTo ?: wifiReturnTo
+        wifiArmedFor = AutomationStore(this).wifiDevice
+        handler.removeCallbacks(wifiAttempt)
+        handler.postDelayed(wifiAttempt, WIFI_DELAY_MS)
+        return true
+    }
+
+    /** Whether the device chosen in settings has a Bluetooth link with the car right now. */
+    // BLUETOOTH (install-time on Android 11, the car's version) covers this; lint asks for
+    // Android 12's BLUETOOTH_CONNECT. A SecurityException still lands in runCatching.
+    @SuppressLint("MissingPermission")
+    private fun chosenDeviceConnected(): Boolean {
+        val address = AutomationStore(this).wifiDevice ?: return false
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+        val device = runCatching { adapter.bondedDevices }.getOrNull()
+            ?.firstOrNull { it.address.equals(address, ignoreCase = true) } ?: return false
+        return isConnected(device)
+    }
+
+    /** After a boot (armed by the boot receiver): adb, if asked for. */
     fun consumeBoot() {
         val store = AutomationStore(this)
         if (!store.bootPending) return
@@ -107,42 +171,34 @@ class EngModeService : AccessibilityService() {
             // still finds the flag and runs the after-boot tasks.
             if (!store.takeBootPending()) return@postDelayed
             if (store.adbOnStartup) start(Flow.ADB, auto = true)
-            autoWifi("startup")
         }, BOOT_DELAY_MS)
     }
 
     /** Settings buttons: run now, under the cover, whatever the state. */
-    fun runNow(which: Flow) {
-        if (which == Flow.WIFI) autoRuns = 0
-        start(which, auto = false)
-    }
+    fun runNow(which: Flow) = start(which, auto = false)
 
-    /**
-     * Automatic Wi-Fi runs since Wi-Fi was last seen on. Capped at [MAX_AUTO_RUNS]: if the runs
-     * don't work, they stop instead of covering the screen every minute while driving. Reset by
-     * Wi-Fi coming on, a run from Settings, or a restart.
-     */
-    private var autoRuns = 0
-
+    /** One automatic Wi-Fi attempt, unless Wi-Fi is already on. Waits for a run in progress (adb). */
     private fun autoWifi(reason: String, returnTo: String? = null) {
         if (!AutomationStore(this).autoWifi) return
         if (wifiOn(this)) {
-            autoRuns = 0
+            Log.i(TAG, "Wi-Fi already on ($reason): nothing to do")
             return
         }
+        // At most one automatic run a minute, whatever the trigger: a phone that keeps reconnecting
+        // (or a switch that doesn't stick) never keeps covering the screen.
         val now = SystemClock.elapsedRealtime()
-        if (lastWifiRun?.let { now - it < COOLDOWN_MS } == true) return
-        if (autoRuns >= MAX_AUTO_RUNS) {
-            Log.w(TAG, "Wi-Fi still off after $autoRuns runs ($reason): not trying again")
+        if (lastAutoWifiRun?.let { now - it < WIFI_COOLDOWN_MS } == true) {
+            Log.i(TAG, "Wi-Fi off ($reason): last automatic run under a minute ago, skipping")
+            return
+        }
+        if (step != Step.IDLE) {
+            Log.i(TAG, "Wi-Fi off ($reason): queued behind the run in progress")
+            queued = Flow.WIFI
+            queuedReturn = returnTo
             return
         }
         Log.i(TAG, "Wi-Fi off ($reason): opening it")
-        if (step != Step.IDLE) {
-            queued = Flow.WIFI
-            return
-        }
-        lastWifiRun = now
-        autoRuns++
+        lastAutoWifiRun = now
         start(Flow.WIFI, auto = true, returnTo = returnTo)
     }
 
@@ -281,7 +337,7 @@ class EngModeService : AccessibilityService() {
         }
         queued?.let { next ->
             queued = null
-            handler.postDelayed({ if (next == Flow.WIFI) autoWifi("queued") else start(next, auto = true) }, QUEUE_GAP_MS)
+            handler.postDelayed({ if (next == Flow.WIFI) autoWifi("queued", returnTo = queuedReturn.also { queuedReturn = null }) else start(next, auto = true) }, QUEUE_GAP_MS)
         }
     }
 
@@ -391,20 +447,20 @@ class EngModeService : AccessibilityService() {
         /** The head unit's engineering app. */
         const val ENGMODE_PKG = "com.desaysv.engmode"
 
+        /** From a Wi-Fi trigger to its one attempt (the phone and the car settle first). */
+        const val WIFI_DELAY_MS = 5_000L
+        private const val PROJECTION_COOLDOWN_MS = 60_000L
+        private const val WIFI_COOLDOWN_MS = 60_000L
+        private const val RETURN_OVERLAY_MS = 800L
+
         /** Android Auto receiver and CarPlay app on this head unit. */
         val PROJECTION_PKGS = setOf("com.google.android.projection.sink", "com.desaysv.vehicle.carplayapp")
-
-        private const val COOLDOWN_MS = 60_000L
         private const val POLL_MS = 300L
         private const val TIMEOUT_MS = 45_000L
         private const val STEP_TIMEOUT_MS = 12_000L
         private const val BOOT_DELAY_MS = 8_000L
-        private const val WIFI_OFF_GRACE_MS = 3_000L
-        private const val RETURN_OVERLAY_MS = 800L
         private const val QUEUE_GAP_MS = 1_500L
         private const val MAX_BACKS = 6
-        private const val MAX_AUTO_RUNS = 3
-        private const val PROJECTION_SETTLE_MS = 3_000L
         /** About 4 s without EngMode on screen during a step before it is reopened. */
         private const val LOST_TICKS = 13
         private const val MAX_RELAUNCHES = 2
@@ -423,20 +479,33 @@ class EngModeService : AccessibilityService() {
         val active: StateFlow<Flow?> = _active.asStateFlow()
 
         /**
-         * Wi-Fi client or hotspot on, or turning on: the engineering menu's switch may turn on
-         * either, and wireless Android Auto / CarPlay use the hotspot. The hotspot state is a
-         * hidden API, read by reflection; where it is blocked it counts as off.
+         * The Wi-Fi client (EngMode's "WIFI" switch) on, or turning on. Not the hotspot: wireless
+         * Android Auto opens that on its own over its Bluetooth handshake, and counting it made
+         * every automatic run stop at "already on" while the client stayed closed.
          */
         fun wifiOn(context: Context): Boolean {
             val wifi = context.applicationContext.getSystemService(WifiManager::class.java) ?: return false
-            if (wifi.wifiState == WifiManager.WIFI_STATE_ENABLED || wifi.wifiState == WifiManager.WIFI_STATE_ENABLING) return true
-            val ap = runCatching { WifiManager::class.java.getMethod("getWifiApState").invoke(wifi) as Int }.getOrNull()
-            return ap == WIFI_AP_STATE_ENABLING || ap == WIFI_AP_STATE_ENABLED
+            return wifi.wifiState == WifiManager.WIFI_STATE_ENABLED || wifi.wifiState == WifiManager.WIFI_STATE_ENABLING
         }
 
-        /** `WifiManager.WIFI_AP_STATE_ENABLING` / `_ENABLED`: hidden constants, stable since API 14. */
-        private const val WIFI_AP_STATE_ENABLING = 12
-        private const val WIFI_AP_STATE_ENABLED = 13
+        /** A paired Bluetooth device, for the settings picker. */
+        data class PairedDevice(val address: String, val name: String, val connected: Boolean)
+
+        /** The car's paired devices, connected ones first; empty when Bluetooth is off or unreadable. */
+        // BLUETOOTH (install-time on Android 11, the car's version) covers this; lint asks for
+        // Android 12's BLUETOOTH_CONNECT. A SecurityException still lands in runCatching.
+        @SuppressLint("MissingPermission")
+        fun pairedDevices(): List<PairedDevice> {
+            val bonded = runCatching {
+                BluetoothAdapter.getDefaultAdapter()?.bondedDevices.orEmpty()
+                    .map { PairedDevice(it.address, it.name?.takeIf(String::isNotBlank) ?: it.address, isConnected(it)) }
+            }.getOrDefault(emptyList())
+            return bonded.sortedWith(compareByDescending<PairedDevice> { it.connected }.thenBy { it.name.lowercase() })
+        }
+
+        /** `BluetoothDevice.isConnected()`: hidden on Android 11, read by reflection; false where blocked. */
+        fun isConnected(device: BluetoothDevice): Boolean =
+            runCatching { BluetoothDevice::class.java.getMethod("isConnected").invoke(device) as Boolean }.getOrDefault(false)
 
         fun adbOn(context: Context): Boolean =
             Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1

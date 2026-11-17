@@ -6,6 +6,9 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Replays a tap that landed in the swipe zone onto the app underneath, so the zone doesn't
@@ -18,10 +21,14 @@ class TapRelayService : AccessibilityService() {
 
     override fun onServiceConnected() {
         instance = this
+        _bound.value = true
     }
 
     override fun onDestroy() {
-        if (instance === this) instance = null
+        if (instance === this) {
+            instance = null
+            _bound.value = false
+        }
         super.onDestroy()
     }
 
@@ -72,5 +79,10 @@ class TapRelayService : AccessibilityService() {
 
         @Volatile var instance: TapRelayService? = null
             private set
+
+        private val _bound = MutableStateFlow(false)
+
+        /** Whether taps can be passed through; until then the top strip would swallow them. */
+        val bound: StateFlow<Boolean> = _bound.asStateFlow()
     }
 }

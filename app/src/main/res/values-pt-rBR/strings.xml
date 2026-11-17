@@ -84,6 +84,10 @@
     <string name="climate_auto">Modo automático</string>
     <string name="climate_sync">Sincronizar zonas</string>
     <string name="climate_recirculation">Recircular o ar</string>
+    <string name="climate_ac">Ar-condicionado</string>
+    <string name="climate_power_short">Liga</string>
+    <string name="climate_sync_short">Sincr.</string>
+    <string name="climate_recirculation_short">Recirc.</string>
     <string name="debug_log">Log de depuração</string>
     <string name="assist_confirm_off">Toque de novo para desligar</string>
     <string name="assist_block_ignition">Ignição desligada</string>
@@ -163,7 +167,7 @@
     <string name="widget_media">Mídia</string>
     <string name="widget_media_sub">Capa e reproduzir / pausar; arraste para trocar a faixa</string>
     <string name="widget_climate">Clima</string>
-    <string name="widget_climate_sub">Quadrante temperatura × ventilação</string>
+    <string name="widget_climate_sub">Banco com fluxo de ar, controles de temperatura e ventilação</string>
     <string name="widget_car_mode">Modo do carro</string>
     <string name="widget_car_mode_sub">Modo da bateria e recuperação de energia; arraste para mudar</string>
     <string name="widget_autonomy">Autonomia</string>
@@ -187,8 +191,13 @@
     <string name="auto_wifi_on">aberto</string>
     <string name="auto_wifi_off">fechado</string>
     <string name="auto_wifi_auto">Abrir automaticamente</string>
-    <string name="auto_wifi_auto_hint">Sempre que estiver desligado: ao ligar o carro, quando ele desligar e quando o Android Auto ou o CarPlay abrir. No máximo uma vez por minuto.</string>
+    <string name="auto_wifi_auto_hint">Enquanto o celular escolhido abaixo estiver conectado por Bluetooth e o Wi-Fi desligado: 5 s depois da partida, depois que o celular conectar ou depois que o Android Auto ou o CarPlay abrir (no máximo uma vez por minuto).</string>
     <string name="auto_wifi_now">Abrir o Wi-Fi agora</string>
+    <string name="auto_wifi_device">Celular que abre o Wi-Fi</string>
+    <string name="auto_wifi_device_hint">Um dos dispositivos Bluetooth pareados com o carro.</string>
+    <string name="auto_wifi_device_connected">conectado agora</string>
+    <string name="auto_wifi_no_devices">Nenhum dispositivo Bluetooth pareado (ou o Bluetooth está desligado).</string>
+    <string name="auto_wifi_pick_device">Escolha um celular: nada abre o Wi-Fi até que um seja escolhido.</string>
     <string name="auto_adb_title">ADB</string>
     <string name="auto_adb_why">Necessário para enviar os comandos de permissão de um computador.</string>
     <string name="auto_adb_on">ativado</string>
@@ -227,4 +236,9 @@
     <string name="weather_snow">Neve</string>
     <string name="weather_thunder">Tempestade</string>
     <string name="desc_weather">Clima: %1$d°, %2$s</string>
+    <string name="voice_error_network">A busca por voz precisa de internet: o carro está sem conexão (erro %1$d).</string>
+    <string name="voice_error_no_match">Não entendi. Toque no microfone e tente de novo (erro %1$d).</string>
+    <string name="voice_error_mic">Não foi possível usar o microfone (erro %1$d).</string>
+    <string name="voice_error_busy">A entrada de voz está ocupada por outro app. Tente de novo (erro %1$d).</string>
+    <string name="voice_error_other">A busca por voz falhou (erro %1$d).</string>
 </resources>

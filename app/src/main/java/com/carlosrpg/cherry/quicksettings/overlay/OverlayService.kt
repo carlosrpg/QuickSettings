@@ -119,13 +119,19 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             }
         }
         lifecycleScope.launch {
-            // The cluster's media card, for an app that plays on its own (setting, off by default).
+            // The cluster's media card, for an app that plays on its own (setting).
             while (isActive) {
                 if (config.clusterMediaSync) {
                     val change = withContext(Dispatchers.IO) { app.clusterMedia.tick(app.media.state.value) }
                     change?.let { Log.i(TAG_CLUSTER, it) }
                 }
                 delay(CLUSTER_SYNC_MS)
+            }
+        }
+        lifecycleScope.launch {
+            TapRelayService.bound.collectLatest {
+                updateEdge()
+                updateTopZone()
             }
         }
         lifecycleScope.launch {
@@ -173,8 +179,9 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         val view = edgeView ?: return
         view.side = config.side
         view.tapOpens = config.tapToOpen
-        // Without the top bar the handle is the only way in, so it stays whatever the setting says.
-        val handle = config.sideHandle || !config.topBar
+        // Without the top strip (bar off, or no tap relay yet) the handle is the only way in, so it
+        // stays whatever the setting says.
+        val handle = config.sideHandle || !config.topBar || !TapRelayService.bound.value
         view.visibility = if (mode == null && handle) View.VISIBLE else View.GONE
         wm.updateViewLayout(view, edgeParams())
         view.invalidate()
@@ -324,7 +331,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
      * be pulled down over Android Auto or a video.
      */
     private fun updateTopZone() {
-        val wanted = topBarView != null && mode == null
+        // Without the tap relay a tap in the strip would be lost, so it waits for the relay.
+        val wanted = topBarView != null && mode == null && TapRelayService.bound.value
         val view = topZoneView
         when {
             wanted && view == null -> {
@@ -430,6 +438,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     /** Slides the drawer back into the edge; [finishClose] removes the window when that ends. */
     private fun close() {
+        Log.i(TAG, "close: drawer=${drawerView != null} mode=$mode closing=$closing")
         handler.removeCallbacks(autoClose)
         voice.cancel()
         if (drawerView == null) return finishClose()
