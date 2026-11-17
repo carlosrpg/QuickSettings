@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.RegenLevel
@@ -165,4 +166,33 @@ fun Modifier.tapOrDrag(
             }
         }
     }
+}
+
+/**
+ * Calls [onSwipe] once when a finger travels [thresholdPx] along ([dx], [dy]) (a unit direction)
+ * and mostly in that direction. Watches the final pass and gives up on any gesture a child
+ * consumed, so the sliders and the climate quadrant keep their drags.
+ */
+fun Modifier.swipeToClose(dx: Float, dy: Float, thresholdPx: Float, onSwipe: () -> Unit): Modifier = composed {
+    val swipe by rememberUpdatedState(onSwipe)
+    pointerInput(dx, dy, thresholdPx) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Final).changes.firstOrNull { it.id == down.id } ?: break
+                if (change.isConsumed || !change.pressed) break
+                if (isCloseSwipe(change.position - down.position, dx, dy, thresholdPx)) {
+                    swipe()
+                    break
+                }
+            }
+        }
+    }
+}
+
+/** [total] went [thresholdPx] along ([dx], [dy]) and at least twice as far as across it. */
+fun isCloseSwipe(total: Offset, dx: Float, dy: Float, thresholdPx: Float): Boolean {
+    val along = total.x * dx + total.y * dy
+    val across = abs(total.x * dy - total.y * dx)
+    return along >= thresholdPx && along >= 2 * across
 }

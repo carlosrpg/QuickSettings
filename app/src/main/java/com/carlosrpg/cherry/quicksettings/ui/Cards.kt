@@ -617,11 +617,11 @@ private fun CycleButton(
 fun RangeCard(car: CarState, modifier: Modifier = Modifier) = QsCard(modifier) {
     CardLabel(stringResource(R.string.range))
     // The same mirrored gauge as the semi-open tile, sized to the card.
-    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-        val ring = minOf(maxHeight * 0.92f, maxWidth / 2.9f)
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+        // As large as the card allows, leaving the corners free for the four values.
         MirrorRangeLarge(
             car.batterySoc, car.electricRangeKm, car.fuelPercent, car.fuelRangeKm, car.chargeLimit,
-            Qs.chargeColor(car.batterySoc), ring,
+            Qs.chargeColor(car.batterySoc), minOf(maxHeight, maxWidth * 0.78f),
         )
     }
 }

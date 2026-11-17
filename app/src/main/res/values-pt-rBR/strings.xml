@@ -209,4 +209,22 @@
     <string name="say_destination">Diga para onde quer ir</string>
     <string name="auto_adb_wifi_warning">Com o Wi-Fi abrindo automaticamente e o ADB ligado ao iniciar, qualquer aparelho no Wi-Fi da central pode acessar o ADB. Desligue um deles quando não precisar.</string>
     <string name="open_drawer_label">Abrir a gaveta do QuickSettings</string>
+    <string name="widget_weather">Clima</string>
+    <string name="widget_weather_sub">Hora, temperatura e a semana</string>
+    <string name="perm_location">Localização</string>
+    <string name="perm_location_why">Clima local para o widget de clima.</string>
+    <string name="weather_today">Hoje</string>
+    <string name="weather_loading">Carregando o clima…</string>
+    <string name="weather_no_permission">Permita a localização nas Configurações</string>
+    <string name="weather_no_location">Aguardando a localização</string>
+    <string name="weather_unavailable">Clima indisponível</string>
+    <string name="weather_clear">Céu limpo</string>
+    <string name="weather_partly_cloudy">Parcialmente nublado</string>
+    <string name="weather_cloudy">Nublado</string>
+    <string name="weather_fog">Neblina</string>
+    <string name="weather_drizzle">Garoa</string>
+    <string name="weather_rain">Chuva</string>
+    <string name="weather_snow">Neve</string>
+    <string name="weather_thunder">Tempestade</string>
+    <string name="desc_weather">Clima: %1$d°, %2$s</string>
 </resources>

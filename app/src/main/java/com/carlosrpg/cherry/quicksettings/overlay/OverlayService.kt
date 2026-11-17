@@ -544,7 +544,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val DRAWER_MARGIN_DP = 16
         // Clear of the car's voice avatar (left) and of its clock and status icons (right).
         private const val TOP_BAR_START_DP = 230
-        private const val TOP_BAR_END_DP = 320
+        private const val TOP_BAR_END_DP = 340
         private const val TOP_BAR_FALLBACK_DP = 100
         private const val TOP_BAR_POLL_MS = 1_000L
         private const val CLUSTER_SYNC_MS = 2_000L

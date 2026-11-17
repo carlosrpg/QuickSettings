@@ -114,6 +114,7 @@ object Icons {
     const val Drag = "M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"
     const val ChevronUp = "M6 15l6-6 6 6"
     const val ChevronDown = "M6 9l6 6 6-6"
+    const val Sun = "M16 12a4 4 0 1 1-8 0a4 4 0 1 1 8 0M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
 }
 
 @Composable

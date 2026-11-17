@@ -110,8 +110,10 @@ fun MirrorRangeTile(soc: Int?, evKm: Int?, fuelPercent: Int?, fuelKm: Int?, evCo
 }
 
 /**
- * The open-card version: the same ring, larger, with each side's % above and km below, named
- * and iconned, mirrored around it; the charge limit is a tick on the EV half.
+ * The open-card version: the ring as large as the card allows, the total inside it on one line,
+ * and each side's values in the corners around it: electric on the left, fuel on the right, the
+ * level on top and the range below. The charge limit is a tick on the EV half and a note above
+ * its range.
  */
 @Composable
 fun MirrorRangeLarge(
@@ -125,56 +127,50 @@ fun MirrorRangeLarge(
     modifier: Modifier = Modifier,
 ) {
     val scale = ring.value / 160f
-    val percentSize = (26 * scale).coerceIn(16f, 34f).sp
-    val kmSize = (20 * scale).coerceIn(14f, 26f).sp
-    val nameSize = (13 * scale).coerceIn(11f, 15f).sp
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ring * 0.12f)) {
-        Side(
-            stringResource(R.string.range_electric), Icons.Battery, evColor, soc, evKm,
-            chargeLimit?.let { stringResource(R.string.range_limit, it) }, ring, percentSize, kmSize, nameSize, Alignment.End,
-        )
-        MirrorRing(soc?.div(100f), fuelPercent?.div(100f), evColor, ring, ring * 0.075f, limitFraction = chargeLimit?.div(100f)) {
+    val percentSize = (24 * scale).coerceIn(16f, 34f).sp
+    val kmSize = (19 * scale).coerceIn(14f, 26f).sp
+    val nameSize = (12 * scale).coerceIn(11f, 15f).sp
+    val total = (36 * scale).coerceIn(22f, 56f).sp
+    Box(modifier.fillMaxSize()) {
+        MirrorRing(
+            soc?.div(100f), fuelPercent?.div(100f), evColor, ring, ring * 0.07f,
+            Modifier.align(Alignment.Center), limitFraction = chargeLimit?.div(100f),
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                TotalInside(totalRange(evKm, fuelKm), (34 * scale).coerceIn(20f, 44f).sp, nameSize)
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(totalRange(evKm, fuelKm)?.toString() ?: "--", color = Qs.Text, fontSize = total, lineHeight = total, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("km", Modifier.padding(bottom = 4.dp), color = Qs.Muted, fontSize = kmSize, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
                 Text(stringResource(R.string.range_total_caption), color = Qs.Muted, fontSize = nameSize, maxLines = 1)
             }
         }
-        Side(
-            stringResource(R.string.range_fuel), Icons.Fuel, Qs.Fuel, fuelPercent, fuelKm,
-            null, ring, percentSize, kmSize, nameSize, Alignment.Start,
-        )
+        Level(stringResource(R.string.range_electric), Icons.Battery, evColor, soc, nameSize, percentSize, Alignment.Start, Modifier.align(Alignment.TopStart))
+        Level(stringResource(R.string.range_fuel), Icons.Fuel, Qs.Fuel, fuelPercent, nameSize, percentSize, Alignment.End, Modifier.align(Alignment.TopEnd))
+        Distance(evKm, chargeLimit?.let { stringResource(R.string.range_limit, it) }, kmSize, nameSize, Alignment.Start, Modifier.align(Alignment.BottomStart))
+        Distance(fuelKm, null, kmSize, nameSize, Alignment.End, Modifier.align(Alignment.BottomEnd))
     }
 }
 
+/** A top corner: the side's name and icon, the level under it. */
 @Composable
-private fun Side(
-    name: String,
-    icon: String,
-    color: Color,
-    percent: Int?,
-    km: Int?,
-    note: String?,
-    ring: Dp,
-    percentSize: TextUnit,
-    kmSize: TextUnit,
-    nameSize: TextUnit,
-    align: Alignment.Horizontal,
-) {
+private fun Level(name: String, icon: String, color: Color, percent: Int?, nameSize: TextUnit, percentSize: TextUnit, align: Alignment.Horizontal, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = align) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            if (align == Alignment.Start) QsIcon(icon, color, 16.dp)
+            Text(name, color = color, fontSize = nameSize, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            if (align == Alignment.End) QsIcon(icon, color, 16.dp)
+        }
+        Text(percent?.let { "$it%" } ?: "--", color = color, fontSize = percentSize, lineHeight = percentSize, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** A bottom corner: the side's range, with an optional note above it. */
+@Composable
+private fun Distance(km: Int?, note: String?, kmSize: TextUnit, noteSize: TextUnit, align: Alignment.Horizontal, modifier: Modifier) {
     val textAlign = if (align == Alignment.End) TextAlign.End else TextAlign.Start
-    Column(Modifier.height(ring).width(ring * 0.78f), horizontalAlignment = align, verticalArrangement = Arrangement.SpaceBetween) {
-        // Top: name and %, level with the top of the ring.
-        Column(horizontalAlignment = align) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (align == Alignment.Start) QsIcon(icon, color, 16.dp)
-                Text(name, color = color, fontSize = nameSize, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                if (align == Alignment.End) QsIcon(icon, color, 16.dp)
-            }
-            Text(percent?.let { "$it%" } ?: "--", color = color, fontSize = percentSize, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = textAlign)
-        }
-        // Bottom: range, level with the bottom of the ring.
-        Column(horizontalAlignment = align) {
-            Text(km?.let { "$it km" } ?: "-- km", color = Qs.Text, fontSize = kmSize, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = textAlign)
-            note?.let { Text(it, color = Qs.Muted, fontSize = nameSize, maxLines = 1, textAlign = textAlign) }
-        }
+    Column(modifier, horizontalAlignment = align) {
+        // The note goes above, so both sides' ranges line up along the bottom.
+        note?.let { Text(it, color = Qs.Muted, fontSize = noteSize, maxLines = 1, textAlign = textAlign) }
+        Text(km?.let { "$it km" } ?: "-- km", color = Qs.Text, fontSize = kmSize, lineHeight = kmSize, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = textAlign)
     }
 }

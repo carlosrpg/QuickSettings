@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class WidgetType { MEDIA, CLIMATE, CAR_MODE, AUTONOMY, NAVIGATION, ASSIST }
+enum class WidgetType { MEDIA, CLIMATE, CAR_MODE, AUTONOMY, NAVIGATION, ASSIST, WEATHER }
 
 enum class Side { LEFT, RIGHT }
 
@@ -39,10 +39,20 @@ data class QsConfig(
 /** [shown] followed by every widget it leaves out: the list order before any was saved. */
 fun withHidden(shown: List<WidgetType>): List<WidgetType> = shown + WidgetType.entries.filter { it !in shown }
 
-/** The approved open layout: media + nav + assist, then climate + car mode + range. */
+/**
+ * A layout saved before the weather widget: it takes the half the range card gave up, right
+ * after it. Unchanged when it already has weather or has no range card.
+ */
+fun addWeatherBesideRange(list: List<WidgetType>): List<WidgetType> {
+    val at = list.indexOf(WidgetType.AUTONOMY)
+    if (at < 0 || WidgetType.WEATHER in list) return list
+    return list.toMutableList().apply { add(at + 1, WidgetType.WEATHER) }
+}
+
+/** The approved open layout: media + nav + assist, then climate + car mode + range + weather. */
 val DEFAULT_OPEN = listOf(
     WidgetType.MEDIA, WidgetType.NAVIGATION, WidgetType.ASSIST,
-    WidgetType.CLIMATE, WidgetType.CAR_MODE, WidgetType.AUTONOMY,
+    WidgetType.CLIMATE, WidgetType.CAR_MODE, WidgetType.AUTONOMY, WidgetType.WEATHER,
 )
 
 class SettingsStore(context: Context) {
@@ -69,7 +79,9 @@ class SettingsStore(context: Context) {
 
     private fun load(): QsConfig {
         val semi = decode(prefs.getString(KEY_SEMI, null)) ?: WidgetType.entries
-        val open = decode(prefs.getString(KEY_OPEN, null)) ?: DEFAULT_OPEN
+        val savedOpenOrder = decode(prefs.getString(KEY_OPEN_ORDER, null))
+        val open = (decode(prefs.getString(KEY_OPEN, null)) ?: DEFAULT_OPEN)
+            .let { if (savedOpenOrder != null && WidgetType.WEATHER !in savedOpenOrder) addWeatherBesideRange(it) else it }
         return QsConfig(
             side = prefs.getString(KEY_SIDE, null)?.let { runCatching { Side.valueOf(it) }.getOrNull() }
                 ?: Side.LEFT,
@@ -82,7 +94,7 @@ class SettingsStore(context: Context) {
             clusterMediaSync = prefs.getBoolean(KEY_CLUSTER_MEDIA, false),
             // A saved order may predate a widget; withHidden appends whatever it lacks.
             semiOrder = withHidden(decode(prefs.getString(KEY_SEMI_ORDER, null)) ?: semi),
-            openOrder = withHidden(decode(prefs.getString(KEY_OPEN_ORDER, null)) ?: open),
+            openOrder = withHidden(savedOpenOrder?.let(::addWeatherBesideRange) ?: open),
         )
     }
 

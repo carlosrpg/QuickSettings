@@ -9,6 +9,9 @@ import com.carlosrpg.cherry.quicksettings.settings.WidgetType.CAR_MODE
 import com.carlosrpg.cherry.quicksettings.settings.WidgetType.CLIMATE
 import com.carlosrpg.cherry.quicksettings.settings.WidgetType.MEDIA
 import com.carlosrpg.cherry.quicksettings.settings.WidgetType.NAVIGATION
+import com.carlosrpg.cherry.quicksettings.settings.WidgetType.WEATHER
+import com.carlosrpg.cherry.quicksettings.settings.addWeatherBesideRange
+import com.carlosrpg.cherry.quicksettings.media.youtubeSearchUrl
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.Test
 
@@ -45,18 +48,18 @@ class LayoutLogicTest {
 
     @Test
     fun `landscape packs the approved four column grid`() {
-        val rows = packRows(listOf(MEDIA, NAVIGATION, ASSIST, CLIMATE, CAR_MODE, AUTONOMY), columns = 4)
+        val rows = packRows(listOf(MEDIA, NAVIGATION, ASSIST, CLIMATE, CAR_MODE, AUTONOMY, WEATHER), columns = 4)
         assertThat(rows).containsExactly(
             listOf(MEDIA, NAVIGATION, ASSIST),
-            listOf(CLIMATE, CAR_MODE, AUTONOMY),
+            listOf(CLIMATE, CAR_MODE, AUTONOMY, WEATHER),
         ).inOrder()
     }
 
     @Test
     fun `portrait gives wide cards their own row`() {
-        val rows = packRows(listOf(MEDIA, NAVIGATION, ASSIST, CLIMATE, CAR_MODE, AUTONOMY), columns = 2)
+        val rows = packRows(listOf(MEDIA, NAVIGATION, ASSIST, CLIMATE, CAR_MODE, AUTONOMY, WEATHER), columns = 2)
         assertThat(rows).containsExactly(
-            listOf(MEDIA), listOf(NAVIGATION, ASSIST), listOf(CLIMATE, CAR_MODE), listOf(AUTONOMY),
+            listOf(MEDIA), listOf(NAVIGATION, ASSIST), listOf(CLIMATE, CAR_MODE), listOf(AUTONOMY, WEATHER),
         ).inOrder()
         assertThat(packRows(emptyList(), 4)).isEmpty()
     }
@@ -76,7 +79,37 @@ class LayoutLogicTest {
         // existed gets that widget appended.
         val shown = listOf(MEDIA, CAR_MODE)
         assertThat(com.carlosrpg.cherry.quicksettings.settings.withHidden(listOf(MEDIA, CLIMATE, CAR_MODE)))
-            .containsExactly(MEDIA, CLIMATE, CAR_MODE, AUTONOMY, NAVIGATION, ASSIST).inOrder()
+            .containsExactly(MEDIA, CLIMATE, CAR_MODE, AUTONOMY, NAVIGATION, ASSIST, WEATHER).inOrder()
         assertThat(listOf(MEDIA, CLIMATE, CAR_MODE).filter { it in shown }).containsExactly(MEDIA, CAR_MODE).inOrder()
+    }
+
+    @Test
+    fun `a layout saved before weather gets it beside the range card`() {
+        assertThat(addWeatherBesideRange(listOf(MEDIA, AUTONOMY, ASSIST))).containsExactly(MEDIA, AUTONOMY, WEATHER, ASSIST).inOrder()
+        assertThat(addWeatherBesideRange(listOf(MEDIA, ASSIST))).containsExactly(MEDIA, ASSIST).inOrder()
+        assertThat(addWeatherBesideRange(listOf(WEATHER, AUTONOMY))).containsExactly(WEATHER, AUTONOMY).inOrder()
+    }
+
+    @Test
+    fun `swipe closes only toward the drawer's origin`() {
+        // Left drawer: swipe left closes; right or up does not; a mostly diagonal drag does not.
+        assertThat(isCloseSwipe(Offset(-120f, 20f), -1f, 0f, 96f)).isTrue()
+        assertThat(isCloseSwipe(Offset(120f, 0f), -1f, 0f, 96f)).isFalse()
+        assertThat(isCloseSwipe(Offset(-120f, 80f), -1f, 0f, 96f)).isFalse()
+        assertThat(isCloseSwipe(Offset(-60f, 0f), -1f, 0f, 96f)).isFalse()
+        // From the top: swipe up closes, down does not.
+        assertThat(isCloseSwipe(Offset(10f, -150f), 0f, -1f, 96f)).isTrue()
+        assertThat(isCloseSwipe(Offset(0f, 150f), 0f, -1f, 96f)).isFalse()
+    }
+
+    @Test
+    fun `youtube apps search through their own page`() {
+        assertThat(youtubeSearchUrl("com.google.android.youtube", "lo fi beats"))
+            .isEqualTo("https://www.youtube.com/results?search_query=lo+fi+beats")
+        assertThat(youtubeSearchUrl("app.morphe.android.apps.youtube.music", "Café"))
+            .isEqualTo("https://music.youtube.com/search?q=Caf%C3%A9")
+        assertThat(youtubeSearchUrl("app.morphe.android.youtube", "x")).startsWith("https://www.youtube.com/")
+        assertThat(youtubeSearchUrl("com.spotify.music", "x")).isNull()
+        assertThat(youtubeSearchUrl(null, "x")).isNull()
     }
 }
