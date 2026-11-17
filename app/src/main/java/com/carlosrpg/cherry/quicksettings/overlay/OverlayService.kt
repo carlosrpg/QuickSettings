@@ -430,6 +430,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     /** Slides the drawer back into the edge; [finishClose] removes the window when that ends. */
     private fun close() {
+        Log.i(TAG, "close: drawer=${drawerView != null} mode=$mode closing=$closing")
         handler.removeCallbacks(autoClose)
         voice.cancel()
         if (drawerView == null) return finishClose()

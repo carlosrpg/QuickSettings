@@ -198,8 +198,13 @@
     <string name="auto_wifi_on">open</string>
     <string name="auto_wifi_off">closed</string>
     <string name="auto_wifi_auto">Open automatically</string>
-    <string name="auto_wifi_auto_hint">Whenever it is off: after the car starts, when it goes off, and when Android Auto or CarPlay comes up. At most once a minute.</string>
+    <string name="auto_wifi_auto_hint">While the phone chosen below is connected over Bluetooth and Wi-Fi is off: 15 s after it connects, and when Android Auto or CarPlay comes up (at most once a minute).</string>
     <string name="auto_wifi_now">Open Wi-Fi now</string>
+    <string name="auto_wifi_device">Phone that opens Wi-Fi</string>
+    <string name="auto_wifi_device_hint">One of the car\'s paired Bluetooth devices.</string>
+    <string name="auto_wifi_device_connected">connected now</string>
+    <string name="auto_wifi_no_devices">No paired Bluetooth devices (or Bluetooth is off).</string>
+    <string name="auto_wifi_pick_device">Choose a phone: nothing opens Wi-Fi until one is chosen.</string>
     <string name="auto_adb_title">ADB</string>
     <string name="auto_adb_why">Needed to send the grant commands from a computer.</string>
     <string name="auto_adb_on">enabled</string>
@@ -238,4 +243,9 @@
     <string name="weather_snow">Snow</string>
     <string name="weather_thunder">Thunderstorm</string>
     <string name="desc_weather">Weather: %1$d°, %2$s</string>
+    <string name="voice_error_network">Voice search needs the internet: the car is offline (error %1$d).</string>
+    <string name="voice_error_no_match">Didn\'t catch that. Tap the mic and try again (error %1$d).</string>
+    <string name="voice_error_mic">The microphone could not be used (error %1$d).</string>
+    <string name="voice_error_busy">Voice input is busy with another app. Try again (error %1$d).</string>
+    <string name="voice_error_other">Voice search failed (error %1$d).</string>
 </resources>

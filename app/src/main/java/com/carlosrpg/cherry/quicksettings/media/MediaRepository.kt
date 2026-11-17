@@ -94,6 +94,11 @@ internal class LevelStepper(
 data class MediaState(
     /** Package that published the session: voice search and "open app" go to it. Null for a car source. */
     val packageName: String? = null,
+    /**
+     * The app that shows what is playing, for the card's tap: the session's package, or for a car
+     * source the head unit app that plays it (Android Auto, CarPlay, …). Null when there is none.
+     */
+    val openPackage: String? = null,
     /** The app's name, or the car source's (Bluetooth, CarPlay, …). */
     val appLabel: String? = null,
     val appIcon: Bitmap? = null,
@@ -132,6 +137,18 @@ internal fun showCarSource(sessionPresent: Boolean, sessionPlaying: Boolean, car
     car.status == CarPlayStatus.PLAYING || car.status == CarPlayStatus.LOADING -> true
     !sessionPresent -> true
     else -> carShown
+}
+
+/**
+ * The head unit app that shows a car source, or null when it has none to open (radio and DAB
+ * live in the tuner service; HiCar, CarLife and the online apps are not installed here).
+ */
+internal fun CarMediaSource.appPackage(): String? = when (this) {
+    CarMediaSource.ANDROID_AUTO -> "com.google.android.projection.sink"
+    CarMediaSource.CARPLAY -> "com.desaysv.vehicle.carplayapp"
+    CarMediaSource.BLUETOOTH, CarMediaSource.LOCAL -> "com.desaysv.svaudioapp"
+    CarMediaSource.VIDEO -> "com.desaysv.videoapp"
+    else -> null
 }
 
 @StringRes
@@ -350,8 +367,12 @@ class MediaRepository(
 
     private fun carState(c: CarMediaState): MediaState {
         val label = context.getString(c.source.labelRes())
+        // Installed (cached lookup: this runs on every publish).
+        val app = c.source.appPackage()?.takeIf { AppInfo.label(context, it) != null }
         return MediaState(
+            openPackage = app,
             appLabel = label,
+            appIcon = app?.let { AppInfo.icon(context, it) },
             // A source without track text (radio) still says what it is.
             title = c.track?.title?.takeIf { it.isNotBlank() } ?: label,
             artist = c.track?.artist?.takeIf { it.isNotBlank() },
@@ -368,6 +389,7 @@ class MediaRepository(
         val playback = c?.playbackState
         return MediaState(
             packageName = c?.packageName,
+            openPackage = c?.packageName,
             appLabel = c?.packageName?.let { AppInfo.label(context, it) },
             appIcon = c?.packageName?.let { AppInfo.icon(context, it) },
             title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE)
@@ -427,11 +449,11 @@ class MediaRepository(
         }
     }
 
-    /** Hands a spoken query to the app that owns the session. Car sources have no search. */
     /**
      * Voice search in the playing app. YouTube and YouTube Music (and their patched builds) ignore
-     * `playFromSearch`, so they get their own search page as a link instead. True when that app
-     * was brought to the front.
+     * `playFromSearch`, so they get their own search page as a link instead (checked on the car:
+     * YouTube's `ACTION_SEARCH` only brings back the open video). True when the query reached an
+     * app (the link opened, or the session took `playFromSearch`): the drawer then closes.
      */
     fun playFromSearch(query: String): Boolean {
         val pkg = _state.value.packageName
@@ -439,11 +461,17 @@ class MediaRepository(
         if (pkg != null && url != null) {
             val opened = runCatching {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }.isSuccess
+            }.onFailure { Log.w(TAG, "voice search link in $pkg failed", it) }.isSuccess
             if (opened) return true
         }
-        controller?.transportControls?.playFromSearch(query, Bundle())
-        return false
+        val controls = controller?.transportControls ?: return false
+        controls.playFromSearch(query, Bundle())
+        // The session plays the result in the background (Motion does): bring its app up so the
+        // video shows. The launch intent resumes the app's task, it doesn't restart it.
+        val shown = runCatching { launch(controller?.packageName) }
+            .onFailure { Log.w(TAG, "voice search: could not bring ${controller?.packageName} up", it) }.getOrDefault(false)
+        Log.i(TAG, "voice search: playFromSearch in ${controller?.packageName}, brought up: $shown")
+        return true
     }
 
     /**
@@ -509,7 +537,7 @@ class MediaRepository(
         volumeSteppers.getValue(channel).moveTo(value.coerceIn(0, level(channel).max))
 
     /** Brings the media app to the front. */
-    fun openApp(): Boolean = launch(_state.value.packageName)
+    fun openApp(): Boolean = launch(_state.value.openPackage)
 
     private fun launch(pkg: String?): Boolean {
         val intent = pkg?.let { context.packageManager.getLaunchIntentForPackage(it) } ?: return false

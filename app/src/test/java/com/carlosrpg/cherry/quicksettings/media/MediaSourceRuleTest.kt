@@ -34,4 +34,11 @@ class MediaSourceRuleTest {
     fun `every car source has a label`() {
         assertThat(CarMediaSource.entries.map { it.labelRes() }.toSet()).hasSize(CarMediaSource.entries.size)
     }
+
+    @Test
+    fun `phone projections open their head unit app`() {
+        assertThat(CarMediaSource.ANDROID_AUTO.appPackage()).isEqualTo("com.google.android.projection.sink")
+        assertThat(CarMediaSource.CARPLAY.appPackage()).isEqualTo("com.desaysv.vehicle.carplayapp")
+        assertThat(CarMediaSource.RADIO.appPackage()).isNull()
+    }
 }

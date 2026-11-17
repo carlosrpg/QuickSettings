@@ -21,6 +21,8 @@
     <!-- Wi-Fi and adb automation: Wi-Fi state is read to act only when it is off; the secure
          settings grant (adb, optional) lets the app switch its own automation service on. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Paired devices and their connections: the device that opens Wi-Fi. Normal at API 30. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 

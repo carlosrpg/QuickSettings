@@ -220,10 +220,10 @@ fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, mod
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 // The chip takes the free space (and ellipsizes in it); Search stays at the end.
                 Box(Modifier.weight(1f)) {
-                    if (media.packageName != null) {
+                    if (media.openPackage != null) {
                         OpenAppChip(media.appIcon, Color(0xFFE2557A), appName, actions::openMediaApp)
                     } else if (media.appLabel != null) {
-                        // One of the car's own sources: it has a name but no app to open.
+                        // A car source with no app to open (radio): just its name.
                         QsText(appName, 15.sp, Qs.TextSoft, FontWeight.SemiBold)
                     }
                 }
