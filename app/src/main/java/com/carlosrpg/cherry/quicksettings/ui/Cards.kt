@@ -15,6 +15,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
 import android.graphics.Bitmap
+import androidx.core.graphics.scale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,6 +67,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -212,8 +216,51 @@ private fun formatTime(ms: Long): String {
 
 private const val ASSIST_NOTICE_MS = 4_000L
 
+/** The media card; with cover art, the art is its backdrop, blended in and darkened. */
 @Composable
-fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier = Modifier) = QsCard(
+fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier = Modifier) =
+    Box(modifier.clip(RoundedCornerShape(24.dp))) {
+        media.art?.let { ArtBackdrop(it, Modifier.matchParentSize()) }
+        MediaCardContent(media, actions, listening, Modifier.fillMaxSize())
+    }
+
+/**
+ * The cover as the card's background, as the weather card does with its picture: a soft wash of
+ * its colours over the whole card, the cover itself on the right fading out toward the text, and
+ * a dark veil, deepest on the left and at the bottom, so the text and buttons stay readable.
+ */
+@Composable
+private fun ArtBackdrop(art: Bitmap, modifier: Modifier) = BoxWithConstraints(modifier) {
+    // Android 11 has no blur: shrunk to a few pixels and scaled back up smoothly, the cover becomes its colours.
+    val wash = remember(art) {
+        art.scale(ART_WASH_PX, (ART_WASH_PX * art.height / art.width).coerceAtLeast(1)).asImageBitmap()
+    }
+    Image(wash, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    Image(
+        art.asImageBitmap(), null, Modifier.align(Alignment.CenterEnd).size(maxWidth * 0.6f, maxHeight).fadeTowardStart(),
+        contentScale = ContentScale.Crop,
+    )
+    Box(
+        Modifier.fillMaxSize()
+            .background(Brush.horizontalGradient(0f to Color(0xE60B1018), 0.45f to Color(0xB30B1018), 1f to Color(0x800B1018)))
+            .background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color(0x990B1018)))
+    )
+}
+
+/** Gone at its start and along its top and bottom edges, so the cover melts into the wash with no hard border. */
+private fun Modifier.fadeTowardStart(): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            drawRect(Brush.horizontalGradient(0f to Color.Transparent, 0.7f to Color.Black), blendMode = BlendMode.DstIn)
+            drawRect(Brush.verticalGradient(0f to Color.Transparent, 0.3f to Color.Black, 0.7f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+        }
+
+/** Width the cover is shrunk to for the wash: small enough to lose all detail. */
+private const val ART_WASH_PX = 16
+
+@Composable
+private fun MediaCardContent(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier) = QsCard(
     modifier, onClick = actions::mediaToFront,
     onClickLabel = stringResource(R.string.open_app, media.appLabel ?: stringResource(R.string.media_app)),
 ) {
