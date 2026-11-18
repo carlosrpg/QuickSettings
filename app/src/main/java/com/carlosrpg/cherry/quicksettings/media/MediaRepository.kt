@@ -8,10 +8,13 @@ import kotlinx.coroutines.withTimeoutOrNull
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaMetadata
+import android.media.browse.MediaBrowser
+import android.service.media.MediaBrowserService
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
@@ -123,7 +126,15 @@ data class MediaState(
     val volumeSimulated: Boolean = false,
     /** False until notification access is granted (needed to see other apps' sessions). */
     val hasAccess: Boolean = false,
+    /** Apps that had a media session lately, newest first, without the one on the card. */
+    val recent: List<RecentApp> = emptyList(),
 )
+
+/** A media app (one that had a session; never a car source or a system session) the card offers to go back to. */
+data class RecentApp(val packageName: String, val label: String, val icon: Bitmap?)
+
+/** [recent] with [pkg] moved to the front, at most [keep] long. */
+internal fun bumpRecent(recent: List<String>, pkg: String, keep: Int): List<String> = (listOf(pkg) + (recent - pkg)).take(keep)
 
 /**
  * Which feed the media widget shows. Whichever is playing wins, an app first. When neither is
@@ -324,6 +335,10 @@ class MediaRepository(
             return
         }
         hasAccess = true
+        // Every app that publishes a session joins the history; the list is newest first, so the newest goes in last.
+        val packages = active.map { it.packageName }.distinct()
+        packages.reversed().filter { it !in sessionPackages }.forEach(::noteSession)
+        sessionPackages = packages.toSet()
         setController(
             active.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: active.firstOrNull()
         )
@@ -362,7 +377,101 @@ class MediaRepository(
         val carNow = car.takeIf { showCarSource(c != null, sessionPlaying, it, carShown = shownCar != null || !shownOnce) }
         shownOnce = true
         shownCar = carNow
-        _state.value = (if (carNow != null) carState(carNow) else sessionState(c)).withVolume()
+        // Playing moves an app that already had a session back to the front.
+        if (sessionPlaying) c?.packageName?.let(::noteSession)
+        val shown = if (carNow != null) carState(carNow) else sessionState(c)
+        _state.value = shown.copy(recent = recentApps(except = shown.openPackage)).withVolume()
+    }
+
+    /** Package names of the apps that had a media session lately, newest first; kept across restarts. */
+    private val recentPrefs = context.getSharedPreferences("media", Context.MODE_PRIVATE)
+    private var recentPackages = recentPrefs.getString(KEY_RECENT, null)?.split(',')?.filter { it.isNotBlank() }.orEmpty()
+
+    /** The apps with a session at the last read, so only a session that appears counts as new. */
+    private var sessionPackages = emptySet<String>()
+
+    private fun noteSession(pkg: String) {
+        if (recentPackages.firstOrNull() == pkg) return
+        if (!isMediaApp(pkg)) return
+        recentPackages = bumpRecent(recentPackages, pkg, RECENT_KEEP)
+        recentPrefs.edit().putString(KEY_RECENT, recentPackages.joinToString(",")).apply()
+    }
+
+    /**
+     * An app the card can bring up: one with a launcher entry, or an installed one that only
+     * offers a media browser (YouTube Music on the car OS, played in the car's media screen).
+     * Never a system session without either, such as Bluetooth or the phone.
+     */
+    private fun isMediaApp(pkg: String): Boolean {
+        val pm = context.packageManager
+        if (pm.getLaunchIntentForPackage(pkg) != null) return true
+        val system = runCatching { pm.getApplicationInfo(pkg, 0).flags and ApplicationInfo.FLAG_SYSTEM != 0 }.getOrDefault(true)
+        return !system && browserService(pkg) != null
+    }
+
+    private fun browserService(pkg: String): ComponentName? =
+        context.packageManager.queryIntentServices(Intent(MediaBrowserService.SERVICE_INTERFACE).setPackage(pkg), 0)
+            .firstOrNull()?.serviceInfo?.let { ComponentName(it.packageName, it.name) }
+
+    /** Brings [pkg] up: its launcher entry, or else the car's media screen switched to its browser. */
+    private fun bringUp(pkg: String): Boolean {
+        if (runCatching { launch(pkg) }.getOrDefault(false)) return true
+        val browser = browserService(pkg) ?: return false
+        val intent = Intent(CAR_MEDIA_TEMPLATE).putExtra(CAR_MEDIA_COMPONENT, browser.flattenToString()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(intent) }.onFailure { Log.w(TAG, "no media screen for $browser", it) }.isSuccess
+    }
+
+    /** Connection kept until the next [playApp]: some apps stop their service once the last client leaves. */
+    private var playBrowser: MediaBrowser? = null
+
+    /** Plays [component]'s session through its media browser, which reaches it even while the session is inactive. */
+    private fun playThroughBrowser(component: ComponentName) {
+        playBrowser?.disconnect()
+        lateinit var browser: MediaBrowser
+        browser = MediaBrowser(context, component, object : MediaBrowser.ConnectionCallback() {
+            override fun onConnected() {
+                runCatching { MediaController(context, browser.sessionToken).transportControls.play() }
+                    .onFailure { Log.w(TAG, "play through $component failed", it) }
+            }
+
+            // The app only lets known media centres connect: the session poll in [playApp] still plays it once it is up.
+            override fun onConnectionFailed() {
+                Log.i(TAG, "$component refused the media browser connection")
+            }
+        }, null)
+        playBrowser = browser
+        runCatching { browser.connect() }.onFailure { Log.w(TAG, "media browser $component", it) }
+    }
+
+    private fun recentApps(except: String?): List<RecentApp> = recentPackages.asSequence()
+        .filter { it != except }
+        // Uninstalled since: label lookup fails.
+        .mapNotNull { pkg -> AppInfo.label(context, pkg)?.let { RecentApp(pkg, it, AppInfo.icon(context, pkg)) } }
+        .take(RECENT_SHOWN)
+        .toList()
+
+    /**
+     * A recent app's icon: bring [pkg] to the front and play it, through its media browser if it
+     * has one, and through its session as soon as that is active (right away, or once a cold-started
+     * app publishes it). False when it can't be opened.
+     */
+    fun playApp(pkg: String): Boolean {
+        if (!bringUp(pkg)) return false
+        browserService(pkg)?.let(::playThroughBrowser)
+        scope.launch {
+            repeat((PLAY_WAIT_MS / PLAY_RETRY_MS).toInt()) {
+                val session = runCatching { sessions.getActiveSessions(listener) }.getOrNull()?.firstOrNull { it.packageName == pkg }
+                if (session != null) {
+                    session.transportControls.play()
+                    delay(CAR_SETTLE_MS)
+                    refreshNow()
+                    return@launch
+                }
+                delay(PLAY_RETRY_MS)
+            }
+            Log.i(TAG, "$pkg published no media session: opened, not played")
+        }
+        return true
     }
 
     private fun carState(c: CarMediaState): MediaState {
@@ -538,7 +647,7 @@ class MediaRepository(
         volumeSteppers.getValue(channel).moveTo(value.coerceIn(0, level(channel).max))
 
     /** Brings the media app to the front. */
-    fun openApp(): Boolean = launch(_state.value.openPackage)
+    fun openApp(): Boolean = _state.value.openPackage?.let(::bringUp) ?: false
 
     private fun launch(pkg: String?): Boolean {
         val intent = pkg?.let { context.packageManager.getLaunchIntentForPackage(it) } ?: return false
@@ -551,6 +660,16 @@ class MediaRepository(
         private const val READ_TIMEOUT_MS = 5_000L
         private const val TAG = "QsMedia"
         private const val CAR_SETTLE_MS = 300L
+        private const val KEY_RECENT = "recent_apps"
+        private const val RECENT_SHOWN = 3
+        /** One more than shown, so the card's own app can be left out and three remain. */
+        private const val RECENT_KEEP = RECENT_SHOWN + 1
+        /** How long a cold-started app gets to publish its session before the play is dropped. */
+        private const val PLAY_WAIT_MS = 8_000L
+        private const val PLAY_RETRY_MS = 400L
+        /** The car OS's media screen, opened on one app's media browser (`Car.CAR_INTENT_ACTION_MEDIA_TEMPLATE`). */
+        private const val CAR_MEDIA_TEMPLATE = "android.car.intent.action.MEDIA_TEMPLATE"
+        private const val CAR_MEDIA_COMPONENT = "android.car.intent.extra.MEDIA_COMPONENT"
     }
 }
 

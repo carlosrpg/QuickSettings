@@ -56,9 +56,10 @@ class QuickSettingsApp : Application() {
         // notification listener after the process was killed, an app update) also brings the
         // drawer back. No-op until the overlay permission is granted.
         OverlayService.start(this)
-        // A force-stop leaves the automation's accessibility service listed but unbound. Give the
-        // system time to bind it as usual (boot, an ordinary start) before forcing a rebind, which
-        // would otherwise cut off a service that was just connecting and its after-boot tasks.
+        // A force-stop takes the app's accessibility services (automation, tap pass-through) off
+        // the list. Give the system time to bind them as usual (boot, an ordinary start) before
+        // forcing a rebind, which would otherwise cut off a service that was just connecting and
+        // its after-boot tasks.
         Handler(Looper.getMainLooper()).postDelayed({ AutomationStore.enableService(this) }, SERVICE_BIND_GRACE_MS)
     }
 }

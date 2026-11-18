@@ -102,7 +102,9 @@ object Icons {
     const val Bulb = "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3"
     const val MarkerBolt = "M12 21.5s-6.5-6-6.5-11.2a6.5 6.5 0 1 1 13 0c0 5.2-6.5 11.2-6.5 11.2M12.9 6.6l-2.4 3.6h3l-2.4 3.6"
     const val Cluster = "M3.5 17a8.5 8.5 0 0 1 17 0M12 17l3.6-5.6M2.5 20h19"
-    const val Wifi = "M5 12.6a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0M12 19.5h.01"
+    /** A clock with a turn-back arrow: recently played. */
+    const val History = "M3 12a9 9 0 1 0 2.64-6.36L3 8.3M3 3.5v4.8h4.8M12 7.5V12l3 2"
+    const val Wifi ="M5 12.6a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0M12 19.5h.01"
     const val Terminal = "M4 6h16v12H4zM7.5 10l2.5 2l-2.5 2M12.5 14.5h4"
     const val Power = "M12 4v8M7.6 6.6a7 7 0 1 0 8.8 0"
     const val SyncZones = "M4 9h13l-3.5-3.5M20 15H7l3.5 3.5"

@@ -62,6 +62,8 @@ import app.jconfig.carbus.carinfo.FanSpec
 import app.jconfig.carbus.carinfo.RegenLevel
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.app
+import com.carlosrpg.cherry.quicksettings.automation.AutomationStore
+import com.carlosrpg.cherry.quicksettings.automation.EngModeService
 import com.carlosrpg.cherry.quicksettings.car.CarRepository
 import com.carlosrpg.cherry.quicksettings.car.CarState
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
@@ -100,6 +102,11 @@ class DrawerActions(
         if (media.openApp()) close()
     }
 
+    /** A recent app on the media card: it comes up and plays, so the drawer gets out of the way. */
+    fun playRecent(pkg: String) {
+        if (media.playApp(pkg)) close()
+    }
+
     /** The card's background tap: bring the media app up, unless it is showing on the cluster. */
     fun mediaToFront() {
         val app = media.state.value.openPackage ?: return
@@ -113,6 +120,17 @@ class DrawerActions(
 
     fun openNavApp() {
         if (NavStore.openApp(context)) close()
+    }
+
+    /** Wi-Fi through the engineering-menu automation, as the settings button does; the drawer closes first so the run has the screen. */
+    fun openWifi() {
+        val service = EngModeService.instance
+        if (service == null) {
+            AutomationStore.enableService(context)
+            return
+        }
+        close()
+        service.runNow(EngModeService.Flow.WIFI)
     }
 
     val cluster get() = context.app.cluster
@@ -625,6 +643,10 @@ private fun OpenDrawer(
                     GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
                     Spacer(Modifier.size(10.dp))
                 }
+                // Dimmed while the automation service is off, as in settings.
+                val automation by EngModeService.running.collectAsState()
+                GlassButton(Icons.Wifi, stringResource(R.string.auto_wifi_now), actions::openWifi, tint = if (automation) Qs.Text else Qs.Dim)
+                Spacer(Modifier.size(10.dp))
                 // No close button: a swipe back closes the open drawer. Settings twice as wide.
                 GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings, Modifier.width(Qs.TouchMin * 2))
             }
