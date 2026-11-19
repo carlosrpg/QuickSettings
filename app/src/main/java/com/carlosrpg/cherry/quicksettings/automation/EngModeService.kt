@@ -448,7 +448,7 @@ class EngModeService : AccessibilityService() {
         const val ENGMODE_PKG = "com.desaysv.engmode"
 
         /** From a Wi-Fi trigger to its one attempt (the phone and the car settle first). */
-        const val WIFI_DELAY_MS = 5_000L
+        const val WIFI_DELAY_MS = 10_000L
         private const val PROJECTION_COOLDOWN_MS = 60_000L
         private const val WIFI_COOLDOWN_MS = 60_000L
         private const val RETURN_OVERLAY_MS = 800L

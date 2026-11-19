@@ -15,12 +15,14 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
 import android.graphics.Bitmap
+import androidx.core.graphics.scale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -66,6 +68,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -85,6 +90,7 @@ import app.jconfig.carbus.carinfo.RegenLevel
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.car.CarState
 import com.carlosrpg.cherry.quicksettings.media.MediaState
+import com.carlosrpg.cherry.quicksettings.media.RecentApp
 import com.carlosrpg.cherry.quicksettings.nav.NavState
 import kotlin.math.roundToInt
 
@@ -211,108 +217,271 @@ private fun formatTime(ms: Long): String {
 
 private const val ASSIST_NOTICE_MS = 4_000L
 
+/** The media card; with cover art, the art is its backdrop, blended in and darkened. */
 @Composable
-fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier = Modifier) = QsCard(
+fun MediaCard(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier = Modifier, wide: Boolean = false) =
+    Box(modifier.clip(RoundedCornerShape(24.dp))) {
+        media.art?.let { ArtBackdrop(it, Modifier.matchParentSize()) }
+        if (wide) MediaCardWide(media, actions, listening, Modifier.fillMaxSize())
+        else MediaCardContent(media, actions, listening, Modifier.fillMaxSize())
+    }
+
+/** Button size in the landscape card, whose rows are short. */
+private val WIDE_BUTTON = 52.dp
+private val WIDE_PLAY = 64.dp
+/** Controls row width from which mute and the wider volume keys fit too. */
+private val WIDE_ROOMY = 420.dp
+
+/**
+ * Landscape (wide, short screens): the cover as tall as the card, and beside it two lines, the
+ * track with the recent apps and search, then every control.
+ */
+@Composable
+private fun MediaCardWide(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier) = QsCard(
     modifier, onClick = actions::mediaToFront,
     onClickLabel = stringResource(R.string.open_app, media.appLabel ?: stringResource(R.string.media_app)),
 ) {
     val appName = media.appLabel ?: stringResource(R.string.media_app)
-    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        val artShape = RoundedCornerShape(18.dp)
-        Box(Modifier.size(150.dp).clip(artShape).background(ArtPlaceholder)) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Box(Modifier.fillMaxHeight().aspectRatio(1f).clip(RoundedCornerShape(18.dp)).background(ArtPlaceholder)) {
             media.art?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
         }
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                // The chip takes the free space (and ellipsizes in it); Search stays at the end.
-                Box(Modifier.weight(1f)) {
-                    if (media.openPackage != null) {
-                        OpenAppChip(media.appIcon, Color(0xFFE2557A), appName, actions::openMediaApp)
-                    } else if (media.appLabel != null) {
-                        // A car source with no app to open (radio): just its name.
-                        QsText(appName, 15.sp, Qs.TextSoft, FontWeight.SemiBold)
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    val title = media.title
+                        ?: stringResource(if (media.hasAccess) R.string.nothing_playing else R.string.allow_notification_access)
+                    QsText(title, 18.sp, weight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        media.appIcon?.let { Image(it.asImageBitmap(), null, Modifier.size(16.dp).clip(RoundedCornerShape(4.dp))) }
+                        QsText(listOfNotNull(media.artist, appName).joinToString(" · "), 13.sp, Qs.Muted)
                     }
                 }
-                // Search goes to the app's media session; the car's own sources have none.
+                media.recent.forEach { RecentAppButton(it, WIDE_BUTTON, actions::playRecent) }
                 if (media.packageName != null) GlassButton(
                     Icons.Mic, stringResource(R.string.voice_search_in, appName), actions::voiceMedia,
-                    label = stringResource(if (listening) R.string.listening else R.string.search),
-                    tint = if (listening) Qs.Route else Qs.Text,
-                    modifier = Modifier.listeningBorder(listening),
-                    size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
+                    tint = if (listening) Qs.Route else Qs.Text, modifier = Modifier.listeningBorder(listening), size = WIDE_BUTTON,
                 )
             }
-            val title = media.title
-                ?: stringResource(if (media.hasAccess) R.string.nothing_playing else R.string.allow_notification_access)
-            QsText(title, 22.sp, weight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-            QsText(media.artist.orEmpty(), 15.sp, Qs.Muted)
-            Box(Modifier.weight(1f))
             if (media.durationMs > 0) {
                 val fraction = (media.positionMs / media.durationMs.toFloat()).coerceIn(0f, 1f)
-                Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x26FFFFFF))) {
+                Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x26FFFFFF))) {
                     Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Color.White))
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    QsText(formatTime(media.positionMs), 12.sp, Qs.Muted)
-                    QsText(formatTime(media.durationMs), 12.sp, Qs.Muted)
+            }
+            // A near miss between buttons does nothing, instead of opening the media app. Mute and
+            // the wider volume keys only where the row has room for them.
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val roomy = maxWidth >= WIDE_ROOMY
+            Row(Modifier.fillMaxWidth().pointerInput(Unit) { detectTapGestures { } }, verticalAlignment = Alignment.CenterVertically) {
+                GlassButton(Icons.Prev, stringResource(R.string.previous_track), actions.media::previous,
+                    shape = RoundedCornerShape(WIDE_BUTTON / 2), filledIcon = true, size = WIDE_BUTTON)
+                Gap(8.dp)
+                GlassButton(
+                    if (media.playing) Icons.Pause else Icons.Play, stringResource(if (media.playing) R.string.pause else R.string.play),
+                    actions.media::playPause, size = WIDE_PLAY, background = Color.White, tint = Color(0xFF0B1018),
+                    filledIcon = true, shape = RoundedCornerShape(WIDE_PLAY / 2), iconSize = 30.dp,
+                )
+                Gap(8.dp)
+                GlassButton(Icons.Next, stringResource(R.string.next_track), actions.media::next,
+                    shape = RoundedCornerShape(WIDE_BUTTON / 2), filledIcon = true, size = WIDE_BUTTON)
+                Box(Modifier.weight(1f))
+                if (roomy) {
+                    GlassButton(if (media.muted) Icons.Mute else Icons.Volume,
+                        stringResource(if (media.muted) R.string.unmute else R.string.mute), actions.media::toggleMute, size = WIDE_BUTTON)
+                    Gap(8.dp)
                 }
+                val volumeWidth = if (roomy) WIDE_BUTTON * 1.4f else WIDE_BUTTON
+                GlassButton(Icons.Minus, stringResource(R.string.volume_down), { actions.media.volumeStep(-1) },
+                    Modifier.width(volumeWidth), size = WIDE_BUTTON)
+                Gap(8.dp)
+                GlassButton(Icons.Plus, stringResource(R.string.volume_up), { actions.media.volumeStep(1) },
+                    Modifier.width(volumeWidth), size = WIDE_BUTTON)
             }
-        }
-    }
-    // The control row keeps its own gaps: a near miss between buttons does nothing, instead of
-    // falling through to the card and opening the media app.
-    Row(
-        Modifier.fillMaxWidth().padding(top = 14.dp).pointerInput(Unit) { detectTapGestures { } },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        GlassButton(
-            Icons.Prev, stringResource(R.string.previous_track), actions.media::previous,
-            shape = RoundedCornerShape(MEDIA_BUTTON / 2), filledIcon = true, size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
-        )
-        Gap(12.dp)
-        GlassButton(
-            if (media.playing) Icons.Pause else Icons.Play, stringResource(if (media.playing) R.string.pause else R.string.play),
-            actions.media::playPause, size = MEDIA_PLAY, background = Color.White, tint = Color(0xFF0B1018),
-            filledIcon = true, shape = RoundedCornerShape(MEDIA_PLAY / 2), iconSize = MEDIA_PLAY_ICON,
-        )
-        Gap(12.dp)
-        GlassButton(
-            Icons.Next, stringResource(R.string.next_track), actions.media::next,
-            shape = RoundedCornerShape(MEDIA_BUTTON / 2), filledIcon = true, size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
-        )
-        Box(Modifier.weight(1f))
-        GlassButton(
-            if (media.muted) Icons.Mute else Icons.Volume,
-            stringResource(if (media.muted) R.string.unmute else R.string.mute), actions.media::toggleMute,
-            size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
-        )
-        Gap(8.dp)
-        // Twice as wide as the other buttons: volume is the one tapped by feel while driving.
-        GlassButton(
-            Icons.Minus, stringResource(R.string.volume_down), { actions.media.volumeStep(-1) }, Modifier.width(VOLUME_BUTTON_WIDTH),
-            size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
-        )
-        Gap(8.dp)
-        // On the car the level can't be read; its own volume bar pops up on every step instead.
-        if (media.volumeKnown) {
-            val volFraction = if (media.maxVolume > 0) media.volume / media.maxVolume.toFloat() else 0f
-            Box(Modifier.width(90.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0x26FFFFFF))) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth(if (media.muted) 0f else volFraction).background(Qs.Text))
             }
-            Gap(8.dp)
-        }
-        GlassButton(
-            Icons.Plus, stringResource(R.string.volume_up), { actions.media.volumeStep(1) }, Modifier.width(VOLUME_BUTTON_WIDTH),
-            size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
-        )
-        if (media.volumeKnown) {
-            QsText("${media.volume}", 15.sp, weight = FontWeight.Bold, modifier = Modifier.width(30.dp).padding(start = 6.dp))
         }
     }
 }
 
+/**
+ * The cover as the card's background, as the weather card does with its picture: a soft wash of
+ * its colours over the whole card, the cover itself on the right fading out toward the text, and
+ * a dark veil, deepest on the left and at the bottom, so the text and buttons stay readable.
+ */
 @Composable
-fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier: Modifier = Modifier) = QsCard(
+private fun ArtBackdrop(art: Bitmap, modifier: Modifier) = BoxWithConstraints(modifier) {
+    // Android 11 has no blur: shrunk to a few pixels and scaled back up smoothly, the cover becomes its colours.
+    val wash = remember(art) {
+        art.scale(ART_WASH_PX, (ART_WASH_PX * art.height / art.width).coerceAtLeast(1)).asImageBitmap()
+    }
+    Image(wash, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    Image(
+        art.asImageBitmap(), null, Modifier.align(Alignment.CenterEnd).size(maxWidth * 0.6f, maxHeight).fadeTowardStart(),
+        contentScale = ContentScale.Crop,
+    )
+    Box(
+        Modifier.fillMaxSize()
+            .background(Brush.horizontalGradient(0f to Color(0xE60B1018), 0.45f to Color(0xB30B1018), 1f to Color(0x800B1018)))
+            .background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color(0x990B1018)))
+    )
+}
+
+/** Gone at its start and along its top and bottom edges, so the cover melts into the wash with no hard border. */
+private fun Modifier.fadeTowardStart(): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            drawRect(Brush.horizontalGradient(0f to Color.Transparent, 0.7f to Color.Black), blendMode = BlendMode.DstIn)
+            drawRect(Brush.verticalGradient(0f to Color.Transparent, 0.3f to Color.Black, 0.7f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+        }
+
+/** Width the cover is shrunk to for the wash: small enough to lose all detail. */
+private const val ART_WASH_PX = 16
+
+@Composable
+private fun MediaCardContent(media: MediaState, actions: DrawerActions, listening: Boolean, modifier: Modifier) = QsCard(
+    modifier, onClick = actions::mediaToFront,
+    onClickLabel = stringResource(R.string.open_app, media.appLabel ?: stringResource(R.string.media_app)),
+) {
+    // The recent apps run down the card's left edge, beside everything else.
+    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (media.recent.isNotEmpty()) RecentApps(media.recent, actions::playRecent)
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            val appName = media.appLabel ?: stringResource(R.string.media_app)
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                val artShape = RoundedCornerShape(18.dp)
+                Box(Modifier.size(150.dp).clip(artShape).background(ArtPlaceholder)) {
+                    media.art?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                }
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // The chip takes the free space (and ellipsizes in it); Search stays at the end.
+                        Box(Modifier.weight(1f)) {
+                            if (media.openPackage != null) {
+                                OpenAppChip(media.appIcon, Color(0xFFE2557A), appName, actions::openMediaApp)
+                            } else if (media.appLabel != null) {
+                                // A car source with no app to open (radio): just its name.
+                                QsText(appName, 15.sp, Qs.TextSoft, FontWeight.SemiBold)
+                            }
+                        }
+                        // Search goes to the app's media session; the car's own sources have none.
+                        if (media.packageName != null) GlassButton(
+                            Icons.Mic, stringResource(R.string.voice_search_in, appName), actions::voiceMedia,
+                            label = stringResource(if (listening) R.string.listening else R.string.search),
+                            tint = if (listening) Qs.Route else Qs.Text,
+                            modifier = Modifier.listeningBorder(listening),
+                            size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
+                        )
+                    }
+                    val title = media.title
+                        ?: stringResource(if (media.hasAccess) R.string.nothing_playing else R.string.allow_notification_access)
+                    QsText(title, 22.sp, weight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                    QsText(media.artist.orEmpty(), 15.sp, Qs.Muted)
+                    Box(Modifier.weight(1f))
+                    if (media.durationMs > 0) {
+                        val fraction = (media.positionMs / media.durationMs.toFloat()).coerceIn(0f, 1f)
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x26FFFFFF))) {
+                            Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Color.White))
+                        }
+                        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            QsText(formatTime(media.positionMs), 12.sp, Qs.Muted)
+                            QsText(formatTime(media.durationMs), 12.sp, Qs.Muted)
+                        }
+                    }
+                }
+            }
+            // The control row keeps its own gaps: a near miss between buttons does nothing, instead of
+            // falling through to the card and opening the media app.
+            Row(
+                Modifier.fillMaxWidth().padding(top = 14.dp).pointerInput(Unit) { detectTapGestures { } },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                GlassButton(
+                    Icons.Prev, stringResource(R.string.previous_track), actions.media::previous,
+                    shape = RoundedCornerShape(MEDIA_BUTTON / 2), filledIcon = true, size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
+                )
+                Gap(12.dp)
+                GlassButton(
+                    if (media.playing) Icons.Pause else Icons.Play, stringResource(if (media.playing) R.string.pause else R.string.play),
+                    actions.media::playPause, size = MEDIA_PLAY, background = Color.White, tint = Color(0xFF0B1018),
+                    filledIcon = true, shape = RoundedCornerShape(MEDIA_PLAY / 2), iconSize = MEDIA_PLAY_ICON,
+                )
+                Gap(12.dp)
+                GlassButton(
+                    Icons.Next, stringResource(R.string.next_track), actions.media::next,
+                    shape = RoundedCornerShape(MEDIA_BUTTON / 2), filledIcon = true, size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
+                )
+                Box(Modifier.weight(1f))
+                GlassButton(
+                    if (media.muted) Icons.Mute else Icons.Volume,
+                    stringResource(if (media.muted) R.string.unmute else R.string.mute), actions.media::toggleMute,
+                    size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
+                )
+                Gap(8.dp)
+                // Twice as wide as the other buttons: volume is the one tapped by feel while driving.
+                GlassButton(
+                    Icons.Minus, stringResource(R.string.volume_down), { actions.media.volumeStep(-1) }, Modifier.width(VOLUME_BUTTON_WIDTH),
+                    size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
+                )
+                Gap(8.dp)
+                // On the car the level can't be read; its own volume bar pops up on every step instead.
+                if (media.volumeKnown) {
+                    val volFraction = if (media.maxVolume > 0) media.volume / media.maxVolume.toFloat() else 0f
+                    Box(Modifier.width(90.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0x26FFFFFF))) {
+                        Box(Modifier.fillMaxHeight().fillMaxWidth(if (media.muted) 0f else volFraction).background(Qs.Text))
+                    }
+                    Gap(8.dp)
+                }
+                GlassButton(
+                    Icons.Plus, stringResource(R.string.volume_up), { actions.media.volumeStep(1) }, Modifier.width(VOLUME_BUTTON_WIDTH),
+                    size = MEDIA_BUTTON, iconSize = MEDIA_ICON,
+                )
+                if (media.volumeKnown) {
+                    QsText("${media.volume}", 15.sp, weight = FontWeight.Bold, modifier = Modifier.width(30.dp).padding(start = 6.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The apps that had a media session lately, as a slim inset rail: a history mark over their icons. A tap
+ * brings the app up and plays it.
+ */
+@Composable
+private fun RecentApps(apps: List<RecentApp>, onPlay: (String) -> Unit) {
+    Column(
+        Modifier.fillMaxHeight().clip(RoundedCornerShape(22.dp)).background(Color(0x38000000))
+            .border(1.dp, Qs.Hairline, RoundedCornerShape(22.dp))
+            // A near miss between icons does nothing, instead of opening the card's app.
+            .pointerInput(Unit) { detectTapGestures { } }
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        QsIcon(Icons.History, Qs.Muted, 20.dp)
+        apps.forEach { RecentAppButton(it, MEDIA_BUTTON, onPlay) }
+    }
+}
+
+/** One recent app: its icon on a button of [size], as big as the card's own buttons (tapped by feel while driving). */
+@Composable
+private fun RecentAppButton(app: RecentApp, size: Dp, onPlay: (String) -> Unit) {
+    val description = stringResource(R.string.play_app, app.label)
+    val shape = RoundedCornerShape(Qs.ButtonRadius)
+    Box(
+        Modifier.size(size).clip(shape).background(Qs.Button).border(1.dp, Qs.Hairline, shape)
+            .clickable(role = Role.Button, onClickLabel = description) { onPlay(app.packageName) }
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (app.icon != null) Image(app.icon.asImageBitmap(), null, Modifier.size(size * 0.6f).clip(RoundedCornerShape(size * 0.14f)))
+        else QsText(app.label.take(1).uppercase(), 20.sp, weight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier: Modifier = Modifier, wide: Boolean = false) = QsCard(
     modifier, onClick = actions::navToFront,
     onClickLabel = stringResource(R.string.open_app, nav?.appLabel ?: actions.navAppLabel() ?: stringResource(R.string.navigation)),
 ) {
@@ -346,7 +515,19 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
     }
     // Without a route the whole middle is the mic; while listening it says so, route or not
     // (a new destination is being asked for).
-    if (nav == null || listening) {
+    if ((nav == null || listening) && wide) {
+        // Landscape: too short to stack, so the mark sits beside the words.
+        Row(
+            Modifier.weight(1f).fillMaxWidth().clickable(onClickLabel = stringResource(R.string.voice_destination), onClick = actions::voiceNav),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        ) {
+            if (listening) ListeningMic(32.dp) else QsIcon(Icons.NavArrow, Qs.Route, 36.dp)
+            Column {
+                QsText(stringResource(if (listening) R.string.listening_ellipsis else R.string.where_to), 18.sp, weight = FontWeight.Bold)
+                QsText(stringResource(if (listening) R.string.say_destination else R.string.tap_say_destination), 13.sp, Qs.Muted)
+            }
+        }
+    } else if (nav == null || listening) {
         Column(
             Modifier.weight(1f).fillMaxWidth().clickable(onClickLabel = stringResource(R.string.voice_destination), onClick = actions::voiceNav),
             verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
@@ -393,8 +574,19 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
 }
 
 @Composable
-fun AssistCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
+fun AssistCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier, wide: Boolean = false) = QsCard(modifier) {
     CardLabel(stringResource(R.string.driver_assist))
+    if (wide) {
+        // Landscape: too short for four rows, so the four switches stand side by side as icons.
+        Row(Modifier.weight(1f).fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val cell = Modifier.weight(1f)
+            AssistRow(Assist.AEB, car.aeb, Icons.Brake, stringResource(R.string.assist_aeb), actions, cell, tile = true)
+            CollisionWarningRow(car.collisionWarning, actions, cell, tile = true)
+            AssistRow(Assist.AUTO_HOLD, car.autoHold, Icons.AutoHold, stringResource(R.string.assist_auto_hold), actions, cell, tile = true)
+            AssistRow(Assist.LANE, car.laneKeep, Icons.Lane, stringResource(R.string.assist_lane), actions, cell, tile = true)
+        }
+        return@QsCard
+    }
     // Fills the card: the gap between the rows grows with it.
     Column(Modifier.weight(1f).fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.SpaceBetween) {
         AssistRow(Assist.AEB, car.aeb, Icons.Brake, stringResource(R.string.assist_aeb), actions)
@@ -423,7 +615,7 @@ private fun NoticeTimeout(active: Boolean, key: Any?, clear: () -> Unit) {
 }
 
 @Composable
-private fun AssistRow(assist: Assist, on: Boolean?, icon: String, name: String, actions: DrawerActions) {
+private fun AssistRow(assist: Assist, on: Boolean?, icon: String, name: String, actions: DrawerActions, modifier: Modifier = Modifier, tile: Boolean = false) {
     val scope = rememberCoroutineScope()
     // Switching a safety function off takes a second tap, as the car's own page asks first.
     var armed by remember { mutableStateOf(false) }
@@ -436,7 +628,7 @@ private fun AssistRow(assist: Assist, on: Boolean?, icon: String, name: String, 
         false -> stringResource(R.string.pill_off)
         null -> "--"
     }
-    AssistRowFrame(on, icon, name, pill, notice, enabled = on != null) {
+    AssistRowFrame(on, icon, name, pill, notice, enabled = on != null, modifier, tile) {
         blocked = null
         if (on == true && assist.confirmOff && !armed) {
             armed = true
@@ -449,7 +641,7 @@ private fun AssistRow(assist: Assist, on: Boolean?, icon: String, name: String, 
 
 /** Off, Near, Standard, Far: each tap moves to the next; a step the car's rules block is skipped. */
 @Composable
-private fun CollisionWarningRow(level: FcwLevel?, actions: DrawerActions) {
+private fun CollisionWarningRow(level: FcwLevel?, actions: DrawerActions, modifier: Modifier = Modifier, tile: Boolean = false) {
     val scope = rememberCoroutineScope()
     var blocked by remember { mutableStateOf<AssistBlock?>(null) }
     NoticeTimeout(blocked != null, blocked) { blocked = null }
@@ -462,7 +654,7 @@ private fun CollisionWarningRow(level: FcwLevel?, actions: DrawerActions) {
     }
     AssistRowFrame(
         level?.let { it != FcwLevel.OFF }, Icons.Collision, stringResource(R.string.assist_fcw), pill,
-        blocked?.messageRes(), enabled = level != null,
+        blocked?.messageRes(), enabled = level != null, modifier, tile,
     ) {
         scope.launch { blocked = actions.car.cycleCollisionWarning() }
     }
@@ -476,8 +668,12 @@ private fun AssistRowFrame(
     pill: String,
     @StringRes notice: Int?,
     enabled: Boolean,
+    modifier: Modifier = Modifier,
+    /** Drawn as an icon tile of the landscape grid instead of a row. */
+    tile: Boolean = false,
     onClick: () -> Unit,
 ) {
+    if (tile) return AssistTile(on, icon, name, pill, notice, enabled, modifier, onClick)
     Row(
         Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(16.dp)).background(Color(0x38000000))
             .clickable(enabled = enabled, onClickLabel = name, onClick = onClick)
@@ -497,9 +693,33 @@ private fun AssistRowFrame(
     }
 }
 
+/** The landscape grid's switch: the ring as large as the tile allows, its state (or notice) under it; the name is read out. */
 @Composable
-fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+private fun AssistTile(on: Boolean?, icon: String, name: String, pill: String, @StringRes notice: Int?, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val text = notice?.let { stringResource(it) } ?: pill
+    val fg = when { notice != null -> Qs.EnergyLow; on == true -> Qs.Energy; else -> Qs.Muted }
+    Column(
+        modifier.fillMaxHeight().clip(RoundedCornerShape(16.dp)).background(Color(0x38000000))
+            .clickable(enabled = enabled, onClickLabel = name, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = "$name, $text" }
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            val ring = minOf(maxWidth, maxHeight).coerceAtMost(64.dp)
+            AssistRing(on, icon, ring, ring * 0.55f)
+        }
+        Text(
+            text, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp,
+            overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier, wide: Boolean = false) = QsCard(modifier) {
+    // Landscape has no room for the header: A/C joins the other buttons below.
+    if (!wide) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         CardLabel(stringResource(R.string.climate_driver), Modifier.weight(1f))
         car.outsideTempC?.let { QsText(stringResource(R.string.outside_temp, it), 13.sp, Qs.Muted) }
         ClimateButton(ClimateSwitch.AC, car.acOn, Icons.AirConditioner, stringResource(R.string.climate_ac), "A/C", actions, compact = true)
@@ -509,7 +729,15 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
     var fan by remember { mutableStateOf<Int?>(null) }
     val shownTemp = temp ?: car.cabinTempC
     val shownFan = fan ?: car.fanLevel
-    Row(Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // Landscape: no room for the seat, so the five buttons share one row above the sliders.
+    if (wide) Row(Modifier.weight(1f).fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val cell = Modifier.weight(1f).fillMaxHeight()
+        ClimateButton(ClimateSwitch.POWER, car.climateOn, Icons.Power, stringResource(R.string.climate_power), stringResource(R.string.climate_power_short), actions, cell, cell = true)
+        ClimateButton(ClimateSwitch.AUTO, car.autoClimate, null, stringResource(R.string.climate_auto), "AUTO", actions, cell, cell = true)
+        ClimateButton(ClimateSwitch.SYNC, car.sync, Icons.SyncZones, stringResource(R.string.climate_sync), stringResource(R.string.climate_sync_short), actions, cell, cell = true)
+        ClimateButton(ClimateSwitch.RECIRCULATION, car.recirculation, Icons.Recirculate, stringResource(R.string.climate_recirculation), stringResource(R.string.climate_recirculation_short), actions, cell, cell = true)
+        ClimateButton(ClimateSwitch.AC, car.acOn, Icons.AirConditioner, stringResource(R.string.climate_ac), "A/C", actions, cell, cell = true)
+    } else Row(Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
             ClimateButton(ClimateSwitch.POWER, car.climateOn, Icons.Power, stringResource(R.string.climate_power), stringResource(R.string.climate_power_short), actions)
             ClimateButton(ClimateSwitch.AUTO, car.autoClimate, null, stringResource(R.string.climate_auto), "AUTO", actions)
@@ -526,21 +754,29 @@ fun ClimateCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modi
     }
     // The temperature fill walks the scale from the coldest setting, so its end shows the chosen one.
     val tempColors = shownTemp?.let { t -> (CabinTempSpec.MIN..t).map { Qs.tempColor(it) } }.orEmpty()
-    HorizontalSlider(
-        shownTemp, CabinTempSpec.MIN..CabinTempSpec.MAX, Icons.Thermometer,
-        shownTemp?.let { "$it°" } ?: "--", stringResource(R.string.slider_temperature),
-        Brush.horizontalGradient(if (tempColors.size > 1) tempColors else List(2) { Qs.tempColor(shownTemp) }),
-        onChange = { temp = it },
-        onFinished = { temp?.takeIf { it != car.cabinTempC }?.let(actions.car::setCabinTemp); temp = null },
-    )
+    val tempSlider = @Composable { m: Modifier ->
+        HorizontalSlider(
+            shownTemp, CabinTempSpec.MIN..CabinTempSpec.MAX, Icons.Thermometer,
+            shownTemp?.let { "$it°" } ?: "--", stringResource(R.string.slider_temperature),
+            Brush.horizontalGradient(if (tempColors.size > 1) tempColors else List(2) { Qs.tempColor(shownTemp) }),
+            onChange = { temp = it },
+            onFinished = { temp?.takeIf { it != car.cabinTempC }?.let(actions.car::setCabinTemp); temp = null },
+            modifier = m,
+        )
+    }
+    val fanSlider = @Composable { m: Modifier ->
+        HorizontalSlider(
+            shownFan, FanSpec.MIN..FanSpec.MAX, Icons.Wind,
+            shownFan?.toString() ?: "--", stringResource(R.string.slider_fan),
+            Brush.horizontalGradient(listOf(Qs.Route.copy(alpha = 0.55f), Qs.Route)),
+            onChange = { fan = it },
+            onFinished = { fan?.takeIf { it != car.fanLevel }?.let(actions.car::setFan); fan = null },
+            modifier = m,
+        )
+    }
+    tempSlider(Modifier)
     Spacer(Modifier.height(8.dp))
-    HorizontalSlider(
-        shownFan, FanSpec.MIN..FanSpec.MAX, Icons.Wind,
-        shownFan?.toString() ?: "--", stringResource(R.string.slider_fan),
-        Brush.horizontalGradient(listOf(Qs.Route.copy(alpha = 0.55f), Qs.Route)),
-        onChange = { fan = it },
-        onFinished = { fan?.takeIf { it != car.fanLevel }?.let(actions.car::setFan); fan = null },
-    )
+    fanSlider(Modifier)
 }
 
 /** Fan 1..10 drawn as four airflow strengths: face, then chest, lap and legs join in. */
@@ -621,13 +857,15 @@ private fun Airflow(level: Int, color: Color, seatWidth: Dp, seatHeight: Dp) {
 @Composable
 private fun ClimateButton(
     switch: ClimateSwitch, on: Boolean?, icon: String?, name: String, label: String,
-    actions: DrawerActions, compact: Boolean = false,
+    actions: DrawerActions, modifier: Modifier = Modifier, compact: Boolean = false,
+    /** Sized by [modifier] (a row of equal buttons, landscape) instead of the fixed size. */
+    cell: Boolean = false,
 ) {
     val state = onOffLabel(on)
     val tint = when (on) { true -> Qs.Energy; false -> Qs.TextSoft; null -> Qs.Dim }
     val shape = RoundedCornerShape(if (compact) 16.dp else Qs.ButtonRadius)
     Box(
-        Modifier.then(if (compact) Modifier.height(32.dp) else Modifier.size(68.dp, 58.dp))
+        modifier.then(if (cell) Modifier else if (compact) Modifier.height(32.dp) else Modifier.size(68.dp, 58.dp))
             .clip(shape)
             .background(if (on == true) Qs.Energy.copy(alpha = 0.16f) else Qs.Button)
             .border(1.dp, if (on == true) Qs.Energy.copy(alpha = 0.45f) else Qs.Hairline, shape)
@@ -643,7 +881,7 @@ private fun ClimateButton(
         } else {
             Box(Modifier.align(Alignment.TopEnd).padding(7.dp).size(6.dp).clip(CircleShape).background(if (on == true) Qs.Energy else Qs.Hairline))
             if (icon == null) {
-                QsText(label, 15.sp, tint, FontWeight.Bold)
+                QsText(label, if (cell) 12.sp else 15.sp, tint, FontWeight.Bold)
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     QsIcon(icon, tint, 22.dp)
@@ -655,15 +893,15 @@ private fun ClimateButton(
 }
 
 @Composable
-fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) = QsCard(modifier) {
+fun DriveEnergyCard(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier, wide: Boolean = false) = QsCard(modifier) {
     // Two buttons, each a symbol of the current state; a tap moves to the next one.
     Row(Modifier.weight(3f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         CycleButton(
-            stringResource(R.string.battery_mode), car.batteryMode?.label() ?: "--", Modifier.weight(1f),
+            stringResource(R.string.battery_mode), car.batteryMode?.label() ?: "--", Modifier.weight(1f), wide,
             onClick = { actions.car.setBatteryMode(nextOf(BatteryMode.entries, car.batteryMode)) },
         ) { size -> QsIcon(car.batteryMode.icon(), Qs.Mode, size, strokeWidth = 1.6f) }
         CycleButton(
-            stringResource(R.string.regeneration), car.regen?.label() ?: "--", Modifier.weight(1f),
+            stringResource(R.string.regeneration), car.regen?.label() ?: "--", Modifier.weight(1f), wide,
             onClick = { actions.car.setRegen(nextOf(RegenLevel.entries, car.regen)) },
         ) { size -> RegenDial(car.regen, size) }
     }
@@ -702,9 +940,24 @@ private fun CycleButton(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
+    /** Landscape: too short to stack three things, so the symbol sits beside the value and the title is only read out. */
+    wide: Boolean = false,
     onClick: () -> Unit,
     symbol: @Composable (size: Dp) -> Unit,
 ) {
+    if (wide) return Row(
+        modifier.fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(Qs.Button)
+            .clickable(onClickLabel = title, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = "$title, $value" }
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+    ) {
+        BoxWithConstraints(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true), contentAlignment = Alignment.Center) {
+            symbol(maxHeight * 0.9f)
+        }
+        QsText(value, 13.sp, Qs.TextSoft, FontWeight.SemiBold)
+    }
     Column(
         modifier.fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(Qs.Button)
             .clickable(onClickLabel = title, onClick = onClick)

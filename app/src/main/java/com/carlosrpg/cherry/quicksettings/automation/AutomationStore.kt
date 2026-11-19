@@ -7,12 +7,13 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import com.carlosrpg.cherry.quicksettings.overlay.TapRelayService
 
 /** The owner's choices for the EngMode automation, and turning its service on. */
 class AutomationStore(private val context: Context) {
     private val prefs = prefs(context)
 
-    /** Open Wi-Fi 5 s after startup, [wifiDevice] connecting, or Android Auto / CarPlay, while that device is connected and Wi-Fi is off. */
+    /** Open Wi-Fi 10 s after startup, [wifiDevice] connecting, or Android Auto / CarPlay, while that device is connected and Wi-Fi is off. */
     var autoWifi: Boolean
         get() = prefs.getBoolean(KEY_AUTO_WIFI, false)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_WIFI, value).apply()
@@ -58,20 +59,25 @@ class AutomationStore(private val context: Context) {
             context.checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
 
         /**
-         * Switches the automation service on, keeping every other accessibility service listed.
-         * A force-stop (or a memory cleaner) switches it off and Android never brings it back, so
-         * the app calls this on every start. Android 11 only rebinds a service it saw crash after
-         * it went from listed to unlisted, so a listed one is unlisted and listed again.
+         * Switches the app's accessibility services on, the automation and the tap pass-through
+         * (the top bar's pull-down zone needs it), keeping every other service listed. A
+         * force-stop (or a memory cleaner) takes both off the list and Android never brings them
+         * back, so the app calls this on every start. Android 11 only rebinds a service it saw
+         * crash after it went from listed to unlisted, so each unbound one is unlisted and listed
+         * again; a bound one is left alone.
          */
         fun enableService(context: Context): Boolean {
             if (!canEnableItself(context)) return false
-            if (EngModeService.instance != null) return true
+            val missing = listOfNotNull(
+                ComponentName(context, EngModeService::class.java).takeIf { EngModeService.instance == null },
+                ComponentName(context, TapRelayService::class.java).takeIf { TapRelayService.instance == null },
+            )
+            if (missing.isEmpty()) return true
             val resolver = context.contentResolver
-            val me = ComponentName(context, EngModeService::class.java)
             val key = Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             val others = Settings.Secure.getString(resolver, key).orEmpty().split(':')
-                .filter { it.isNotBlank() && ComponentName.unflattenFromString(it) != me }
-            val with = (others + me.flattenToShortString()).joinToString(":")
+                .filter { it.isNotBlank() && ComponentName.unflattenFromString(it) !in missing }
+            val with = (others + missing.map { it.flattenToShortString() }).joinToString(":")
             val without = others.joinToString(":")
             Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
             Settings.Secure.putString(resolver, key, with)

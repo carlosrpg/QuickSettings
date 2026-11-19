@@ -36,6 +36,13 @@ class MediaSourceRuleTest {
     }
 
     @Test
+    fun `recent apps keep the newest first, once each, capped`() {
+        assertThat(bumpRecent(listOf("a", "b", "c"), "c", keep = 3)).containsExactly("c", "a", "b").inOrder()
+        assertThat(bumpRecent(listOf("a", "b", "c"), "d", keep = 3)).containsExactly("d", "a", "b").inOrder()
+        assertThat(bumpRecent(emptyList(), "a", keep = 3)).containsExactly("a")
+    }
+
+    @Test
     fun `phone projections open their head unit app`() {
         assertThat(CarMediaSource.ANDROID_AUTO.appPackage()).isEqualTo("com.google.android.projection.sink")
         assertThat(CarMediaSource.CARPLAY.appPackage()).isEqualTo("com.desaysv.vehicle.carplayapp")

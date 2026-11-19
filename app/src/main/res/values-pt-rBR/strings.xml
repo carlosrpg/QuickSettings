@@ -41,6 +41,7 @@
     <string name="desc_assist">Frenagem de emergência %1$s, alerta de colisão %2$s, auto hold %3$s, prevenção de saída de faixa %4$s</string>
 
     <string name="open_app">Abrir %1$s</string>
+    <string name="play_app">Tocar %1$s</string>
     <string name="media_app">App de mídia</string>
     <string name="voice_search_in">Busca por voz em %1$s</string>
     <string name="search">Buscar</string>
@@ -191,7 +192,7 @@
     <string name="auto_wifi_on">aberto</string>
     <string name="auto_wifi_off">fechado</string>
     <string name="auto_wifi_auto">Abrir automaticamente</string>
-    <string name="auto_wifi_auto_hint">Enquanto o celular escolhido abaixo estiver conectado por Bluetooth e o Wi-Fi desligado: 5 s depois da partida, depois que o celular conectar ou depois que o Android Auto ou o CarPlay abrir (no máximo uma vez por minuto).</string>
+    <string name="auto_wifi_auto_hint">Enquanto o celular escolhido abaixo estiver conectado por Bluetooth e o Wi-Fi desligado: 10 s depois da partida, depois que o celular conectar ou depois que o Android Auto ou o CarPlay abrir (no máximo uma vez por minuto).</string>
     <string name="auto_wifi_now">Abrir o Wi-Fi agora</string>
     <string name="auto_wifi_device">Celular que abre o Wi-Fi</string>
     <string name="auto_wifi_device_hint">Um dos dispositivos Bluetooth pareados com o carro.</string>
