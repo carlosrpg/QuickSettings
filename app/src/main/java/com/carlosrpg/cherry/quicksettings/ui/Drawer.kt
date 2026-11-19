@@ -654,12 +654,14 @@ private fun OpenDrawer(
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     row.forEach { type ->
                         val m = Modifier.weight(type.span().coerceAtMost(columns).toFloat()).fillMaxHeight()
+                        // Landscape screens (wide and short) get the compact card layouts; portrait keeps its own.
+                        val wide = !portrait
                         when (type) {
-                            WidgetType.MEDIA -> MediaCard(media, actions, listening && actions.voiceFor == WidgetType.MEDIA, m)
-                            WidgetType.NAVIGATION -> NavCard(nav, actions, listening && actions.voiceFor == WidgetType.NAVIGATION, m)
-                            WidgetType.ASSIST -> AssistCard(car, actions, m)
-                            WidgetType.CLIMATE -> ClimateCard(car, actions, m)
-                            WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m)
+                            WidgetType.MEDIA -> MediaCard(media, actions, listening && actions.voiceFor == WidgetType.MEDIA, m, wide)
+                            WidgetType.NAVIGATION -> NavCard(nav, actions, listening && actions.voiceFor == WidgetType.NAVIGATION, m, wide)
+                            WidgetType.ASSIST -> AssistCard(car, actions, m, wide)
+                            WidgetType.CLIMATE -> ClimateCard(car, actions, m, wide)
+                            WidgetType.CAR_MODE -> DriveEnergyCard(car, actions, m, wide)
                             WidgetType.AUTONOMY -> RangeCard(car, m)
                             WidgetType.WEATHER -> WeatherCard(actions.weather, m)
                         }
