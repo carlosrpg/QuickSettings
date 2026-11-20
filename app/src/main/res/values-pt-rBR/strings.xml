@@ -33,7 +33,7 @@
     <string name="pill_off">Inativo</string>
 
     <string name="desc_media">Mídia</string>
-    <string name="desc_climate">Clima %1$s graus, ventilação %2$s</string>
+    <string name="desc_climate">Ar-condicionado %1$s graus, ventilação %2$s</string>
     <string name="desc_mode">Modo da bateria %1$s, recuperação de energia %2$s</string>
     <string name="desc_autonomy">Bateria %1$s por cento, autonomia elétrica %2$s quilômetros, combustível %3$s por cento, autonomia a combustão %4$s quilômetros, total %5$s quilômetros</string>
     <string name="desc_nav_idle">Navegação, toque para buscar um destino</string>
@@ -81,7 +81,7 @@
     <string name="fcw_near">Perto</string>
     <string name="fcw_standard">Padrão</string>
     <string name="fcw_far">Longe</string>
-    <string name="climate_power">Ligar ou desligar o clima</string>
+    <string name="climate_power">Ligar ou desligar o ar-condicionado</string>
     <string name="climate_auto">Modo automático</string>
     <string name="climate_sync">Sincronizar zonas</string>
     <string name="climate_recirculation">Recircular o ar</string>
@@ -95,7 +95,7 @@
     <string name="assist_block_speed">Só abaixo de 10 km/h</string>
     <string name="assist_block_unavailable">Indisponível</string>
 
-    <string name="climate_driver">Clima · motorista</string>
+    <string name="climate_driver">Ar-condicionado · motorista</string>
     <string name="outside_temp">ext. %1$d°</string>
     <string name="warmer">Mais quente</string>
     <string name="cooler">Mais frio</string>
@@ -157,7 +157,7 @@
     <string name="tap_to_open">Tocar na alça da borda para abrir</string>
     <string name="tap_to_open_hint">Desligado: abre só deslizando a partir da alça. O gesto de voltar do próprio carro captura deslizes que começam bem na borda da tela.</string>
     <string name="top_bar">Barra de informações no topo da tela</string>
-    <string name="top_bar_hint">Mostra mídia, bateria, combustível, regeneração e clima na área da barra superior do carro, ao lado do relógio, e some enquanto um app em tela cheia, como o Android Auto, esconde essa barra (precisa do acesso de acessibilidade). Deslize para baixo logo abaixo dela, mesmo sobre um app em tela cheia, para abrir a gaveta completa.</string>
+    <string name="top_bar_hint">Mostra mídia, bateria, combustível, regeneração e ar-condicionado na área da barra superior do carro, ao lado do relógio, e some enquanto um app em tela cheia, como o Android Auto, esconde essa barra (precisa do acesso de acessibilidade). Deslize para baixo logo abaixo dela, mesmo sobre um app em tela cheia, para abrir a gaveta completa.</string>
     <string name="widgets">Widgets</string>
     <string name="state_semi">Compacta</string>
     <string name="state_open">Aberta</string>
@@ -167,7 +167,7 @@
 
     <string name="widget_media">Mídia</string>
     <string name="widget_media_sub">Capa e reproduzir / pausar; arraste para trocar a faixa</string>
-    <string name="widget_climate">Clima</string>
+    <string name="widget_climate">Ar-condicionado</string>
     <string name="widget_climate_sub">Banco com fluxo de ar, controles de temperatura e ventilação</string>
     <string name="widget_car_mode">Modo do carro</string>
     <string name="widget_car_mode_sub">Modo da bateria e recuperação de energia; arraste para mudar</string>
