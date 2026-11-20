@@ -242,4 +242,14 @@
     <string name="voice_error_mic">Não foi possível usar o microfone (erro %1$d).</string>
     <string name="voice_error_busy">A entrada de voz está ocupada por outro app. Tente de novo (erro %1$d).</string>
     <string name="voice_error_other">A busca por voz falhou (erro %1$d).</string>
+    <string name="update_title">Atualização do app</string>
+    <string name="update_check">Procurar atualizações</string>
+    <string name="update_checking">Verificando…</string>
+    <string name="update_latest">Versão mais recente: %1$s</string>
+    <string name="update_current">Você já tem a versão mais recente.</string>
+    <string name="update_install">Atualizar para %1$s</string>
+    <string name="update_downloading">Baixando…</string>
+    <string name="update_waiting">Confirme a instalação na tela que o Android mostrar.</string>
+    <string name="update_failed">A atualização falhou: %1$s</string>
+    <string name="update_saved">Instalação recusada (%1$s). O APK foi salvo em Download/QuickSettings-update.apk: instale pelo gerenciador de arquivos.</string>
 </resources>
