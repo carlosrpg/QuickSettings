@@ -14,6 +14,7 @@ body {
 }
 a { color: var(--route); }
 img { display: block; max-width: 100%; }
+[hidden] { display: none !important; }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
 .glow::before {
   content: ""; position: absolute; inset: -20% -10% auto; height: 720px; z-index: -1; pointer-events: none;
@@ -132,6 +133,9 @@ ol.steps strong { color: var(--text); display: block; }
 .grant[data-state="ok"] .grant-dot { background: var(--energy); box-shadow: 0 0 10px var(--energy); }
 .grant[data-state="missing"] .grant-dot { background: var(--amber); }
 .grant-body { min-width: 0; }
+.app-row { margin-bottom: 10px; border: 1px solid var(--hair); }
+.app-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+@media (max-width: 560px) { .app-actions { grid-column: 2; justify-content: flex-start; } }
 .grant-title { font-weight: 600; }
 .grant p { margin: 2px 0 6px; color: var(--muted); font-size: 14px; }
 .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted); margin-left: 6px; vertical-align: 2px; }

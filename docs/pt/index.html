@@ -138,12 +138,12 @@
   <section id="setup-section">
     <div class="wrap">
       <h2>Configure pelo navegador</h2>
-      <p class="sub">A central não tem tela de ajustes para sobrepor a outros apps nem para o acesso às notificações, então essas permissões são dadas por ADB. Esta página faz isso por você com um cabo USB, sem instalar nada no computador.</p>
+      <p class="sub">A central não tem tela de ajustes para sobrepor a outros apps nem para o acesso às notificações, então essas permissões são dadas por ADB. Esta página instala o app e concede as permissões por você com um cabo USB, sem instalar nada no computador.</p>
       <ol class="steps">
-        <li><strong>Baixe o APK</strong>Da <a href="https://github.com/carlosrpg/QuickSettings/releases/latest">versão mais recente</a>, num pendrive.</li>
-        <li><strong>Instale no carro</strong>Com um gerenciador de arquivos na central, depois abra o QuickSettings uma vez.</li>
         <li><strong>Ative a depuração USB</strong>No menu de engenharia do carro, depois ligue um cabo de dados deste computador ao carro.</li>
-        <li><strong>Conecte e conceda</strong>Aqui embaixo, no Chrome ou Edge. O microfone (busca por voz) é concedido no próprio app.</li>
+        <li><strong>Conecte</strong>Aqui embaixo, no Chrome ou Edge, e escolha a central.</li>
+        <li><strong>Instale</strong>Instalar a mais recente baixa a última versão e a instala no carro. Ou escolha um APK que você já tem.</li>
+        <li><strong>Conceda</strong>Conceda o que falta. O microfone (busca por voz) é concedido no próprio app.</li>
       </ol>
 
       <div id="setup" aria-live="polite">
@@ -155,6 +155,15 @@
           </div>
         </div>
         <div id="setup-status">Carregando…</div>
+        <div id="app-row" class="grant app-row" data-state="unknown">
+          <span class="grant-dot" aria-hidden="true"></span>
+          <div class="grant-body"><div class="grant-title">App QuickSettings</div><p id="app-version"></p></div>
+          <div class="app-actions">
+            <button id="install-latest" class="btn small primary" disabled>Instalar a mais recente</button>
+            <button id="choose-apk" class="btn small" disabled>Escolher arquivo APK…</button>
+            <input id="apk-file" type="file" accept=".apk,application/vnd.android.package-archive" hidden>
+          </div>
+        </div>
         <ul id="grant-list"></ul>
         <div class="setup-foot">
           <button id="grant-all" class="btn primary" disabled>Conceder tudo o que falta</button>
@@ -169,7 +178,7 @@
       <h2>Dúvidas</h2>
       <details><summary>Quais navegadores funcionam?</summary><p>Chrome, Edge ou outro navegador Chromium com WebUSB, no Windows, macOS, Linux ou ChromeOS. O Chrome de um celular Android também serve, com um adaptador USB-OTG. Firefox e Safari não têm WebUSB.</p></details>
       <details><summary>A conexão falha ou o carro não aparece na lista</summary><p>Use um cabo de dados, não um só de carga. Se você tem as ferramentas do Android instaladas, provavelmente outro adb está segurando a porta: rode <code>adb kill-server</code> e tente de novo. No Windows a central pode precisar do driver USB do Google.</p></details>
-      <details><summary>O que esta página roda no meu carro?</summary><p>Só os comandos mostrados em "Comando manual" de cada item, mais verificações de leitura (<code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Ela não instala nada, e nada é enviado a lugar nenhum além do carro, pelo cabo.</p></details>
+      <details><summary>O que esta página roda no meu carro?</summary><p>Para instalar, ela copia o APK e um script curto (<a href="../car-setup.sh">car-setup.sh</a>) para <code>/data/local/tmp</code> e roda o script, que instala o APK com o <code>pm</code>, abre o app e apaga os dois arquivos. O ADB do carro recusa qualquer comando com a palavra "install", por isso a instalação roda num script. Fora isso, só os comandos mostrados em "Comando manual" de cada item, mais verificações de leitura (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Nada é enviado a lugar nenhum além do carro, pelo cabo.</p></details>
       <details><summary>Preciso fazer isso de novo?</summary><p>Não. As permissões continuam depois de reiniciar e de atualizar o app. Desinstalar o app as remove.</p></details>
       <details><summary>Prefiro digitar os comandos</summary><p>Todos os comandos estão no <a href="https://github.com/carlosrpg/QuickSettings#install-on-the-car">README</a>, e a tela de ajustes do app mostra cada um que falta.</p></details>
     </div>

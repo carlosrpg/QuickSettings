@@ -137,3 +137,48 @@ jobs:
           --target "$GITHUB_SHA"
           --title "QuickSettings $RELEASE_TAG"
           --generate-notes
+
+  # The setup site (docs/) plus the APK just released, under latest/. The page installs from there
+  # because GitHub's release download links send no CORS headers. Needs Settings > Pages > Source:
+  # GitHub Actions.
+  pages:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: QuickSettings-*
+          merge-multiple: true
+          path: release-apks
+
+      - name: Assemble site
+        run: |
+          cp -r docs _site
+          mkdir -p _site/latest
+          apk="$(ls release-apks/QuickSettings-*.apk | head -n 1)"
+          test -f "$apk"
+          cp "$apk" _site/latest/QuickSettings.apk
+          version="$(basename "$apk" .apk)"
+          printf '{"version":"%s"}\n' "${version#QuickSettings-}" > _site/latest/version.json
+          cat _site/latest/version.json
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

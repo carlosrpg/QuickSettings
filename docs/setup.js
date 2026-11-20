@@ -17,7 +17,13 @@ const STRINGS = {
     required: "Required", optional: "Optional", manual: "Manual command", grant: "Grant", granted: "Granted",
     notConnected: "Not connected.", pick: "Pick the head unit in the browser's USB dialog…", noDevice: "No device selected.",
     connected: "Connected over USB. If the car asks to allow USB debugging, accept it.",
-    notInstalled: "Connected, but QuickSettings isn't on the car yet. Install the APK first (step 2), then connect again.",
+    notInstalled: "Connected, but QuickSettings isn't on the car yet. Install it above; the permissions appear here after.",
+    onCar: (v) => `On the car: ${v}`, notOnCar: "Not on the car yet", latest: (v) => `Latest: ${v}`, noLatest: "Latest: not published on this site",
+    downloading: "Downloading the latest APK…", sending: "Sending the APK to the car…", installing: "Installing on the car…",
+    installed: "Installed, and QuickSettings is opening on the car.",
+    copied: "The car refused the install over ADB. The APK is now in the car's Download folder: open it there with a file manager.",
+    installFailed: "The install failed. The log below has the details.",
+    noDownload: "This site has no APK to download yet. Get it from the releases page, then use Choose APK file.",
     allSet: "All set. Open QuickSettings on the car; its Status panel should show everything up.",
     missing: (n) => `${n} required permission${n > 1 ? "s" : ""} missing.`,
     reqDone: "The required permission is granted. Optional ones are below.",
@@ -35,7 +41,13 @@ const STRINGS = {
     required: "Obrigatória", optional: "Opcional", manual: "Comando manual", grant: "Conceder", granted: "Concedida",
     notConnected: "Não conectado.", pick: "Escolha a central na janela USB do navegador…", noDevice: "Nenhum aparelho escolhido.",
     connected: "Conectado por USB. Se o carro pedir para permitir a depuração USB, aceite.",
-    notInstalled: "Conectado, mas o QuickSettings ainda não está no carro. Instale o APK primeiro (passo 2) e conecte de novo.",
+    notInstalled: "Conectado, mas o QuickSettings ainda não está no carro. Instale-o acima; as permissões aparecem aqui depois.",
+    onCar: (v) => `No carro: ${v}`, notOnCar: "Ainda não está no carro", latest: (v) => `Mais recente: ${v}`, noLatest: "Mais recente: não publicada neste site",
+    downloading: "Baixando o APK mais recente…", sending: "Enviando o APK para o carro…", installing: "Instalando no carro…",
+    installed: "Instalado, e o QuickSettings está abrindo no carro.",
+    copied: "O carro recusou a instalação por ADB. O APK está agora na pasta Download do carro: abra-o lá com um gerenciador de arquivos.",
+    installFailed: "A instalação falhou. O registro abaixo tem os detalhes.",
+    noDownload: "Este site ainda não tem o APK para baixar. Baixe-o na página de versões e use Escolher arquivo APK.",
     allSet: "Tudo pronto. Abra o QuickSettings no carro; o painel Status deve mostrar tudo ativo.",
     missing: (n) => `${n} permiss${n > 1 ? "ões obrigatórias faltando" : "ão obrigatória faltando"}.`,
     reqDone: "A permissão obrigatória foi concedida. As opcionais estão abaixo.",
@@ -164,13 +176,73 @@ function renderList() {
   $("#grant-all").disabled = !states || GRANTS.every((g) => states[g.id]);
 }
 
+// The latest release, published next to the site by CI (GitHub's own download links send no CORS
+// headers, so a page can't fetch them). Missing when the site is served without CI, e.g. locally.
+const LATEST = new URL("latest/", import.meta.url);
+let latest = null;
+fetch(new URL("version.json", LATEST)).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => {
+  latest = j?.version ?? null;
+  showApp(undefined);
+});
+
+function showApp(onCar) {
+  const row = $("#app-row");
+  row.dataset.state = onCar === undefined ? "unknown" : onCar ? "ok" : "missing";
+  $("#app-version").textContent = [
+    onCar === undefined ? null : onCar ? T.onCar(onCar) : T.notOnCar,
+    latest ? T.latest(latest) : T.noLatest,
+  ].filter(Boolean).join(" · ");
+  $("#install-latest").disabled = !adb || !latest;
+  $("#choose-apk").disabled = !adb;
+}
+
+async function pushFile(path, blob, mode) {
+  const sync = await adb.sync();
+  try { await sync.write({ filename: path, file: blob.stream(), permission: mode }); } finally { await sync.dispose(); }
+}
+
+// Push the APK and car-setup.sh, run the script (the only line adbd sees is "sh <script>").
+async function installApk(apk) {
+  const busy = [$("#install-latest"), $("#choose-apk")];
+  busy.forEach((b) => (b.disabled = true));
+  let result = "failed";
+  try {
+    const script = await fetch(new URL("car-setup.sh", import.meta.url)).then((r) => r.blob());
+    setStatus(T.sending);
+    await pushFile("/data/local/tmp/qs.apk", apk, 0o644);
+    await pushFile("/data/local/tmp/qs_r.sh", script, 0o755);
+    setStatus(T.installing);
+    log("$ sh /data/local/tmp/qs_r.sh");
+    const out = await sh("sh /data/local/tmp/qs_r.sh");
+    log(out);
+    result = /QS_RESULT:(\w+)/.exec(out)?.[1] ?? "failed";
+  } catch (e) {
+    log(`! ${e.message ?? e}`);
+  } finally {
+    // The script cleans up after itself; this covers a push that failed before it ran.
+    await sh("rm -f /data/local/tmp/qs.apk /data/local/tmp/qs_r.sh").catch(() => {});
+  }
+  await refresh();
+  if (result === "ok") log(T.installed);
+  else setStatus(result === "copied" ? T.copied : T.installFailed, result === "copied" ? "warn" : "error");
+}
+
+async function installLatest() {
+  setStatus(T.downloading);
+  const r = await fetch(new URL("QuickSettings.apk", LATEST)).catch(() => null);
+  if (!r?.ok) return setStatus(T.noDownload, "error");
+  await installApk(await r.blob());
+}
+
 async function refresh() {
   const pkgs = await sh(`pm list packages ${PKG}`);
   if (!pkgs.split("\n").some((l) => l.trim() === `package:${PKG}`)) {
     states = null;
+    showApp(false);
     renderList();
     return setStatus(T.notInstalled, "warn");
   }
+  showApp(/versionName=(\S+)/.exec(await sh(`dumpsys package ${PKG} | grep versionName`))?.[1] ?? "?");
   states = {};
   for (const g of GRANTS) states[g.id] = g.check.ok(await sh(g.check.cmd));
   renderList();
@@ -223,6 +295,7 @@ async function disconnect() {
   $("#disconnect").hidden = true;
   $("#device").textContent = "";
   setStatus(T.disconnected);
+  showApp(undefined);
   renderList();
 }
 
@@ -236,3 +309,10 @@ renderList();
 $("#connect").onclick = connect;
 $("#disconnect").onclick = disconnect;
 $("#grant-all").onclick = () => run(GRANTS.filter((g) => !states?.[g.id]));
+$("#install-latest").onclick = installLatest;
+$("#choose-apk").onclick = () => $("#apk-file").click();
+$("#apk-file").onchange = (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (file) installApk(file);
+};

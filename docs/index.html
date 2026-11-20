@@ -138,12 +138,12 @@
   <section id="setup-section">
     <div class="wrap">
       <h2>Set up from your browser</h2>
-      <p class="sub">The head unit has no settings page for drawing over apps or notification access, so those are granted over ADB. This page does it for you over a USB cable, with nothing to install on your computer.</p>
+      <p class="sub">The head unit has no settings page for drawing over apps or notification access, so those are granted over ADB. This page installs the app and grants them for you over a USB cable, with nothing to install on your computer.</p>
       <ol class="steps">
-        <li><strong>Download the APK</strong>From the <a href="https://github.com/carlosrpg/QuickSettings/releases/latest">latest release</a>, onto a USB stick.</li>
-        <li><strong>Install it on the car</strong>With a file manager on the head unit, then open QuickSettings once.</li>
         <li><strong>Turn on USB debugging</strong>In the car's engineering menu, then plug a data cable from this computer into the car.</li>
-        <li><strong>Connect and grant</strong>Below, in Chrome or Edge. Microphone (voice search) is granted in the app itself.</li>
+        <li><strong>Connect</strong>Below, in Chrome or Edge, and pick the head unit.</li>
+        <li><strong>Install</strong>Install latest downloads the newest release and installs it on the car. Or choose an APK you already have.</li>
+        <li><strong>Grant</strong>Grant what's missing. Microphone (voice search) is granted in the app itself.</li>
       </ol>
 
       <div id="setup" aria-live="polite">
@@ -155,6 +155,15 @@
           </div>
         </div>
         <div id="setup-status">Loading…</div>
+        <div id="app-row" class="grant app-row" data-state="unknown">
+          <span class="grant-dot" aria-hidden="true"></span>
+          <div class="grant-body"><div class="grant-title">QuickSettings app</div><p id="app-version"></p></div>
+          <div class="app-actions">
+            <button id="install-latest" class="btn small primary" disabled>Install latest</button>
+            <button id="choose-apk" class="btn small" disabled>Choose APK file…</button>
+            <input id="apk-file" type="file" accept=".apk,application/vnd.android.package-archive" hidden>
+          </div>
+        </div>
         <ul id="grant-list"></ul>
         <div class="setup-foot">
           <button id="grant-all" class="btn primary" disabled>Grant everything missing</button>
@@ -169,7 +178,7 @@
       <h2>Questions</h2>
       <details><summary>Which browsers work?</summary><p>Chrome, Edge or another Chromium browser with WebUSB, on Windows, macOS, Linux or ChromeOS. Chrome on an Android phone works too, with a USB-OTG adapter. Firefox and Safari have no WebUSB.</p></details>
       <details><summary>The connection fails or the car isn't listed</summary><p>Use a data cable, not a charge-only one. If you have the Android tools installed, another adb is probably holding the port: run <code>adb kill-server</code> and try again. On Windows the head unit may need the Google USB driver.</p></details>
-      <details><summary>What does this page run on my car?</summary><p>Only the commands shown under "Manual command" for each item, plus read-only checks (<code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). It doesn't install anything, and nothing is sent anywhere but to the car over the cable.</p></details>
+      <details><summary>What does this page run on my car?</summary><p>To install, it copies the APK and a short script (<a href="car-setup.sh">car-setup.sh</a>) to <code>/data/local/tmp</code> and runs the script, which installs the APK with <code>pm</code>, opens the app and deletes both files. The car's ADB refuses any command containing the word "install", which is why that runs from a script. Otherwise it runs only the commands shown under "Manual command" for each item, plus read-only checks (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Nothing is sent anywhere but to the car over the cable.</p></details>
       <details><summary>Do I have to do this again?</summary><p>No. The grants survive reboots and app updates. Uninstalling the app removes them.</p></details>
       <details><summary>I'd rather type the commands</summary><p>Every command is in the <a href="https://github.com/carlosrpg/QuickSettings#install-on-the-car">README</a>, and the app's settings screen shows each missing one.</p></details>
     </div>
