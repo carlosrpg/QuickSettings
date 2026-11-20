@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickSettings for Jaecoo 7</title>
+<meta name="description" content="A widget drawer that floats over every app on the Jaecoo 7 head unit. Set it up from your browser over USB.">
+<meta name="theme-color" content="#0b0e14">
+<link rel="alternate" hreflang="pt-BR" href="pt/">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><i aria-hidden="true"></i>QuickSettings</a>
+    <nav>
+      <a href="#screens">Screens</a>
+      <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
+      <a class="cta" href="#setup-section">Set up</a>
+      <a class="lang" href="pt/" hreflang="pt-BR" lang="pt-BR">PT</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero glow">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow">Jaecoo 7 · Android Automotive 11</div>
+        <h1>Your car, one <em>swipe away</em>.</h1>
+        <p class="lead">A glass drawer that floats over every app on the head unit: media, climate, battery mode, range, navigation and driver assist, readable at a glance and controllable with one finger.</p>
+        <div class="actions">
+          <a class="btn primary" href="#setup-section">Set it up from this page</a>
+          <a class="btn" href="https://github.com/carlosrpg/QuickSettings/releases/latest">Download the APK</a>
+        </div>
+      </div>
+      <div class="device">
+        <img src="img/full-en.webp" width="800" height="1174" alt="QuickSettings fully open over the home screen: media, navigation, driver assist, climate, battery mode, range and weather cards">
+      </div>
+    </div>
+  </section>
+
+  <section id="screens">
+    <div class="wrap">
+      <h2>See it on the head unit</h2>
+      <p class="sub">Real screens from the app, running on an Android Automotive 11 emulator (car values are simulated).</p>
+      <div class="carousel" aria-roledescription="carousel">
+        <div class="track" tabindex="0">
+          <article class="slide">
+            <figure><div class="bars" role="img" aria-label="Info bar showing media, battery, fuel, regeneration and climate; with a route, the next turn and a range ring">
+              <span>No route</span><div class="topbar" data-variant="full"></div>
+              <span>With a route</span><div class="topbar" data-variant="nav"></div>
+            </div></figure>
+            <div><div class="kicker">Top bar</div><h3>Info bar beside the clock</h3><p>Media, battery and fuel with their ranges, regeneration and climate live in the car's own top bar. With a route, the next turn joins them and range folds into a ring. It steps aside while a full-screen app such as Android Auto hides that bar.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="img/full-en.webp" width="800" height="1174" loading="lazy" alt="Fully open drawer with large cards"></figure>
+            <div><div class="kicker">Full drawer</div><h3>Every control, one swipe</h3><p>Swipe down just below the top bar, even over a full-screen app, for large cards: media with transport and volume, navigation, driver assist with the stock gates, the climate seat, battery mode and regeneration, range and weather. Temperature and fan sliders run along the sides.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="img/settings-en.webp" width="800" height="1174" loading="lazy" alt="Settings screen with drawer position, handle options and the widget list"></figure>
+            <div><div class="kicker">Settings</div><h3>Make it yours</h3><p>Pick the side and the height of the handle, choose between touch and swipe, turn the info bar on or off, and reorder or hide widgets separately for the half-open and open drawer. A Status panel shows the car link, media and notification access live.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="img/semi-en.webp" width="800" height="1174" loading="lazy" alt="Half-open drawer on the left edge with small widget tiles"></figure>
+            <div><div class="kicker">Side bar</div><h3>Half-open, at a glance</h3><p>Touch the handle on the screen edge and a column of small tiles slides in: album art, the climate quadrant, battery mode and regen, range rings, next turn, driver assist and weather. Press and drag a tile to change it without opening anything.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="img/wifi-en.webp" width="752" height="267" loading="lazy" alt="Wi-Fi section with Open automatically turned on and a phone picker"></figure>
+            <div><div class="kicker">Wi-Fi automation</div><h3>Wi-Fi opens for wireless Android Auto and CarPlay</h3><p>The car turns its Wi-Fi off on its own. Choose your phone and QuickSettings opens Wi-Fi while it's connected over Bluetooth: 10 s after startup, when the phone connects, or when Android Auto or CarPlay comes up, at most once a minute.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="img/adb-en.webp" width="752" height="315" loading="lazy" alt="ADB section with Enable on startup and the engineering-menu password field"></figure>
+            <div><div class="kicker">ADB automation</div><h3>ADB on, without the menus</h3><p>Save the engineering-menu password once (stored encrypted on the head unit) and the app switches USB debugging on for you, on demand or once at every start of the car. It warns you when Wi-Fi and ADB are both automatic.</p></div>
+          </article>
+        </div>
+        <div class="carousel-nav">
+          <button class="btn round prev" aria-label="Previous screen">‹</button>
+          <div class="dots"></div>
+          <button class="btn round next" aria-label="Next screen">›</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>Six widgets, two sizes</h2>
+      <p class="sub">Touch the edge handle to open the drawer half-way: small tiles you read at a glance, with press-and-drag shortcuts. Open it fully for large cards and every control. English and Brazilian Portuguese.</p>
+      <div class="grid">
+        <article class="card">
+          <div class="icon" style="background:rgba(77,163,255,.15);color:var(--route)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+          <h3>Media</h3>
+          <p>Apps on the head unit and the car's own sources: Bluetooth, USB, CarPlay, Android Auto. Drag for volume and tracks, voice search sent to the app that's playing.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(255,122,46,.15);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg></div>
+          <h3>Climate</h3>
+          <p>A temperature × fan quadrant: drag the marker and it's set on release. Climate on/off, auto, zone sync and recirculation follow the car's state.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(61,220,151,.15);color:var(--energy)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+          <h3>Car mode</h3>
+          <p>Battery mode (Initial, Smart, Forced with a hold target) and regeneration Low, Medium, High, one tap each.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(242,184,75,.15);color:var(--fuel)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg></div>
+          <h3>Autonomy</h3>
+          <p>Battery and fuel rings, electric and fuel range in km and %, and the total.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(138,123,191,.18);color:var(--mid)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m3 11 19-9-9 19-2-8-8-2z"/></svg></div>
+          <h3>Navigation</h3>
+          <p>Next turn, street and ETA from your nav app; voice destination with no route; send the map to the instrument cluster and back.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(255,90,95,.14);color:var(--red)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <h3>Driver assist</h3>
+          <p>Emergency braking, auto hold, lane departure prevention and collision warning, with the stock UI's own rules and a second tap to switch a safety function off.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="sub">QuickSettings talks to the car through the head unit's own services, the same ones the stock apps use, through the open-source <a href="https://github.com/carlosrpg/jconfig-carbus">jconfig-carbus</a> library.</p>
+      <div class="facts">
+        <div class="fact"><h3>Nothing writes on its own</h3><p>Every change to the car comes from your tap, slider release or drag release. Safety functions keep the stock gates.</p></div>
+        <div class="fact" style="border-color:var(--energy)"><h3>Always there</h3><p>The drawer runs as a foreground service from boot, and the notification listener brings it back if the system kills it.</p></div>
+        <div class="fact" style="border-color:var(--warm)"><h3>Live values</h3><p>The car has no change notifications for apps, so the drawer polls every 1.5 s while it's on screen, and right after each change.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup-section">
+    <div class="wrap">
+      <h2>Set up from your browser</h2>
+      <p class="sub">The head unit has no settings page for drawing over apps or notification access, so those are granted over ADB. This page installs the app and grants them for you over a USB cable, with nothing to install on your computer.</p>
+      <ol class="steps">
+        <li><strong>Turn on USB debugging</strong>In the car's engineering menu, then plug a data cable from this computer into the car.</li>
+        <li><strong>Connect</strong>Below, in Chrome or Edge, and pick the head unit.</li>
+        <li><strong>Install</strong>Install latest downloads the newest release and installs it on the car. Or choose an APK you already have.</li>
+        <li><strong>Grant</strong>Grant what's missing. Microphone (voice search) is granted in the app itself.</li>
+      </ol>
+
+      <div id="setup" aria-live="polite">
+        <div class="setup-head">
+          <div><strong>Head unit</strong> <span id="device"></span></div>
+          <div>
+            <button id="connect" class="btn primary">Connect</button>
+            <button id="disconnect" class="btn" hidden>Disconnect</button>
+          </div>
+        </div>
+        <div id="setup-status">Loading…</div>
+        <div id="app-row" class="grant app-row" data-state="unknown">
+          <span class="grant-dot" aria-hidden="true"></span>
+          <div class="grant-body"><div class="grant-title">QuickSettings app</div><p id="app-version"></p></div>
+          <div class="app-actions">
+            <button id="install-latest" class="btn small primary" disabled>Install latest</button>
+            <button id="choose-apk" class="btn small" disabled>Choose APK file…</button>
+            <input id="apk-file" type="file" accept=".apk,application/vnd.android.package-archive" hidden>
+          </div>
+        </div>
+        <ul id="grant-list"></ul>
+        <div class="setup-foot">
+          <button id="grant-all" class="btn primary" disabled>Grant everything missing</button>
+        </div>
+        <pre id="setup-log" hidden></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" class="faq">
+    <div class="wrap">
+      <h2>Questions</h2>
+      <details><summary>Which browsers work?</summary><p>Chrome, Edge or another Chromium browser with WebUSB, on Windows, macOS, Linux or ChromeOS. Chrome on an Android phone works too, with a USB-OTG adapter. Firefox and Safari have no WebUSB.</p></details>
+      <details><summary>The connection fails or the car isn't listed</summary><p>Use a data cable, not a charge-only one. If you have the Android tools installed, another adb is probably holding the port: run <code>adb kill-server</code> and try again. On Windows the head unit may need the Google USB driver.</p></details>
+      <details><summary>What does this page run on my car?</summary><p>To install, it copies the APK and a short script (<a href="car-setup.sh">car-setup.sh</a>) to <code>/data/local/tmp</code> and runs the script, which installs the APK with <code>pm</code>, opens the app and deletes both files. The car's ADB refuses any command containing the word "install", which is why that runs from a script. Otherwise it runs only the commands shown under "Manual command" for each item, plus read-only checks (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Nothing is sent anywhere but to the car over the cable.</p></details>
+      <details><summary>Do I have to do this again?</summary><p>No. The grants survive reboots and app updates. Uninstalling the app removes them.</p></details>
+      <details><summary>I'd rather type the commands</summary><p>Every command is in the <a href="https://github.com/carlosrpg/QuickSettings#install-on-the-car">README</a>, and the app's settings screen shows each missing one.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>QuickSettings is an independent project, not affiliated with Jaecoo, Chery or Desay SV.</span>
+    <a href="https://github.com/carlosrpg/QuickSettings">Source on GitHub</a>
+  </div>
+</footer>
+
+<script src="topbar.js" defer></script>
+<script src="carousel.js" defer></script>
+<script type="module" src="setup.js"></script>
+</body>
+</html>

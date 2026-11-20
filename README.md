@@ -69,6 +69,16 @@ them either.
 
 ## Install on the car
 
+**From the browser:** open the
+[setup page](https://carlosrpg.github.io/QuickSettings/#setup-section)
+([em português](https://carlosrpg.github.io/QuickSettings/pt/#setup-section)) in Chrome or Edge, plug the
+car in with a data cable and click Connect. **Install latest** installs the newest release on the
+car: the page pushes the APK and `docs/car-setup.sh` to `/data/local/tmp` and runs the script, which
+runs `pm install`, opens the app and deletes both files (if the car refuses, it copies the APK to
+the Download folder instead). Then it shows which of the grants below are missing and applies them
+over WebUSB, with the same commands. The page lives in `docs/`; CI deploys it to GitHub Pages
+with the released APK under `latest/` (Settings → Pages → Source: GitHub Actions).
+
 **Easy path (Windows):** download `QuickSettings-FirstInstall.zip` from the latest
 [release](../../releases), unzip it, enable ADB on the car, connect the cable and double-click
 `First-Install.cmd`. It fetches adb if needed, copies the APK to the car's Download folder when
