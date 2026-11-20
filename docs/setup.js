@@ -20,7 +20,7 @@ const STRINGS = {
     notInstalled: "Connected, but QuickSettings isn't on the car yet. Install the APK first (step 2), then connect again.",
     allSet: "All set. Open QuickSettings on the car; its Status panel should show everything up.",
     missing: (n) => `${n} required permission${n > 1 ? "s" : ""} missing.`,
-    reqDone: "Required permissions granted. Optional ones are below.",
+    reqDone: "The required permission is granted. Optional ones are below.",
     failed: "A command failed. The log below has the details.",
     busy: "The USB port is held by another program. On a PC with the Android tools, run  adb kill-server  and try again.",
     cant: (m) => `Couldn't connect: ${m}`, disconnected: "Disconnected.",
@@ -38,7 +38,7 @@ const STRINGS = {
     notInstalled: "Conectado, mas o QuickSettings ainda não está no carro. Instale o APK primeiro (passo 2) e conecte de novo.",
     allSet: "Tudo pronto. Abra o QuickSettings no carro; o painel Status deve mostrar tudo ativo.",
     missing: (n) => `${n} permiss${n > 1 ? "ões obrigatórias faltando" : "ão obrigatória faltando"}.`,
-    reqDone: "Permissões obrigatórias concedidas. As opcionais estão abaixo.",
+    reqDone: "A permissão obrigatória foi concedida. As opcionais estão abaixo.",
     failed: "Um comando falhou. O registro abaixo tem os detalhes.",
     busy: "A porta USB está presa por outro programa. Num PC com as ferramentas do Android, rode  adb kill-server  e tente de novo.",
     cant: (m) => `Não foi possível conectar: ${m}`, disconnected: "Desconectado.",
@@ -63,7 +63,7 @@ const GRANTS = [
     manual: [`adb shell appops set ${PKG} SYSTEM_ALERT_WINDOW allow`],
   },
   {
-    id: "listener", required: true,
+    id: "listener", required: false,
     check: {
       cmd: "settings --user current get secure enabled_notification_listeners",
       ok: (o) => o.includes(`${PKG}/`) && o.includes("QsNotificationListener"),
