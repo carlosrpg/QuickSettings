@@ -76,7 +76,7 @@ h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -.02em; line-height: 1
   background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); border: 1px solid var(--hair);
   border-radius: 24px; padding: 28px;
 }
-.slide figure { margin: 0; height: 520px; display: grid; place-items: center; background: #06080c; border-radius: 16px; padding: 14px; }
+.slide figure { margin: 0; height: 520px; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; background: #06080c; border-radius: 16px; padding: 14px; }
 .slide figure img { max-height: 492px; width: auto; height: auto; max-width: 100%; border-radius: 10px; }
 .slide h3 { font-size: 24px; margin: 0 0 8px; letter-spacing: -.01em; }
 .slide p { color: var(--muted); margin: 0; }
@@ -86,6 +86,10 @@ h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -.02em; line-height: 1
   .slide figure { height: 420px; }
   .slide figure img { max-height: 392px; }
 }
+/* Info bar drawn by topbar.js: 1px = 1dp, a 600 dp strip zoomed to the figure's width */
+.bars { width: 100%; display: grid; gap: 10px; }
+.bars span { color: var(--dim); font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-top: 8px; }
+.topbar { width: 600px; height: 64px; padding: 0 12px; background: #14171c; border-radius: 10px; overflow: hidden; }
 .carousel-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 18px; }
 .dots { display: flex; gap: 8px; }
 .dots button { width: 10px; height: 10px; border-radius: 50%; border: 0; padding: 0; background: var(--dim); cursor: pointer; transition: width .2s, background .2s; }

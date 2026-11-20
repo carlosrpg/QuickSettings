@@ -36,7 +36,7 @@
         </div>
       </div>
       <div class="device">
-        <img src="../img/full-pt.webp" width="800" height="1240" alt="QuickSettings totalmente aberto sobre a tela inicial: cartões de mídia, navegação, assistência, clima, modo da bateria, autonomia e tempo">
+        <img src="../img/full-pt.webp" width="800" height="1174" alt="QuickSettings totalmente aberto sobre a tela inicial: cartões de mídia, navegação, assistência, clima, modo da bateria, autonomia e tempo">
       </div>
     </div>
   </section>
@@ -48,19 +48,22 @@
       <div class="carousel" aria-roledescription="carrossel">
         <div class="track" tabindex="0">
           <article class="slide">
-            <figure><img src="../img/semi-pt.webp" width="800" height="1240" loading="lazy" alt="Meia gaveta na borda esquerda com blocos pequenos"></figure>
+            <figure><img src="../img/semi-pt.webp" width="800" height="1174" loading="lazy" alt="Meia gaveta na borda esquerda com blocos pequenos"></figure>
             <div><div class="kicker">Barra lateral</div><h3>Meia gaveta, de relance</h3><p>Toque na alça na borda da tela e entra uma coluna de blocos pequenos: capa do álbum, o quadrante do clima, modo da bateria e regeneração, anéis de autonomia, próxima manobra, assistência e tempo. Pressione e arraste um bloco para mudá-lo sem abrir nada.</p></div>
           </article>
           <article class="slide">
-            <figure><img src="../img/full-pt.webp" width="800" height="1240" loading="lazy" alt="Gaveta totalmente aberta com cartões grandes"></figure>
+            <figure><img src="../img/full-pt.webp" width="800" height="1174" loading="lazy" alt="Gaveta totalmente aberta com cartões grandes"></figure>
             <div><div class="kicker">Gaveta completa</div><h3>Todos os controles num deslize</h3><p>Deslize para baixo logo abaixo da barra superior, mesmo sobre um app em tela cheia, para os cartões grandes: mídia com controles e volume, navegação, assistência com as travas originais, o banco do clima, modo da bateria e regeneração, autonomia e tempo. Os controles de temperatura e ventilação ficam nas laterais.</p></div>
           </article>
           <article class="slide">
-            <figure><img src="../img/infobar-pt.webp" width="800" height="230" loading="lazy" alt="Barra de informações na barra superior do carro com mídia, bateria, combustível, regeneração e clima"></figure>
-            <div><div class="kicker">Barra superior</div><h3>Informações ao lado do relógio</h3><p>Mídia, bateria e combustível com a autonomia de cada um, regeneração e clima ficam na própria barra superior do carro. Ela sai da frente enquanto um app em tela cheia, como o Android Auto, esconde essa barra.</p></div>
+            <figure><div class="bars" role="img" aria-label="Barra de informações com mídia, bateria, combustível, recuperação de energia e clima; com rota, a próxima manobra e um anel de autonomia">
+              <span>Sem rota</span><div class="topbar" data-variant="full"></div>
+              <span>Com rota</span><div class="topbar" data-variant="nav"></div>
+            </div></figure>
+            <div><div class="kicker">Barra superior</div><h3>Informações ao lado do relógio</h3><p>Mídia, bateria e combustível com a autonomia de cada um, recuperação de energia e clima ficam na própria barra superior do carro. Com uma rota, a próxima manobra entra junto e a autonomia vira um anel. Ela sai da frente enquanto um app em tela cheia, como o Android Auto, esconde essa barra.</p></div>
           </article>
           <article class="slide">
-            <figure><img src="../img/settings-pt.webp" width="800" height="1240" loading="lazy" alt="Tela de ajustes com posição da gaveta, opções da alça e lista de widgets"></figure>
+            <figure><img src="../img/settings-pt.webp" width="800" height="1174" loading="lazy" alt="Tela de ajustes com posição da gaveta, opções da alça e lista de widgets"></figure>
             <div><div class="kicker">Ajustes</div><h3>Do seu jeito</h3><p>Escolha o lado e a altura da alça, toque ou deslize para abrir, ligue ou desligue a barra de informações e reordene ou esconda widgets separadamente para a meia gaveta e a gaveta aberta. O painel Status mostra ao vivo a ligação com o carro, a mídia e o acesso às notificações.</p></div>
           </article>
           <article class="slide">
@@ -180,6 +183,7 @@
   </div>
 </footer>
 
+<script src="../topbar.js" defer></script>
 <script src="../carousel.js" defer></script>
 <script type="module" src="../setup.js"></script>
 </body>
