@@ -70,7 +70,8 @@ them either.
 ## Install on the car
 
 **From the browser:** install the APK (steps 1–3 below), then open the
-[setup page](https://carlosrpg.github.io/QuickSettings/#setup-section) in Chrome or Edge, plug the
+[setup page](https://carlosrpg.github.io/QuickSettings/#setup-section)
+([em português](https://carlosrpg.github.io/QuickSettings/pt/#setup-section)) in Chrome or Edge, plug the
 car in with a data cable and click Connect. It shows which of the grants below are missing and
 applies them over WebUSB, with the same commands. The page lives in `docs/` (GitHub Pages, from
 `/docs` on `main`).
