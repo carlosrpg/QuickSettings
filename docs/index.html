@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickSettings for Jaecoo 7</title>
+<meta name="description" content="A widget drawer that floats over every app on the Jaecoo 7 head unit. Set it up from your browser over USB.">
+<meta name="theme-color" content="#0b0e14">
+<style>
+  :root {
+    --bg: #0b0e14; --bg2: #0e121a; --glass: rgba(14,18,26,.85); --tile: rgba(255,255,255,.06);
+    --hair: rgba(255,255,255,.10); --text: #eef2f7; --soft: #c6d0dc; --muted: #9aa6b6; --dim: #6b7686;
+    --cool: #2f6bff; --mid: #8a7bbf; --warm: #ff7a2e; --energy: #3ddc97; --amber: #ffb547; --red: #ff5a5f;
+    --fuel: #f2b84b; --route: #4da3ff; --radius: 20px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--route); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  .glow::before {
+    content: ""; position: absolute; inset: -20% -10% auto; height: 720px; z-index: -1; pointer-events: none;
+    background: radial-gradient(40% 50% at 25% 35%, rgba(47,107,255,.28), transparent 70%),
+                radial-gradient(35% 45% at 80% 30%, rgba(255,122,46,.20), transparent 70%);
+    filter: blur(20px);
+  }
+  header.nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(14px); background: rgba(11,14,20,.7); border-bottom: 1px solid var(--hair); }
+  header.nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+  .brand { font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; }
+  .brand i { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--cool), var(--warm)); display: inline-block; }
+  header.nav nav { margin-left: auto; display: flex; gap: 20px; }
+  header.nav nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
+  header.nav nav a:hover { color: var(--text); }
+  @media (max-width: 640px) { header.nav nav a:not(.cta) { display: none; } }
+
+  .hero { position: relative; padding: 80px 0 60px; overflow-x: clip; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; }
+  @media (max-width: 900px) { .hero .wrap { grid-template-columns: 1fr; } .hero { padding-top: 48px; } }
+  .eyebrow { color: var(--warm); font-weight: 600; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+  h1 { font-size: clamp(36px, 5.5vw, 60px); line-height: 1.05; letter-spacing: -.03em; margin: 12px 0 18px; }
+  h1 em { font-style: normal; background: linear-gradient(90deg, var(--route), var(--mid) 50%, var(--warm)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { color: var(--soft); font-size: 19px; max-width: 34em; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .btn {
+    appearance: none; border: 1px solid var(--hair); background: var(--tile); color: var(--text);
+    padding: 12px 20px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px; transition: background .15s, transform .15s;
+  }
+  .btn:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+  .btn:active:not(:disabled) { transform: scale(.98); }
+  .btn.primary { background: var(--cool); border-color: transparent; }
+  .btn.primary:hover:not(:disabled) { background: #4a80ff; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.small { padding: 7px 14px; font-size: 14px; }
+  .btn:focus-visible, summary:focus-visible { outline: 2px solid var(--route); outline-offset: 2px; }
+
+  /* Drawer illustration */
+  .screen {
+    position: relative; aspect-ratio: 16/10; border-radius: 26px; overflow: hidden; border: 1px solid var(--hair);
+    background: linear-gradient(160deg, #1a2333, #0c1018 60%), #0c1018; box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  }
+  .screen .map { position: absolute; inset: 0; opacity: .35;
+    background:
+      linear-gradient(115deg, transparent 47%, var(--route) 47.4%, var(--route) 48.4%, transparent 48.8%),
+      repeating-linear-gradient(0deg, transparent 0 38px, rgba(255,255,255,.05) 38px 39px),
+      repeating-linear-gradient(90deg, transparent 0 38px, rgba(255,255,255,.05) 38px 39px); }
+  .drawer {
+    position: absolute; top: 4%; bottom: 4%; left: 3%; width: 46%; border-radius: 20px; padding: 3%;
+    background: var(--glass); backdrop-filter: blur(18px); border: 1px solid var(--hair);
+    display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 3.5%;
+    animation: slide 1.1s cubic-bezier(.2,.8,.2,1) both .2s;
+  }
+  @keyframes slide { from { transform: translateX(-108%); } }
+  @media (prefers-reduced-motion: reduce) { .drawer { animation: none; } html { scroll-behavior: auto; } }
+  .w { background: var(--tile); border-radius: 14px; padding: 9%; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; font-size: clamp(9px, 1.15vw, 12px); color: var(--muted); }
+  .w b { color: var(--text); font-size: 1.35em; font-weight: 650; }
+  .w .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .w .bar span { display: block; height: 100%; }
+  .ring { width: 46%; aspect-ratio: 1; border-radius: 50%; align-self: center;
+    background: conic-gradient(var(--energy) 0 68%, rgba(255,255,255,.1) 0); -webkit-mask: radial-gradient(circle, transparent 56%, #000 57%); mask: radial-gradient(circle, transparent 56%, #000 57%); }
+  .quad { flex: 1; margin-top: 6%; border-radius: 10px; position: relative;
+    background: linear-gradient(90deg, rgba(47,107,255,.35), rgba(138,123,191,.3), rgba(255,122,46,.4)); }
+  .quad::after { content: ""; position: absolute; left: 62%; top: 38%; width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,.25); }
+  .handle { position: absolute; left: 0; top: 40%; width: 5px; height: 20%; border-radius: 0 6px 6px 0; background: rgba(255,255,255,.35); }
+
+  section { padding: 72px 0; }
+  h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -.02em; line-height: 1.15; margin: 0 0 12px; }
+  .sub { color: var(--muted); max-width: 46em; margin: 0 0 36px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025)); border: 1px solid var(--hair); border-radius: var(--radius); padding: 24px; }
+  .card h3 { margin: 14px 0 6px; font-size: 19px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; }
+  .icon svg { width: 22px; height: 22px; }
+
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 800px) { .facts { grid-template-columns: 1fr; } }
+  .fact { border-left: 2px solid var(--cool); padding: 4px 0 4px 18px; }
+  .fact h3 { margin: 0 0 4px; font-size: 17px; }
+  .fact p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0 0 32px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 900px) { ol.steps { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { ol.steps { grid-template-columns: 1fr; } }
+  ol.steps li { counter-increment: s; background: var(--tile); border: 1px solid var(--hair); border-radius: 16px; padding: 18px 18px 18px 60px; position: relative; color: var(--soft); font-size: 15px; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 18px; top: 16px; width: 28px; height: 28px; border-radius: 50%; background: var(--cool); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  ol.steps strong { color: var(--text); display: block; }
+
+  #setup { background: var(--bg2); border: 1px solid var(--hair); border-radius: 24px; padding: 28px; }
+  .setup-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  #device { color: var(--muted); font-size: 14px; }
+  #setup-status { margin: 8px 0 20px; padding: 12px 16px; border-radius: 12px; background: var(--tile); color: var(--soft); }
+  #setup-status[data-tone="ok"] { background: rgba(61,220,151,.12); color: var(--energy); }
+  #setup-status[data-tone="warn"] { background: rgba(255,181,71,.12); color: var(--amber); }
+  #setup-status[data-tone="error"] { background: rgba(255,90,95,.12); color: var(--red); }
+  #grant-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .grant { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: start; padding: 16px; border-radius: 14px; background: var(--tile); }
+  .grant-dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 7px; background: var(--dim); }
+  .grant[data-state="ok"] .grant-dot { background: var(--energy); box-shadow: 0 0 10px var(--energy); }
+  .grant[data-state="missing"] .grant-dot { background: var(--amber); }
+  .grant-body { min-width: 0; }
+  .grant-title { font-weight: 600; }
+  .grant p { margin: 2px 0 6px; color: var(--muted); font-size: 14px; }
+  .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted); margin-left: 6px; vertical-align: 2px; }
+  .tag.req { background: rgba(255,122,46,.15); color: var(--warm); }
+  summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+  pre { margin: 8px 0 0; padding: 10px 12px; background: #06080c; border-radius: 10px; overflow-x: auto; font-size: 12.5px; }
+  code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+  #setup-log { margin-top: 18px; max-height: 200px; overflow: auto; }
+  .setup-foot { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+  @media (max-width: 560px) { .grant { grid-template-columns: auto 1fr; } .grant .btn { grid-column: 2; justify-self: start; } }
+
+  .faq details { border-bottom: 1px solid var(--hair); padding: 16px 0; }
+  .faq summary { color: var(--text); font-size: 17px; font-weight: 600; list-style: none; }
+  .faq summary::after { content: "+"; float: right; color: var(--dim); }
+  .faq details[open] summary::after { content: "–"; }
+  .faq details p { color: var(--muted); margin: 10px 0 0; }
+
+  footer { border-top: 1px solid var(--hair); padding: 32px 0 48px; color: var(--dim); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><i aria-hidden="true"></i>QuickSettings</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#faq">FAQ</a>
+      <a class="cta" href="#setup-section">Set up</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero glow">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow">Jaecoo 7 · Android Automotive 11</div>
+        <h1>Your car, one <em>swipe away</em>.</h1>
+        <p class="lead">A glass drawer that floats over every app on the head unit: media, climate, battery mode, range, navigation and driver assist, readable at a glance and controllable with one finger.</p>
+        <div class="actions">
+          <a class="btn primary" href="#setup-section">Set it up from this page</a>
+          <a class="btn" href="https://github.com/carlosrpg/QuickSettings/releases/latest">Download the APK</a>
+        </div>
+      </div>
+      <div class="screen" role="img" aria-label="Illustration of the QuickSettings drawer open over a map, showing media, climate, range and navigation widgets">
+        <div class="map"></div>
+        <div class="handle"></div>
+        <div class="drawer" aria-hidden="true">
+          <div class="w"><span>Now playing</span><b>Bluetooth</b><div class="bar"><span style="width:42%;background:var(--route)"></span></div></div>
+          <div class="w"><span>Climate · 22°</span><div class="quad"></div></div>
+          <div class="w"><span>Range</span><div class="ring"></div><b>84 km</b></div>
+          <div class="w"><span>In 300 m</span><b>↱ Av. Paulista</b><div class="bar"><span style="width:70%;background:var(--warm)"></span></div></div>
+          <div class="w"><span>Battery mode</span><b style="color:var(--energy)">Smart</b><span>Regen ▮▮▯</span></div>
+          <div class="w"><span>Assist</span><b>AEB · ON</b><span>Lane prevention on</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>Six widgets, two sizes</h2>
+      <p class="sub">Touch the edge handle to open the drawer half-way: small tiles you read at a glance, with press-and-drag shortcuts. Open it fully for large cards and every control. English and Brazilian Portuguese.</p>
+      <div class="grid">
+        <article class="card">
+          <div class="icon" style="background:rgba(77,163,255,.15);color:var(--route)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+          <h3>Media</h3>
+          <p>Apps on the head unit and the car's own sources: Bluetooth, USB, CarPlay, Android Auto. Drag for volume and tracks, voice search sent to the app that's playing.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(255,122,46,.15);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg></div>
+          <h3>Climate</h3>
+          <p>A temperature × fan quadrant: drag the marker and it's set on release. Climate on/off, auto, zone sync and recirculation follow the car's state.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(61,220,151,.15);color:var(--energy)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+          <h3>Car mode</h3>
+          <p>Battery mode (Initial, Smart, Forced with a hold target) and regeneration Low, Medium, High, one tap each.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(242,184,75,.15);color:var(--fuel)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg></div>
+          <h3>Autonomy</h3>
+          <p>Battery and fuel rings, electric and fuel range in km and %, and the total.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(138,123,191,.18);color:var(--mid)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m3 11 19-9-9 19-2-8-8-2z"/></svg></div>
+          <h3>Navigation</h3>
+          <p>Next turn, street and ETA from your nav app; voice destination with no route; send the map to the instrument cluster and back.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(255,90,95,.14);color:var(--red)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <h3>Driver assist</h3>
+          <p>Emergency braking, auto hold, lane departure prevention and collision warning, with the stock UI's own rules and a second tap to switch a safety function off.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="sub">QuickSettings talks to the car through the head unit's own services, the same ones the stock apps use, through the open-source <a href="https://github.com/carlosrpg/jconfig-carbus">jconfig-carbus</a> library.</p>
+      <div class="facts">
+        <div class="fact"><h3>Nothing writes on its own</h3><p>Every change to the car comes from your tap, slider release or drag release. Safety functions keep the stock gates.</p></div>
+        <div class="fact" style="border-color:var(--energy)"><h3>Always there</h3><p>The drawer runs as a foreground service from boot, and the notification listener brings it back if the system kills it.</p></div>
+        <div class="fact" style="border-color:var(--warm)"><h3>Live values</h3><p>The car has no change notifications for apps, so the drawer polls every 1.5 s while it's on screen, and right after each change.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup-section">
+    <div class="wrap">
+      <h2>Set up from your browser</h2>
+      <p class="sub">The head unit has no settings page for drawing over apps or notification access, so those are granted over ADB. This page does it for you over a USB cable, with nothing to install on your computer.</p>
+      <ol class="steps">
+        <li><strong>Download the APK</strong>From the <a href="https://github.com/carlosrpg/QuickSettings/releases/latest">latest release</a>, onto a USB stick.</li>
+        <li><strong>Install it on the car</strong>With a file manager on the head unit, then open QuickSettings once.</li>
+        <li><strong>Turn on USB debugging</strong>In the car's engineering menu, then plug a data cable from this computer into the car.</li>
+        <li><strong>Connect and grant</strong>Below, in Chrome or Edge. Microphone (voice search) is granted in the app itself.</li>
+      </ol>
+
+      <div id="setup" aria-live="polite">
+        <div class="setup-head">
+          <div>
+            <strong>Head unit</strong> <span id="device"></span>
+          </div>
+          <div>
+            <button id="connect" class="btn primary">Connect</button>
+            <button id="disconnect" class="btn" hidden>Disconnect</button>
+          </div>
+        </div>
+        <div id="setup-status">Loading…</div>
+        <ul id="grant-list"></ul>
+        <div class="setup-foot">
+          <button id="grant-all" class="btn primary" disabled>Grant everything missing</button>
+        </div>
+        <pre id="setup-log" hidden></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" class="faq">
+    <div class="wrap">
+      <h2>Questions</h2>
+      <details><summary>Which browsers work?</summary><p>Chrome, Edge or another Chromium browser with WebUSB, on Windows, macOS, Linux or ChromeOS. Chrome on an Android phone works too, with a USB-OTG adapter. Firefox and Safari have no WebUSB.</p></details>
+      <details><summary>The connection fails or the car isn't listed</summary><p>Use a data cable, not a charge-only one. If you have the Android tools installed, another adb is probably holding the port: run <code>adb kill-server</code> and try again. On Windows the head unit may need the Google USB driver.</p></details>
+      <details><summary>What does this page run on my car?</summary><p>Only the commands shown under "Manual command" for each item, plus read-only checks (<code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). It doesn't install anything, and nothing is sent anywhere but to the car over the cable.</p></details>
+      <details><summary>Do I have to do this again?</summary><p>No. The grants survive reboots and app updates. Uninstalling the app removes them.</p></details>
+      <details><summary>I'd rather type the commands</summary><p>Every command is in the <a href="https://github.com/carlosrpg/QuickSettings#install-on-the-car">README</a>, and the app's settings screen shows each missing one.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>QuickSettings is an independent project, not affiliated with Jaecoo, Chery or Desay SV.</span>
+    <a href="https://github.com/carlosrpg/QuickSettings">Source on GitHub</a>
+  </div>
+</footer>
+
+<script type="module" src="setup.js"></script>
+</body>
+</html>

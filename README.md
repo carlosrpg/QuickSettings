@@ -69,6 +69,12 @@ them either.
 
 ## Install on the car
 
+**From the browser:** install the APK (steps 1–3 below), then open the
+[setup page](https://carlosrpg.github.io/QuickSettings/#setup-section) in Chrome or Edge, plug the
+car in with a data cable and click Connect. It shows which of the grants below are missing and
+applies them over WebUSB, with the same commands. The page lives in `docs/` (GitHub Pages, from
+`/docs` on `main`).
+
 **Easy path (Windows):** download `QuickSettings-FirstInstall.zip` from the latest
 [release](../../releases), unzip it, enable ADB on the car, connect the cable and double-click
 `First-Install.cmd`. It fetches adb if needed, copies the APK to the car's Download folder when
