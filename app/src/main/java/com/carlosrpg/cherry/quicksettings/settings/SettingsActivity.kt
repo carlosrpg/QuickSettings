@@ -93,7 +93,12 @@ import com.carlosrpg.cherry.quicksettings.ui.QsIcon
 import com.carlosrpg.cherry.quicksettings.ui.QsSlider
 import com.carlosrpg.cherry.quicksettings.ui.QsText
 import com.carlosrpg.cherry.quicksettings.ui.Segmented
+import android.content.pm.PackageInstaller
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 class SettingsActivity : ComponentActivity() {
@@ -163,8 +168,80 @@ class SettingsActivity : ComponentActivity() {
             // Wi-Fi and adb change elsewhere: their state is re-read every tick. Not keyed, so the
             // password field and switches keep their state (and focus) across ticks.
             AutomationPanels(refresh)
+            UpdatePanel()
             key(refresh) { Status() }
         }
+    }
+
+    /** Checks GitHub Pages for a newer build and installs it, with Android's own confirm screen. */
+    @Composable
+    private fun UpdatePanel() = Panel {
+        CardLabel(stringResource(R.string.update_title))
+        val scope = rememberCoroutineScope()
+        var latest by remember { mutableStateOf<String?>(null) }
+        var message by remember { mutableStateOf<String?>(null) }
+        var busy by remember { mutableStateOf(false) }
+        val context = this@SettingsActivity
+        val refused = stringResource(R.string.update_saved, "%s")
+        val failed = stringResource(R.string.update_failed, "%s")
+        val waiting = stringResource(R.string.update_waiting)
+        // The session's result: Android's confirm screen first, then success or the reason it failed.
+        DisposableEffect(Unit) {
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(c: android.content.Context, intent: Intent) {
+                    val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                    if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                        @Suppress("DEPRECATION") // the typed overload is API 33+
+                        intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)?.let { open(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        message = waiting
+                        return
+                    }
+                    busy = false
+                    if (status == PackageInstaller.STATUS_SUCCESS) return
+                    val reason = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "status $status"
+                    DebugLog.add("update", "install failed: $reason")
+                    if (status == PackageInstaller.STATUS_FAILURE_ABORTED) { message = null; return } // the user cancelled
+                    scope.launch {
+                        val apk = java.io.File(cacheDir, "update.apk")
+                        val saved = withContext(Dispatchers.IO) { AppUpdater.saveToDownloads(context, apk) }
+                        message = (if (saved) refused else failed).format(reason)
+                    }
+                }
+            }
+            // Only senders holding our signature permission: the session result, never another app.
+            @Suppress("UnspecifiedRegisterReceiverFlag") // the flag is API 33+; the permission protects it
+            registerReceiver(receiver, android.content.IntentFilter(AppUpdater.ACTION_RESULT), AppUpdater.RESULT_PERMISSION, null)
+            onDispose { unregisterReceiver(receiver) }
+        }
+        val newer = latest?.let { AppUpdater.isNewer(it, BuildConfig.VERSION_NAME) } == true
+        QsText(stringResource(R.string.status_version, BuildConfig.VERSION_NAME), 14.sp, Qs.TextSoft)
+        latest?.let { QsText(stringResource(if (newer) R.string.update_latest else R.string.update_current, it), 14.sp, Qs.TextSoft) }
+        message?.let { Text(it, color = Qs.Warm, fontSize = 13.sp) }
+        val label = when {
+            busy -> stringResource(if (newer) R.string.update_downloading else R.string.update_checking)
+            newer -> stringResource(R.string.update_install, latest!!)
+            else -> stringResource(R.string.update_check)
+        }
+        GlassButton(null, label, {
+            if (busy) return@GlassButton
+            busy = true
+            scope.launch {
+                try {
+                    if (!newer) {
+                        message = null
+                        latest = withContext(Dispatchers.IO) { AppUpdater.latestVersion() }
+                        busy = false
+                    } else {
+                        message = null
+                        withContext(Dispatchers.IO) { AppUpdater.install(context, AppUpdater.download(context)) }
+                    }
+                } catch (e: Exception) {
+                    DebugLog.add("update", e.toString())
+                    message = failed.format(e.message ?: e.javaClass.simpleName)
+                    busy = false
+                }
+            }
+        }, label = label)
     }
 
     @Composable

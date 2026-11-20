@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Settings > App update: installs the newest build through a PackageInstaller session. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Guards the install-result receiver: the session's PendingIntent fires as this app. -->
+    <permission
+        android:name="com.carlosrpg.cherry.quicksettings.permission.UPDATE_RESULT"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.carlosrpg.cherry.quicksettings.permission.UPDATE_RESULT" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
