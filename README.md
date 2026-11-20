@@ -73,9 +73,11 @@ them either.
 [setup page](https://carlosrpg.github.io/QuickSettings/#setup-section)
 ([em português](https://carlosrpg.github.io/QuickSettings/pt/#setup-section)) in Chrome or Edge, plug the
 car in with a data cable and click Connect. **Install latest** installs the newest release on the
-car: the page pushes the APK and `docs/car-setup.sh` to `/data/local/tmp` and runs the script, which
-runs `pm install`, opens the app and deletes both files (if the car refuses, it copies the APK to
-the Download folder instead). Then it shows which of the grants below are missing and applies them
+car: the page pushes the APK and `docs/car-setup.sh` to `/data/local/tmp` and runs the script. The
+car refuses a plain `pm install` from the adb-shell uid, so the script installs the APK through a
+`PackageInstaller` session opened by a small embedded helper run with `app_process`, opens the app
+and deletes the pushed files (if that session is refused too, it copies the APK to the Download
+folder for a file-manager install). Then it shows which of the grants below are missing and applies them
 over WebUSB, with the same commands. The page lives in `docs/`; CI deploys it to GitHub Pages
 with the released APK under `latest/` (Settings → Pages → Source: GitHub Actions).
 
