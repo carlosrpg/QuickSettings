@@ -257,32 +257,36 @@ class SettingsActivity : ComponentActivity() {
         val store = app.settings
         CardLabel(stringResource(R.string.drawer_position))
         var position by remember(config.edgePosition) { mutableFloatStateOf(config.edgePosition) }
-        ScreenPreview(config.side, position)
-        QsText(stringResource(R.string.side), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
-        Segmented(
-            Side.entries, config.side,
-            { stringResource(if (it == Side.LEFT) R.string.side_left else R.string.side_right) },
-            Qs.Text, { side -> store.update { it.copy(side = side) } },
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            QsText(stringResource(R.string.position_on_edge), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
-            QsText(stringResource(positionLabel(position)), 14.sp, Qs.Muted)
-        }
-        val sliderDescription = stringResource(R.string.position_on_edge)
-        QsSlider(
-            value = position,
-            range = 0f..1f,
-            description = sliderDescription,
-            onChange = { position = it },
-            onFinished = { store.update { it.copy(edgePosition = position) } },
-        )
-        val tapLabel = stringResource(R.string.tap_to_open)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                QsText(tapLabel, 16.sp, weight = FontWeight.SemiBold)
-                Text(stringResource(R.string.tap_to_open_hint), color = Qs.Muted, fontSize = 13.sp)
+        // The handle shows when it is switched on, or when the top bar is off (then it is the only
+        // way in). Without it, its side, place and tap setting change nothing, so they go away.
+        if (handleShown(config)) {
+            ScreenPreview(config.side, position)
+            QsText(stringResource(R.string.side), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
+            Segmented(
+                Side.entries, config.side,
+                { stringResource(if (it == Side.LEFT) R.string.side_left else R.string.side_right) },
+                Qs.Text, { side -> store.update { it.copy(side = side) } },
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                QsText(stringResource(R.string.position_on_edge), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
+                QsText(stringResource(positionLabel(position)), 14.sp, Qs.Muted)
             }
-            Toggle(config.tapToOpen, tapLabel) { store.update { it.copy(tapToOpen = !it.tapToOpen) } }
+            val sliderDescription = stringResource(R.string.position_on_edge)
+            QsSlider(
+                value = position,
+                range = 0f..1f,
+                description = sliderDescription,
+                onChange = { position = it },
+                onFinished = { store.update { it.copy(edgePosition = position) } },
+            )
+            val tapLabel = stringResource(R.string.tap_to_open)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    QsText(tapLabel, 16.sp, weight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.tap_to_open_hint), color = Qs.Muted, fontSize = 13.sp)
+                }
+                Toggle(config.tapToOpen, tapLabel) { store.update { it.copy(tapToOpen = !it.tapToOpen) } }
+            }
         }
         val handleLabel = stringResource(R.string.side_handle)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -556,13 +560,18 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun WidgetsPanel(config: QsConfig) = Panel {
         val store = app.settings
-        var tab by remember { mutableIntStateOf(0) }
+        var chosen by remember { mutableIntStateOf(0) }
+        // Semi-open is reached only from the side handle: without it, only the open order matters.
+        val semiReachable = handleShown(config)
+        val tab = if (semiReachable) chosen else 1
         Row(verticalAlignment = Alignment.CenterVertically) {
             CardLabel(stringResource(R.string.widgets), Modifier.weight(1f))
-            Segmented(
-                listOf(0, 1), tab, { stringResource(if (it == 0) R.string.state_semi else R.string.state_open) },
-                Qs.Text, { tab = it }, Modifier.width(340.dp),
-            )
+            if (semiReachable) {
+                Segmented(
+                    listOf(0, 1), tab, { stringResource(if (it == 0) R.string.state_semi else R.string.state_open) },
+                    Qs.Text, { chosen = it }, Modifier.width(340.dp),
+                )
+            }
         }
         QsText(stringResource(R.string.widgets_hint), 13.sp, Qs.Muted)
         val order = if (tab == 0) config.semiOrder else config.openOrder
@@ -575,6 +584,9 @@ class SettingsActivity : ComponentActivity() {
             }
         }
     }
+
+    /** Whether the side handle is on screen (the overlay's rule, less the tap relay a grant away). */
+    private fun handleShown(config: QsConfig) = config.sideHandle || !config.topBar
 
     @StringRes
     private fun positionLabel(p: Float) = when {
@@ -698,6 +710,8 @@ class SettingsActivity : ComponentActivity() {
             fun age(at: Long) = if (at == 0L) "never" else "${(now - at) / 1000} s ago"
             appendLine("feeds: car read ${age(app.car.lastReadAt)}  media read ${age(app.media.lastRefreshAt)}")
             appendLine("full screen: ${com.carlosrpg.cherry.quicksettings.overlay.FullScreenDetector.last}")
+            appendLine("--- drawer: touches, gestures and zones (newest last; a touch with no line never reached the app)")
+            OverlayService.drawerEvents.snapshot().ifEmpty { listOf("none") }.forEach { appendLine("  $it") }
             appendLine("--- cluster media (sync ${if (app.settings.config.value.clusterMediaSync) "on" else "off"})")
             appendLine("sync: ${app.clusterMedia.describe()}")
             appendLine("car media now: ${app.media.describeCar()}")

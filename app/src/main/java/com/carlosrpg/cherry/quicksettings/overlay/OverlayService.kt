@@ -41,6 +41,7 @@ import com.carlosrpg.cherry.quicksettings.ui.DrawerActions
 import com.carlosrpg.cherry.quicksettings.ui.DrawerMode
 import com.carlosrpg.cherry.quicksettings.ui.DrawerRoot
 import com.carlosrpg.cherry.quicksettings.ui.TopBar
+import com.carlosrpg.cherry.quicksettings.media.EventRing
 import com.carlosrpg.cherry.quicksettings.nav.NavStore
 import com.carlosrpg.cherry.quicksettings.phone.PhoneLink
 import com.carlosrpg.cherry.quicksettings.voice.VoiceInput
@@ -125,6 +126,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         phones = PhoneLink(this, actions) { kick.trySend(Unit) }
         config = app.settings.config.value
         fullScreen = FullScreenDetector(this)
+        event("service started (overlay allowed=${canDraw(this)}, tap relay=${TapRelayService.bound.value})")
         addEdge()
         updateTopBar()
         lifecycleScope.launch {
@@ -152,6 +154,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         lifecycleScope.launch { TapRelayService.windowEvents.collect { checkFullScreen() } }
         lifecycleScope.launch {
             TapRelayService.bound.collectLatest {
+                event("tap relay ${if (it) "bound" else "not bound"}")
                 updateEdge()
                 updateTopZone()
             }
@@ -167,6 +170,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     }
 
     override fun onDestroy() {
+        event("service stopped")
         handler.removeCallbacksAndMessages(null)
         contentResolver.unregisterContentObserver(navStateObserver)
         phones.setEnabled(false)
@@ -192,7 +196,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     // --- edge window -------------------------------------------------------------------
 
     private fun addEdge() {
-        val view = EdgeTouchView(this, config.side, config.tapToOpen, onOpen = { show(DrawerMode.SEMI) }, onTap = ::relayTap)
+        val view = EdgeTouchView(this, config.side, config.tapToOpen, onOpen = { how -> show(DrawerMode.SEMI, how) }, onTap = ::relayTap, log = ::event)
         edgeView = view
         wm.addView(view, edgeParams())
     }
@@ -207,6 +211,19 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         view.visibility = if (mode == null && handle) View.VISIBLE else View.GONE
         wm.updateViewLayout(view, edgeParams())
         view.invalidate()
+        zoneState("edge", when {
+            mode != null -> "hidden (drawer ${mode?.name?.lowercase()})"
+            !handle -> "hidden (side handle off; the top strip opens the drawer)"
+            relayPending -> "visible, untouchable while a tap is passed on"
+            else -> "visible, ${if (config.tapToOpen) "touch" else "swipe"} opens"
+        })
+    }
+
+    private val zoneStates = HashMap<String, String>()
+
+    /** Logs a touch zone's state when it changes: a zone that is gone or untouchable explains a dead touch. */
+    private fun zoneState(zone: String, state: String) {
+        if (zoneStates.put(zone, state) != state) event("$zone zone: $state")
     }
 
     private fun edgeParams(touchable: Boolean = !relayPending) = WindowManager.LayoutParams(
@@ -243,22 +260,43 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         view: View, x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long,
         params: (touchable: Boolean) -> WindowManager.LayoutParams,
     ) {
-        val relay = TapRelayService.instance ?: return
+        val relay = TapRelayService.instance ?: return event("touch not passed on: tap relay not bound")
         relayPending = true
         wm.updateViewLayout(view, params(false))
+        // If the system never reports the replay back, the zones must not stay dead.
+        handler.postDelayed(relayTimeout, RELAY_DELAY_MS + durationMs + RELAY_TIMEOUT_MS)
         handler.postDelayed({
-            relay.replay(x0, y0, x1, y1, durationMs) {
-                handler.post {
-                    relayPending = false
-                    if (view.isAttachedToWindow) wm.updateViewLayout(view, params(true))
-                }
-            }
+            relay.replay(x0, y0, x1, y1, durationMs) { handler.post(::restoreTouch) }
         }, RELAY_DELAY_MS)
     }
 
+    private val relayTimeout = Runnable {
+        if (relayPending) {
+            event("passed-on touch never reported back: zones made touchable again")
+            restoreTouch()
+        }
+    }
+
+    /**
+     * Ends a pass-on: makes the zones that exist now touchable again. The window that took the
+     * touch may have been replaced meanwhile (the drawer opened and closed, the bar came back),
+     * and a replacement added during the pass-on started untouchable too.
+     */
+    private fun restoreTouch() {
+        handler.removeCallbacks(relayTimeout)
+        relayPending = false
+        edgeView?.let { if (it.isAttachedToWindow) wm.updateViewLayout(it, edgeParams()) }
+        topZoneView?.let { if (it.isAttachedToWindow) wm.updateViewLayout(it, topZoneParams()) }
+        updateEdge()
+        updateTopZone()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Sent by OpenDrawerActivity (a gesture app launching QuickSettings): the full drawer.
-        if (intent?.action == ACTION_OPEN_TOP) handler.post { if (mode == null) openFromTop() }
+        // Sent by OpenDrawerActivity (a gesture app launching QuickSettings): the full drawer,
+        // also from semi-open or while it is still sliding shut.
+        if (intent?.action == ACTION_OPEN_TOP) handler.post {
+            if (mode == DrawerMode.OPEN && !closing) event("gesture: drawer already open") else openFromTop("gesture")
+        }
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -381,10 +419,17 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private fun updateTopZone() {
         // Without the tap relay a tap in the strip would be lost, so it waits for the relay.
         val wanted = topBarView != null && mode == null && TapRelayService.bound.value
+        zoneState("top", when {
+            topBarView == null -> "off (top bar off)"
+            mode != null -> "hidden (drawer ${mode?.name?.lowercase()})"
+            !TapRelayService.bound.value -> "off (tap relay not bound)"
+            relayPending -> "up, untouchable while a touch is passed on"
+            else -> "up"
+        })
         val view = topZoneView
         when {
             wanted && view == null -> {
-                topZoneView = TopSwipeView(this, onOpen = ::openFromTop, onPass = ::relayTop)
+                topZoneView = TopSwipeView(this, onOpen = ::openFromTop, onPass = ::relayTop, log = ::event)
                     .also { wm.addView(it, topZoneParams()) }
             }
             wanted && view != null -> wm.updateViewLayout(view, topZoneParams())
@@ -395,9 +440,9 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         }
     }
 
-    private fun openFromTop() {
+    private fun openFromTop(how: String) {
         fromTop = true
-        show(DrawerMode.OPEN)
+        show(DrawerMode.OPEN, how)
     }
 
     private fun relayTop(x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long) {
@@ -446,7 +491,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     // --- drawer window -----------------------------------------------------------------
 
-    private fun show(target: DrawerMode) {
+    private fun show(target: DrawerMode, how: String? = null) {
+        if (how != null) event("$how -> ${target.name.lowercase()} (was ${mode?.name?.lowercase() ?: "closed"}${if (closing) ", closing" else ""})")
         handler.removeCallbacks(finishCloseFallback)
         closing = false
         val wasClosed = mode == null
@@ -471,7 +517,15 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 }
             }
             drawerView = view
-            wm.addView(view, drawerParams())
+            try {
+                wm.addView(view, drawerParams())
+            } catch (e: RuntimeException) {
+                // Overlay permission gone, or the window manager refused: say so instead of dying.
+                event("drawer window refused: $e")
+                drawerView = null
+                mode = null
+                return
+            }
         } else {
             wm.updateViewLayout(drawerView, drawerParams())
         }
@@ -608,11 +662,20 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val OPEN_IDLE_MS = 20_000L
         private const val RELAY_DELAY_MS = 60L
         private const val TAP_RELAY_MS = 40L
+        private const val RELAY_TIMEOUT_MS = 1_500L
         private const val ACTION_OPEN_TOP = "com.carlosrpg.cherry.quicksettings.OPEN_TOP"
         // The slide-out takes 220 ms; past this the window goes regardless.
         private const val CLOSE_FALLBACK_MS = 600L
 
         fun canDraw(context: Context) = Settings.canDrawOverlays(context)
+
+        /** Every attempt to open the drawer and what came of it, for the debug screen. */
+        val drawerEvents = EventRing(40)
+
+        fun event(line: String) {
+            Log.i("QsDrawer", line)
+            drawerEvents.add(line)
+        }
 
         fun start(context: Context) {
             if (canDraw(context)) context.startForegroundService(Intent(context, OverlayService::class.java))
@@ -620,7 +683,15 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
         /** Opens the full drawer, as a pull down from the top does. Call from a foreground activity. */
         fun openTop(context: Context) {
-            if (canDraw(context)) context.startService(Intent(context, OverlayService::class.java).setAction(ACTION_OPEN_TOP))
+            if (!canDraw(context)) return event("gesture: overlay permission missing, nothing can be drawn")
+            val intent = Intent(context, OverlayService::class.java).setAction(ACTION_OPEN_TOP)
+            try {
+                context.startService(intent)
+            } catch (e: IllegalStateException) {
+                // Not allowed to start a plain service from here: the foreground start always is.
+                event("gesture: plain start refused ($e), starting in the foreground")
+                context.startForegroundService(intent)
+            }
         }
     }
 }

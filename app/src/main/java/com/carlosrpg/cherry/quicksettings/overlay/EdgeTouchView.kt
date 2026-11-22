@@ -24,8 +24,10 @@ class EdgeTouchView(
     context: Context,
     var side: Side,
     var tapOpens: Boolean,
-    private val onOpen: () -> Unit,
+    /** Called with how it opened ("edge touch", "edge swipe"). */
+    private val onOpen: (how: String) -> Unit,
     private val onTap: (rawX: Float, rawY: Float) -> Unit,
+    private val log: (String) -> Unit = {},
 ) : View(context) {
     private val density = resources.displayMetrics.density
     private val openDistance = 24 * density
@@ -62,19 +64,23 @@ class EdgeTouchView(
                 // release.
                 if (tapOpens) {
                     opened = true
-                    onOpen()
+                    onOpen("edge touch")
+                } else {
+                    log("edge touched")
                 }
             }
             MotionEvent.ACTION_MOVE -> if (!opened) {
                 val inward = if (side == Side.LEFT) event.rawX - downX else downX - event.rawX
                 if (inward > openDistance && inward > abs(event.rawY - downY)) {
                     opened = true
-                    onOpen()
+                    onOpen("edge swipe")
                 }
             }
             MotionEvent.ACTION_UP -> if (!opened && hypot(event.rawX - downX, event.rawY - downY) < touchSlop) {
                 onTap(event.rawX, event.rawY)
             }
+            // The car's back gesture (or another system gesture) took the touch before it was a swipe.
+            MotionEvent.ACTION_CANCEL -> if (!opened) log("edge touch taken by the system before it opened")
         }
         return true
     }
