@@ -34,8 +34,9 @@ builds).
   prebuilt AARs in `app/libs/`: `carbus` (the Kotlin layer) and `vdbus-client` (the vendor client
   classes it talks through). Both must ship: the head unit has no copy of the vendor client that
   an app can load. CarInfo has no subscribe, and values also change from the stock settings, voice
-  and buttons, so the app **polls**: every 1.5 s while the drawer is visible, and again right
-  after each write.
+  and buttons, so the app **polls**, on one heartbeat shared by car, media and the cluster sync:
+  every 2 s while the drawer is out or a paired phone shows it, every 5 s while only the top bar
+  shows, not at all while nothing does, and again right after each write.
 - **Media**, from two feeds that never overlap:
   - Apps installed on the head unit: the active `MediaSession`, found through the notification
     listener.
@@ -62,6 +63,13 @@ The **Status** panel at the bottom of the settings screen shows, live, whether t
 link, the car-media link and notification access are up. Its **Debug log** button prints, as text to
 photograph, the navigation state, every notification posted right now and the last ones the
 listener was handed. A navigation app that is guiding and has no line there is not posting one.
+
+**Phone control** (Settings → Phones, off by default). Phones on the car's Wi-Fi open the
+drawer as a web page served by the car at `http://<car>:8080`. **Add phone** shows a QR code;
+the phone that scans it is added once someone at the head unit taps **Allow**, and **Remove**
+takes it off at once. A phone can do what the drawer does, with the same gates (driver-assist
+rules, a second tap before a safety function goes off). Design and API:
+[docs/companion-api.md](docs/companion-api.md).
 
 Nothing writes to the car on its own. Every write comes from a tap, a slider release or a
 drag release. Regen and battery mode aren't gated on speed: the stock settings app doesn't gate

@@ -2,7 +2,6 @@ package com.carlosrpg.cherry.quicksettings.media
 
 import android.os.SystemClock
 import android.util.Log
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import android.content.ComponentName
@@ -38,7 +37,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -197,7 +195,6 @@ class MediaRepository(
 
     private var controller: MediaController? = null
     private var hasAccess = false
-    private var pollJob: Job? = null
     private var sessionsListenerAdded = false
 
     /** A car media read that timed out may still be blocked in the service: wait on it, don't stack more. */
@@ -264,41 +261,20 @@ class MediaRepository(
 
     private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { refresh() }
 
-    /** Starts following both feeds and re-reads every [intervalMs] (neither pushes everything). */
-    fun start(intervalMs: Long = POLL_MS) {
-        if (pollJob?.isActive == true) return refresh()
-        pollJob = scope.launch {
-            while (isActive) {
-                // One bad read must not end the loop: with the top bar up nothing restarts it.
-                try {
-                    refreshNow()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.w(TAG, "media refresh failed", e)
-                }
-                delay(intervalMs)
-            }
-        }
-    }
-
-    fun stop() {
-        pollJob?.cancel()
-        pollJob = null
-    }
-
-    fun restart() {
-        stop()
-        start()
-    }
-
     fun refresh() {
         scope.launch { refreshNow() }
     }
 
-    private suspend fun refreshNow() {
+    /**
+     * Reads both feeds once: the overlay's heartbeat calls this (neither feed pushes everything;
+     * the car's own sources push nothing).
+     */
+    suspend fun refreshNow() {
         readSessions()
-        carMedia?.let { media ->
+        // A playing app session always wins the card (showCarSource), so the car's media service
+        // is only asked while no app plays: four binder calls a beat saved while one does.
+        val appPlaying = controller?.playbackState?.state == PlaybackState.STATE_PLAYING
+        carMedia?.takeUnless { appPlaying }?.let { media ->
             // Binder calls into the car's media service: off the main thread, and abandoned
             // after a while, since a call that never returns cannot be cancelled.
             // (null is a real answer here, "no car source", so wait on completion, not the value.)
@@ -656,7 +632,6 @@ class MediaRepository(
     }
 
     companion object {
-        const val POLL_MS = 2_000L
         private const val READ_TIMEOUT_MS = 5_000L
         private const val TAG = "QsMedia"
         private const val CAR_SETTLE_MS = 300L

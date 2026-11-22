@@ -105,12 +105,12 @@ private fun NextTurn(nav: NavState, modifier: Modifier, height: Dp) {
         Shadowed {
             Column {
                 nav.title?.let { Text(it, color = Qs.Text, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                nav.text?.let { Text(it, color = Qs.TextSoft, fontSize = 14.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                nav.text?.let { Text(it, color = BarSoft, fontSize = 14.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 nav.subText?.let {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        QsIcon(Icons.Pin, Qs.Muted, 12.dp)
+                        QsIcon(Icons.Pin, BarSoft, 12.dp)
                         Spacer(Modifier.width(3.dp))
-                        Text(it, color = Qs.Muted, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(it, color = BarSoft, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -157,7 +157,7 @@ private fun Climate(car: CarState) {
                     Spacer(Modifier.width(4.dp))
                     QsText(car.fanLevel?.toString() ?: "–", 18.sp, Qs.Text, FontWeight.SemiBold)
                 }
-                car.outsideTempC?.let { QsText(stringResource(R.string.outside_temp, it), 14.sp, Qs.Muted) }
+                car.outsideTempC?.let { QsText(stringResource(R.string.outside_temp, it), 14.sp, BarSoft) }
             }
         }
     }
@@ -182,7 +182,7 @@ private fun NowPlaying(media: MediaState, modifier: Modifier, art: Dp = 48.dp) {
         Column {
             Shadowed {
                 QsText(media.title ?: stringResource(R.string.nothing_playing), 20.sp, weight = FontWeight.SemiBold)
-                listOfNotNull(media.artist, media.appLabel).firstOrNull()?.let { QsText(it, 15.sp, Qs.Muted) }
+                listOfNotNull(media.artist, media.appLabel).firstOrNull()?.let { QsText(it, 15.sp, BarSoft) }
             }
         }
     }
@@ -204,6 +204,13 @@ private fun Stat(icon: String, tint: Color, value: String?, sub: String?) {
  * White text over whatever the car's bar shows (a light map, a wallpaper) gets a tight black
  * halo with a slight drop, so it reads on any background.
  */
+/**
+ * Secondary text under the halo. The drawer's mid greys read as a dark smudge once the black
+ * halo sits around them on a light map, so the bar's subtitles stay near-white and step down by
+ * size and weight instead.
+ */
+private val BarSoft = Color(0xFFD9E0E8)
+
 @Composable
 private fun Shadowed(content: @Composable () -> Unit) {
     // In dp, so the halo is as thick on the car's denser screen as on the emulator.

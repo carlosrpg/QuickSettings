@@ -84,6 +84,13 @@ import com.carlosrpg.cherry.quicksettings.nav.NavStore
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import com.carlosrpg.cherry.quicksettings.overlay.TapRelayService
+import com.carlosrpg.cherry.quicksettings.phone.PhoneApi
+import com.carlosrpg.cherry.quicksettings.phone.PhoneLink
+import com.carlosrpg.cherry.quicksettings.phone.QrImage
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import java.text.DateFormat
+import java.util.Date
 import com.carlosrpg.cherry.quicksettings.ui.ArtPlaceholder
 import com.carlosrpg.cherry.quicksettings.ui.CardLabel
 import com.carlosrpg.cherry.quicksettings.ui.GlassButton
@@ -165,6 +172,7 @@ class SettingsActivity : ComponentActivity() {
                 WidgetsPanel(config)
             }
             ClusterPanel(config)
+            PhonesPanel(config)
             // Wi-Fi and adb change elsewhere: their state is re-read every tick. Not keyed, so the
             // password field and switches keep their state (and focus) across ticks.
             AutomationPanels(refresh)
@@ -404,6 +412,85 @@ class SettingsActivity : ComponentActivity() {
                 Text(stringResource(R.string.cluster_media_sync_hint), color = Qs.Muted, fontSize = 13.sp)
             }
             Toggle(config.clusterMediaSync, label) { app.settings.update { it.copy(clusterMediaSync = !it.clusterMediaSync) } }
+        }
+    }
+
+    /**
+     * Phone control: the switch, the car's address, the paired phones with Remove, and Add phone,
+     * which shows a QR code for one phone. A phone that scans it is added only once someone here
+     * taps Allow.
+     */
+    @Composable
+    private fun PhonesPanel(config: QsConfig) = Panel {
+        CardLabel(stringResource(R.string.phones_panel))
+        SwitchRow(R.string.phone_control, R.string.phone_control_hint, config.phoneControl) {
+            app.settings.update { it.copy(phoneControl = !it.phoneControl) }
+        }
+        if (!config.phoneControl) return@Panel
+        val registry = app.phones
+        val running by PhoneLink.running.collectAsState()
+        val phones by registry.phones.collectAsState()
+        val code by registry.code.collectAsState()
+        val request by registry.request.collectAsState()
+        // Re-read with the screen's own refresh: the car may join or leave a Wi-Fi meanwhile.
+        var addresses by remember { mutableStateOf(PhoneLink.lanAddresses()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(STATUS_REFRESH_MS * 4)
+                addresses = withContext(Dispatchers.IO) { PhoneLink.lanAddresses() }
+            }
+        }
+        val address = addresses.firstOrNull()?.let { "http://$it:${PhoneApi.PORT}" }
+        Text(
+            when {
+                !running -> stringResource(R.string.phones_port_busy)
+                address == null -> stringResource(R.string.phones_no_network)
+                else -> stringResource(R.string.phones_address, address)
+            },
+            color = if (running && address != null) Qs.TextSoft else Qs.Warm, fontSize = 14.sp,
+        )
+        val dates = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
+        if (phones.isEmpty()) Text(stringResource(R.string.phones_none), color = Qs.Muted, fontSize = 13.sp)
+        phones.forEach { phone ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    QsText(phone.name, 16.sp, weight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(R.string.phone_used, dates.format(Date(phone.addedAt)), dates.format(Date(phone.lastUsedAt))),
+                        color = Qs.Muted, fontSize = 13.sp,
+                    )
+                }
+                val remove = stringResource(R.string.phone_remove)
+                GlassButton(null, remove, { registry.remove(phone.id) }, label = remove)
+            }
+        }
+        val pairing = code
+        if (pairing != null && address != null && running) {
+            // The code dies after five minutes; take the QR away then.
+            LaunchedEffect(pairing) {
+                delay((pairing.expiresAt - System.currentTimeMillis()).coerceAtLeast(0))
+                if (registry.code.value == pairing) registry.cancelCode()
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                QrImage("$address/#pair=${pairing.code}")
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.phone_scan), color = Qs.TextSoft, fontSize = 14.sp)
+                    val cancel = stringResource(R.string.phone_cancel)
+                    GlassButton(null, cancel, registry::cancelCode, label = cancel)
+                }
+            }
+        } else if (running && address != null) {
+            val add = stringResource(R.string.phone_add)
+            GlassButton(Icons.Plus, add, { registry.newCode() }, label = add)
+        }
+        request?.let { asking ->
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(stringResource(R.string.phone_allow_title, asking.name)) },
+                text = { Text(stringResource(R.string.phone_allow_text)) },
+                confirmButton = { TextButton({ registry.answer(true) }) { Text(stringResource(R.string.phone_allow)) } },
+                dismissButton = { TextButton({ registry.answer(false) }) { Text(stringResource(R.string.phone_deny)) } },
+            )
         }
     }
 

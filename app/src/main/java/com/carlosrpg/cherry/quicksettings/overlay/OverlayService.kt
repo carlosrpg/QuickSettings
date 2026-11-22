@@ -7,12 +7,12 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.database.ContentObserver
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.view.WindowInsets
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -42,18 +42,27 @@ import com.carlosrpg.cherry.quicksettings.ui.DrawerMode
 import com.carlosrpg.cherry.quicksettings.ui.DrawerRoot
 import com.carlosrpg.cherry.quicksettings.ui.TopBar
 import com.carlosrpg.cherry.quicksettings.nav.NavStore
+import com.carlosrpg.cherry.quicksettings.phone.PhoneLink
 import com.carlosrpg.cherry.quicksettings.voice.VoiceInput
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 
 /**
  * Hosts the drawer over every app: a narrow edge window (hint + swipe zone) while closed and
- * a Compose window while semi-open or open. Car and media data are polled only while the
- * drawer is visible.
+ * a Compose window while semi-open or open. Car and media data are polled on one heartbeat,
+ * only while the drawer, the top bar or a paired phone shows them (media also while the cluster
+ * sync is on). Also hosts the phone server ([PhoneLink]).
  */
 class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private val savedState = SavedStateRegistryController.create(this)
@@ -62,6 +71,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private lateinit var wm: WindowManager
     private lateinit var voice: VoiceInput
     private lateinit var actions: DrawerActions
+    private lateinit var phones: PhoneLink
     private val handler = Handler(Looper.getMainLooper())
 
     private var edgeView: EdgeTouchView? = null
@@ -70,6 +80,13 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private var topZoneView: TopSwipeView? = null
     private lateinit var fullScreen: FullScreenDetector
     private var polls = 0
+    private var beats = 0
+    /** Wakes the heartbeat before its interval is up: the drawer opened, a setting changed. */
+    private val kick = Channel<Unit>(Channel.CONFLATED)
+    private val ticks = MutableStateFlow(0L)
+    private val navStateObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) = checkFullScreen()
+    }
     /** The car and media states the top bar last drew, and how many checks it has lagged. */
     private var drawnCar: Any? = null
     private var drawnMedia: Any? = null
@@ -99,11 +116,13 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             toSemi = { show(DrawerMode.SEMI) },
             toOpen = { show(DrawerMode.OPEN) },
             close = ::close,
+            ticks = ticks.asStateFlow(),
             openSettings = {
                 close()
                 startActivity(Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             },
         )
+        phones = PhoneLink(this, actions) { kick.trySend(Unit) }
         config = app.settings.config.value
         fullScreen = FullScreenDetector(this)
         addEdge()
@@ -111,23 +130,26 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         lifecycleScope.launch {
             app.settings.config.collectLatest {
                 config = it
-                if (it.clusterMediaSync) app.media.start() else app.clusterMedia.reset()
-                releaseFeedsIfIdle()
+                if (!it.clusterMediaSync) app.clusterMedia.reset()
+                phones.setEnabled(it.phoneControl)
+                kick.trySend(Unit)
                 updateEdge()
                 updateTopBar()
                 drawerView?.let { view -> wm.updateViewLayout(view, drawerParams()) }
             }
         }
+        lifecycleScope.launch { heartbeat() }
         lifecycleScope.launch {
-            // The cluster's media card, for an app that plays on its own (setting).
-            while (isActive) {
+            // A new track, or play/pause, reaches the cluster at once; the beat keeps its progress moving.
+            app.media.state.map { Triple(it.packageName, it.title to it.artist, it.playing) }.distinctUntilChanged().collect {
                 if (config.clusterMediaSync) {
-                    val change = withContext(Dispatchers.IO) { app.clusterMedia.tick(app.media.state.value) }
-                    change?.let { Log.i(TAG_CLUSTER, it) }
+                    withContext(Dispatchers.IO) { app.clusterMedia.tick(app.media.state.value) }?.let { Log.i(TAG_CLUSTER, it) }
                 }
-                delay(CLUSTER_SYNC_MS)
             }
         }
+        // Full screen follows window changes as they happen; the heartbeat only backs this up.
+        contentResolver.registerContentObserver(Settings.Global.getUriFor(FullScreenDetector.KEY_NAV_STATE), false, navStateObserver)
+        lifecycleScope.launch { TapRelayService.windowEvents.collect { checkFullScreen() } }
         lifecycleScope.launch {
             TapRelayService.bound.collectLatest {
                 updateEdge()
@@ -146,6 +168,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        contentResolver.unregisterContentObserver(navStateObserver)
+        phones.setEnabled(false)
         voice.cancel()
         removeDrawer()
         edgeView?.let(wm::removeView)
@@ -154,8 +178,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         topBarView = null
         topZoneView?.let(wm::removeView)
         topZoneView = null
-        app.car.stopPolling()
-        app.media.stop()
         super.onDestroy()
     }
 
@@ -261,50 +283,77 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                         }
                     }
                 }.also { wm.addView(it, topBarParams()) }
-                app.car.startPolling()
-                app.media.start()
-                handler.post(topBarTick)
+                kick.trySend(Unit)
             }
             config.topBar && view != null -> wm.updateViewLayout(view, topBarParams())
             !config.topBar && view != null -> {
-                handler.removeCallbacks(topBarTick)
                 wm.removeView(view)
                 topBarView = null
-                releaseFeedsIfIdle()
             }
         }
         updateTopZone()
     }
 
     /**
-     * Once a second while the top bar is up: follow full-screen apps, and every few seconds
-     * check that car and media data are still arriving, restarting a feed that has gone quiet
-     * (nothing else restarts it while the drawer stays closed).
+     * The app's one timer. Each beat reads the car and media side by side, feeds the cluster's
+     * media card, and backs up the full-screen check, then sleeps: [OPEN_POLL_MS] while the
+     * drawer is out, [IDLE_POLL_MS] while only the top bar (or the cluster sync) needs data,
+     * and until [kick] while nothing does. [kick] also cuts a sleep short.
      */
-    private val topBarTick = object : Runnable {
-        override fun run() {
-            val full = fullScreen.poll()
-            if (full != fullScreenApp) {
-                fullScreenApp = full
-                updateTopZone()
+    private suspend fun heartbeat() {
+        while (lifecycleScope.isActive) {
+            // A phone showing the drawer needs fresh data as much as the drawer itself.
+            val watched = phones.api.watching()
+            val shown = mode != null || topBarView != null || watched
+            val clusterSync = config.clusterMediaSync
+            coroutineScope {
+                if (shown) launch { beat("car") { app.car.refresh(full = beats % FULL_READ_EVERY == 0) } }
+                if (shown || clusterSync) launch {
+                    beat("media") { app.media.refreshNow() }
+                    if (clusterSync) beat("cluster") {
+                        withContext(Dispatchers.IO) { app.clusterMedia.tick(app.media.state.value) }?.let { Log.i(TAG_CLUSTER, it) }
+                    }
+                }
             }
-            if (++polls % WATCHDOG_EVERY == 0) watchdog()
-            handler.postDelayed(this, TOP_BAR_POLL_MS)
+            if (topBarView != null) {
+                checkFullScreen()
+                if (++polls % WATCHDOG_EVERY == 0) watchdog()
+            }
+            if (shown) ticks.value++
+            beats++
+            val interval = when {
+                mode != null || watched -> OPEN_POLL_MS
+                shown || clusterSync -> IDLE_POLL_MS
+                else -> Long.MAX_VALUE
+            }
+            // Woken early (drawer opened, top bar added): the next read is a full one, nothing stale shows.
+            if (withTimeoutOrNull(interval) { kick.receive() } != null) beats = 0
+        }
+    }
+
+    /** One bad read must not end the heartbeat: nothing else would restart it. */
+    private suspend fun beat(what: String, block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "$what read failed", e)
+        }
+    }
+
+    /** Hides the top bar while a full-screen app (Android Auto, video) has the screen. */
+    private fun checkFullScreen() {
+        if (topBarView == null) return
+        val full = fullScreen.poll()
+        if (full != fullScreenApp) {
+            fullScreenApp = full
+            updateTopZone()
         }
     }
 
     private fun watchdog() {
-        val now = SystemClock.elapsedRealtime()
-        if (!app.car.isConnected()) {
-            Log.w(TAG, "car service not connected: car values cannot update")
-        } else if (now - app.car.lastReadAt > STALE_MS) {
-            Log.w(TAG, "car data stale for ${now - app.car.lastReadAt} ms: restarting its polling")
-            app.car.restartPolling()
-        }
-        if (now - app.media.lastRefreshAt > STALE_MS) {
-            Log.w(TAG, "media data stale for ${now - app.media.lastRefreshAt} ms: restarting it")
-            app.media.restart()
-        }
+        if (!app.car.isConnected()) Log.w(TAG, "car service not connected: car values cannot update")
         // Fresh data the strip has not drawn on two checks in a row: the window stopped
         // recomposing. Build it again.
         val behind = drawnCar !== app.car.state.value || drawnMedia !== app.media.state.value
@@ -317,7 +366,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     }
 
     private fun recreateTopBar() {
-        handler.removeCallbacks(topBarTick)
         topBarView?.let(wm::removeView)
         topBarView = null
         updateTopBar()
@@ -429,10 +477,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         }
         updateEdge()
         updateTopZone()
-        if (wasClosed) {
-            app.car.startPolling()
-            app.media.start()
-        }
+        if (wasClosed) kick.trySend(Unit)
         scheduleAutoClose()
     }
 
@@ -460,17 +505,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         removeDrawer()
         updateEdge()
         updateTopZone()
-        releaseFeedsIfIdle()
-    }
-
-    /**
-     * Stops reading the car and media once nothing shows them: not the drawer, not the top bar.
-     * Media keeps going while the cluster sync is on, since that follows it in the background.
-     */
-    private fun releaseFeedsIfIdle() {
-        if (mode != null || topBarView != null) return
-        app.car.stopPolling()
-        if (!config.clusterMediaSync) app.media.stop()
     }
 
     private fun removeDrawer() {
@@ -555,11 +589,18 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val TOP_BAR_START_DP = 230
         private const val TOP_BAR_END_DP = 340
         private const val TOP_BAR_FALLBACK_DP = 100
-        private const val TOP_BAR_POLL_MS = 1_000L
-        private const val CLUSTER_SYNC_MS = 2_000L
+        /** Heartbeat while the drawer is out: its controls follow changes made elsewhere. */
+        private const val OPEN_POLL_MS = 2_000L
+        /** Heartbeat for the top bar or the cluster sync alone: slow-moving values. */
+        private const val IDLE_POLL_MS = 5_000L
         private const val TAG_CLUSTER = "QsClusterSync"
-        private const val WATCHDOG_EVERY = 5
-        private const val STALE_MS = 10_000L
+        // Two beats (about ten seconds) between checks that the top bar still redraws.
+        private const val WATCHDOG_EVERY = 2
+        /**
+         * Every third beat reads all car items (energy, range, assist: about 15 calls); the rest
+         * read only speed and climate. Writes still read everything right after.
+         */
+        private const val FULL_READ_EVERY = 3
         private const val TOP_ZONE_HEIGHT_DP = 48
         private const val TAG = "QsTopBar"
         private const val SEMI_MAX_FRACTION = 0.8f

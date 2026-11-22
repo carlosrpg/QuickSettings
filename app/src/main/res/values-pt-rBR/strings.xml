@@ -209,6 +209,7 @@
     <string name="auto_password">Senha do EngMode</string>
     <string name="auto_password_hint">O menu de engenharia a pede antes do seu botão de ADB. Guardada criptografada na central.</string>
     <string name="slider_temperature">Temperatura da cabine</string>
+    <string name="slider_passenger_temperature">Temperatura do passageiro</string>
     <string name="slider_fan">Velocidade do ventilador</string>
     <string name="slider_volume">Volume da mídia</string>
     <string name="slider_nav_voice">Volume da voz da navegação</string>
@@ -252,4 +253,20 @@
     <string name="update_waiting">Confirme a instalação na tela que o Android mostrar.</string>
     <string name="update_failed">A atualização falhou: %1$s</string>
     <string name="update_saved">Instalação recusada (%1$s). O APK foi salvo em Download/QuickSettings-update.apk: instale pelo gerenciador de arquivos.</string>
+    <string name="phones_panel">Celulares</string>
+    <string name="phone_control">Controle pelo celular</string>
+    <string name="phone_control_hint">Os celulares pareados aqui podem mostrar a gaveta e usá-la pelo Wi-Fi do carro: clima, energia, assistência ao motorista e mídia.</string>
+    <string name="phones_address">No Wi-Fi do carro em %1$s</string>
+    <string name="phones_no_network">O carro não está em uma rede Wi-Fi. Conecte-o a um hotspot ou ligue o dele.</string>
+    <string name="phones_port_busy">Não foi possível abrir a porta 8080 no carro.</string>
+    <string name="phones_none">Nenhum celular pareado ainda.</string>
+    <string name="phone_used">Adicionado em %1$s · último uso %2$s</string>
+    <string name="phone_remove">Remover</string>
+    <string name="phone_add">Adicionar celular</string>
+    <string name="phone_scan">Leia este código com a câmera do celular, conectado ao mesmo Wi-Fi do carro. Vale por 5 minutos, para um celular.</string>
+    <string name="phone_cancel">Cancelar</string>
+    <string name="phone_allow_title">Permitir %1$s?</string>
+    <string name="phone_allow_text">Este celular poderá mudar clima, energia, assistência ao motorista e mídia pelo Wi-Fi do carro até você removê-lo aqui.</string>
+    <string name="phone_allow">Permitir</string>
+    <string name="phone_deny">Recusar</string>
 </resources>

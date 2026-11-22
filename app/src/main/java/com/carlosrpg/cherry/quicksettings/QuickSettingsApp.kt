@@ -19,6 +19,7 @@ import com.carlosrpg.cherry.quicksettings.media.ClusterMediaSync
 import com.carlosrpg.cherry.quicksettings.media.LogClusterMediaSink
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
+import com.carlosrpg.cherry.quicksettings.phone.PhoneRegistry
 import com.carlosrpg.cherry.quicksettings.settings.SettingsStore
 import com.carlosrpg.cherry.quicksettings.weather.WeatherRepository
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,11 @@ class QuickSettingsApp : Application() {
     /** Writes an app's track to the instrument cluster when the setting is on; logs it off the car. */
     lateinit var clusterMedia: ClusterMediaSync private set
     val weather by lazy { WeatherRepository(this, scope) }
+    /** The phones allowed to control the car, and the pairing in progress. */
+    val phones by lazy {
+        val prefs = getSharedPreferences("phones", MODE_PRIVATE)
+        PhoneRegistry(load = { prefs.getString("registry", null) }, save = { prefs.edit().putString("registry", it).apply() })
+    }
 
     override fun onCreate() {
         super.onCreate()

@@ -1,0 +1,76 @@
+/* Night Glass, as on the head unit. */
+:root {
+  --bg: #0B1018;
+  --card: rgba(255, 255, 255, 0.045);
+  --edge: rgba(255, 255, 255, 0.09);
+  --button: rgba(255, 255, 255, 0.08);
+  --text: #F2F5F8;
+  --soft: #C5CDD7;
+  --muted: #8693A3;
+  --accent: #5AA9FF;
+  --on: #3DD68C;
+  --warm: #FFB45A;
+  --bad: #FF6B6B;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font: 16px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: 0 16px calc(24px + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
+}
+.status {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px;
+  margin: 0 -16px 12px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: rgba(11, 16, 24, 0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--edge); font-size: 14px; color: var(--soft);
+}
+.status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.status.ok .dot { background: var(--on); }
+.status.bad .dot { background: var(--bad); }
+main { display: grid; gap: 12px; max-width: 760px; margin: 0 auto; }
+@media (min-width: 720px) { main { grid-template-columns: 1fr 1fr; } .wide { grid-column: 1 / -1; } }
+main.offline .card button, main.offline .card input { opacity: 0.4; pointer-events: none; }
+.card {
+  background: var(--card); border: 1px solid var(--edge); border-radius: 22px; padding: 16px;
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+}
+.label { font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.big { font-size: 34px; font-weight: 600; }
+.soft { color: var(--soft); }
+.muted { color: var(--muted); font-size: 14px; }
+.warn { color: var(--warm); font-size: 14px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row.spread { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+button {
+  font: inherit; color: var(--text); background: var(--button); border: 1px solid var(--edge);
+  border-radius: 14px; min-height: 48px; min-width: 48px; padding: 0 14px; cursor: pointer;
+}
+button:active { background: rgba(255, 255, 255, 0.16); }
+button.on { background: rgba(90, 169, 255, 0.22); border-color: var(--accent); }
+button.arm { background: rgba(255, 180, 90, 0.2); border-color: var(--warm); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.stepper { display: grid; grid-template-columns: 56px 1fr 56px; align-items: center; text-align: center; }
+.stepper .value { font-size: 28px; font-weight: 600; }
+.stepper .value.applying { color: var(--accent); }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 32px; }
+input[type=text] {
+  font: inherit; color: var(--text); background: rgba(0, 0, 0, 0.25); border: 1px solid var(--edge);
+  border-radius: 14px; min-height: 48px; padding: 0 14px; width: 100%;
+}
+.art { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; background: var(--button); flex: none; }
+.icon { width: 28px; height: 28px; border-radius: 6px; flex: none; }
+.maneuver { width: 56px; height: 56px; flex: none; }
+.bar { height: 6px; border-radius: 3px; background: var(--button); overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.chips button { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.assist { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.assist .pill { margin-left: auto; font-size: 14px; color: var(--muted); }
+.assist.on .pill { color: var(--on); }
+.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.days div { background: var(--button); border-radius: 12px; padding: 8px; font-size: 14px; }
+.notice { padding: 24px 4px; display: flex; flex-direction: column; gap: 14px; }
+.notice h1 { font-size: 22px; margin: 0; }
