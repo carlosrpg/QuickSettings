@@ -7,6 +7,18 @@
 <meta name="description" content="A widget drawer that floats over every app on the Jaecoo 7 head unit. Set it up from your browser over USB.">
 <meta name="theme-color" content="#0b0e14">
 <link rel="alternate" hreflang="pt-BR" href="pt/">
+<script>
+// A browser set to Portuguese (pt, pt-BR, pt-PT) goes to the Portuguese page, unless the visitor
+// picked English with the language link. Section links keep their place on the other page.
+(function () {
+  var choice = null;
+  try { choice = localStorage.getItem("qs.lang"); } catch (e) {}
+  var lang = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+  if (choice === "en" || (choice !== "pt" && !/^pt(-|$)/i.test(lang))) return;
+  var ids = { "#screens": "#telas", "#features": "#recursos", "#how": "#como", "#phone": "#celular" };
+  location.replace("pt/" + location.search + (ids[location.hash] || location.hash));
+})();
+</script>
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
@@ -19,7 +31,7 @@
       <a href="#phone">Phone</a>
       <a href="#faq">FAQ</a>
       <a class="cta" href="#setup-section">Set up</a>
-      <a class="lang" href="pt/" hreflang="pt-BR" lang="pt-BR">PT</a>
+      <a class="lang" href="pt/" hreflang="pt-BR" lang="pt-BR" onclick="try{localStorage.setItem('qs.lang','pt')}catch(e){}">PT</a>
     </nav>
   </div>
 </header>
