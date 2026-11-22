@@ -7,7 +7,10 @@ English and Brazilian Portuguese.
 
 The car's own back gesture takes any swipe that starts within 30 px of the left or right screen
 edge, so the handle opens on touch. "Touch the edge handle to open" in settings (on by default)
-switches to swipe-only.
+switches to swipe-only. With the info bar on, a pull down just below the car's top bar opens the
+full drawer, and **Two-finger swipe down** (off by default) opens it on the car's own
+two-finger gesture, with no gesture app needed. A gesture app that launches QuickSettings by
+package opens the full drawer too.
 
 Style: **Night Glass**, the approved styleguide.
 
@@ -16,7 +19,7 @@ Style: **Night Glass**, the approved styleguide.
 | Widget | Semi-open | Open |
 |---|---|---|
 | Media | Album art, play/pause. Press and drag: up/down volume, left/right previous/next | Source (an app, tap to open it, or one of the car's own: Bluetooth, USB, CarPlay, Android Auto, …), title, progress, transport, volume, voice search sent to the app that owns the session |
-| Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | A large quadrant: touch anywhere to place the marker and drag it; values update live and are set on release. Beside it, four symbol buttons that follow the car's state: climate on/off, automatic mode, zone sync and air recirculation. "A/C" in the quadrant lights up while the compressor runs |
+| Climate | Temperature × fan quadrant. Press and drag moves the marker: up/down temperature, left/right fan, set on release | The seat with airflow that follows temperature and fan, temperature and fan sliders set on release, and buttons that follow the car's state: climate on/off, automatic mode, zone sync, air recirculation and A/C. While the zones are split, the passenger temperature takes the top of the passenger-side slider column |
 | Car mode | Battery-mode glyph and regen bars. Press and drag: up/down battery mode, left/right regen | Two buttons that show the state as a symbol and step to the next on tap: battery mode (marker with bolt = Initial, light bulb = Smart, charging battery = Forced) and regeneration (a brake disc whose rim lights one, two or three arcs for Low, Medium, High); hold-target slider for Forced |
 | Autonomy | Battery ring (outer) and fuel ring (inner), electric km | Electric and fuel range, km and %, total |
 | Navigation | Next manoeuvre and distance; with no route, a tap starts a voice destination search | Nav app (tap to open it), next turn, street, ETA, voice destination, and a button that shows the nav app on the instrument cluster or brings it back (only on a car with a cluster display) |
@@ -63,22 +66,57 @@ The **Status** panel at the bottom of the settings screen shows, live, whether t
 link, the car-media link and notification access are up. Its **Debug log** button prints, as text to
 photograph, the navigation state, every notification posted right now and the last ones the
 listener was handed. A navigation app that is guiding and has no line there is not posting one.
-
-**Phone control** (Settings → Phones, off by default). Phones on the car's Wi-Fi open the
-drawer as a web page served by the car at `http://<car>:8080`. **Add phone** shows a QR code;
-the phone that scans it is added once someone at the head unit taps **Allow**, and **Remove**
-takes it off at once. A phone can do what the drawer does, with the same gates (driver-assist
-rules, a second tap before a safety function goes off). The **QS Companion** app (`companion/`)
-wraps that page: it finds the car on the Wi-Fi by itself, pairs with the six-digit code shown
-under the QR code, and falls back to the internet relay (`relay/`, a Cloudflare Worker) when the
-phone isn't on the car's Wi-Fi. The relay only exists in builds made with `qs.relayUrl` and
-`qs.relayKey` in `local.properties`; over it, driver assist is read-only unless Settings →
-Phones → **Driver assist over the internet** is on (it asks first). Design and API:
-[docs/companion-api.md](docs/companion-api.md).
+Its **drawer** section lists the last 40 attempts to open the drawer: each touch on the handle or
+the top strip and what came of it, each gesture the car reported (a two-finger swipe the car read
+as a pinch or a long press shows up as such), each launch from a gesture app, and when a touch
+zone was hidden or briefly untouchable, and why. A touch with no line never reached the app.
 
 Nothing writes to the car on its own. Every write comes from a tap, a slider release or a
 drag release. Regen and battery mode aren't gated on speed: the stock settings app doesn't gate
 them either.
+
+## Phone control
+
+Everyone in the car can use the drawer from their phone. Off by default: **Settings → Phones →
+Phone control** starts a small web server on the car (`http://<car>:8080`) that answers only
+devices on a local network, and only phones someone at the head unit allowed.
+
+1. **Install the phone app.** QS Companion for Android is on the
+   [site](https://carlosrpg.github.io/QuickSettings/#phone) and in every
+   [release](../../releases) (`QSCompanion-<version>.apk`). On an iPhone, or without the app, the
+   phone uses the same page in its browser.
+2. **Pair.** Put the phone on the car's Wi-Fi (or the car on the phone's hotspot) and tap **Add
+   phone** on the car. It shows a QR code and a six-digit code, both valid for five minutes and
+   one attempt. The app finds the car by itself and asks for the code; a browser opens the QR
+   code's link. Keep the settings screen open: the car asks **Allow <name>?** there.
+3. **Use it.** The page shows the drawer's cards in the open-drawer order, in English or
+   Portuguese, with a status line: connected over Wi-Fi, over the internet, car offline (last
+   seen), or no connection. **Remove** on the car takes a phone off at once.
+
+Commands go through the drawer's own calls and gates: ignition and speed rules for driver
+assist, and a second tap before emergency braking or lane keeping goes off. A phone counts as
+watching while it polls, and the car is then read every 2 s as with the drawer open.
+
+**Over the internet (optional).** `relay/` is a Cloudflare Worker with one Durable Object per car.
+The car keeps one outbound WebSocket to it and the relay forwards each phone request; the car still
+checks every token. Pairing works only on the car's Wi-Fi, and through the relay driver assist is
+read-only unless **Settings → Phones → Driver assist over the internet** is on (it asks first).
+Releases built by CI have no relay. To run your own:
+
+```bash
+cd relay
+npx wrangler deploy                    # Free plan is enough; prints https://qs-relay.<you>.workers.dev
+npx wrangler secret put RELAY_KEY      # a long random string
+```
+
+Then put the same two values in `local.properties` and build both APKs yourself:
+
+```
+qs.relayUrl=https://qs-relay.<you>.workers.dev
+qs.relayKey=<the RELAY_KEY value>
+```
+
+Design, API and what differs from the first draft: [docs/companion-api.md](docs/companion-api.md).
 
 ## Install on the car
 
@@ -157,6 +195,7 @@ Requires JDK 21 and the Android SDK (`local.properties` with `sdk.dir`).
 ```bash
 ./gradlew app:testDebugUnitTest app:lintDebug app:assembleDebug   # emulator build, in-memory car
 ./gradlew app:assembleRelease -Pqs.mock=false                       # head-unit build, signed
+./gradlew companion:testDebugUnitTest companion:assembleRelease     # QS Companion phone app, signed
 ```
 
 Versioning follows AABrowser-Motion: CI passes `-PappVersionName`; local builds take the next
@@ -177,5 +216,6 @@ scripts/update-carbus.sh ../jconfig-carbus
 
 `.github/workflows/ci.yml` runs unit tests and lint and builds a signed release APK on every pull
 request (signed with a throwaway key) and on `main` (signed with the release key, then published
-as a GitHub release). Secrets: `RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`,
+as a GitHub release). It builds the QS Companion phone app alongside, under the same version, and
+the Pages deploy serves both APKs from `latest/` (`QuickSettings.apk`, `QSCompanion.apk`). Secrets: `RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`,
 `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`.

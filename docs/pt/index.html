@@ -16,6 +16,7 @@
     <nav>
       <a href="#telas">Telas</a>
       <a href="#recursos">Recursos</a>
+      <a href="#celular">Celular</a>
       <a href="#faq">Dúvidas</a>
       <a class="cta" href="#setup-section">Configurar</a>
       <a class="lang" href="../" hreflang="en" lang="en">EN</a>
@@ -60,7 +61,7 @@
           </article>
           <article class="slide">
             <figure><img src="../img/settings-pt.webp" width="800" height="1174" loading="lazy" alt="Tela de ajustes com posição da gaveta, opções da alça e lista de widgets"></figure>
-            <div><div class="kicker">Ajustes</div><h3>Do seu jeito</h3><p>Escolha o lado e a altura da alça, toque ou deslize para abrir, ligue ou desligue a barra de informações e reordene ou esconda widgets separadamente para a meia gaveta e a gaveta aberta. O painel Status mostra ao vivo a ligação com o carro, a mídia e o acesso às notificações.</p></div>
+            <div><div class="kicker">Ajustes</div><h3>Do seu jeito</h3><p>Escolha o lado e a altura da alça, toque ou deslize para abrir, ligue ou desligue a barra de informações e reordene ou esconda widgets separadamente para a meia gaveta e a gaveta aberta e, se quiser, abra com o gesto de dois dedos para baixo do próprio carro. O painel Status mostra ao vivo a ligação com o carro, a mídia e o acesso às notificações.</p></div>
           </article>
           <article class="slide">
             <figure><img src="../img/semi-pt.webp" width="800" height="1174" loading="lazy" alt="Meia gaveta na borda esquerda com blocos pequenos"></figure>
@@ -97,7 +98,7 @@
         <article class="card">
           <div class="icon" style="background:rgba(255,122,46,.15);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg></div>
           <h3>Ar-condicionado</h3>
-          <p>Um quadrante temperatura × ventilação: arraste o marcador e o valor é aplicado ao soltar. Liga/desliga, automático, sincronia de zonas e recirculação seguem o estado do carro.</p>
+          <p>Controles deslizantes de temperatura e ventilação aplicados ao soltar, temperatura do passageiro com as zonas separadas e um quadrante temperatura × ventilação na meia gaveta. Liga/desliga, A/C, automático, sincronia de zonas e recirculação seguem o estado do carro.</p>
         </article>
         <article class="card">
           <div class="icon" style="background:rgba(61,220,151,.15);color:var(--energy)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
@@ -130,7 +131,30 @@
       <div class="facts">
         <div class="fact"><h3>Nada muda sozinho</h3><p>Toda mudança no carro vem de um toque seu, de soltar um controle deslizante ou de soltar um arraste. As funções de segurança mantêm as travas originais.</p></div>
         <div class="fact" style="border-color:var(--energy)"><h3>Sempre ali</h3><p>A gaveta roda como serviço em primeiro plano desde a partida, e o acesso às notificações a traz de volta se o sistema a encerrar.</p></div>
-        <div class="fact" style="border-color:var(--warm)"><h3>Valores ao vivo</h3><p>O carro não avisa os apps quando algo muda, então a gaveta consulta a cada 1,5 s enquanto está na tela, e logo depois de cada mudança.</p></div>
+        <div class="fact" style="border-color:var(--warm)"><h3>Valores ao vivo</h3><p>O carro não avisa os apps quando algo muda, então os valores são lidos a cada 2 s enquanto a gaveta ou um celular pareado os mostra, a cada 5 s só para a barra de informações, e logo depois de cada mudança.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="celular" class="phone-section">
+    <div class="wrap">
+      <div>
+        <h2>Controle pelo celular</h2>
+        <p class="sub">Todos no carro podem usar a gaveta no próprio celular: ar-condicionado, modo do carro, mídia, navegação e assistência ao motorista, com as mesmas regras da central.</p>
+        <ol class="steps">
+          <li><strong>Ligue</strong>No carro: QuickSettings → Configurações → Celulares → Controle pelo celular. Vem desligado.</li>
+          <li><strong>Instale o QS Companion</strong>Baixe abaixo no seu Android. No iPhone, leia o QR code que o carro mostra e use a página no Safari.</li>
+          <li><strong>Pareie</strong>Entre no Wi-Fi do carro (ou conecte o carro ao roteador do celular), toque em Adicionar celular no carro e digite o código de seis dígitos no app.</li>
+          <li><strong>Permita</strong>Alguém na central toca em Permitir. Remova o celular ali quando quiser.</li>
+        </ol>
+        <div class="actions">
+          <a class="btn primary" href="../latest/QSCompanion.apk" download>Baixar o QS Companion para Android</a>
+          <a class="btn" href="https://github.com/carlosrpg/QuickSettings/releases/latest">Todas as versões</a>
+        </div>
+        <p class="note">Android 8 ou mais novo. Quando o Android pedir, permita que o navegador instale apps. O app encontra o carro no Wi-Fi sozinho e mostra se está conectado. Acessar o carro pela internet exige um relay seu, embutido nos seus próprios APKs (veja o <a href="https://github.com/carlosrpg/QuickSettings#phone-control">README</a>); por ele, a assistência ao motorista fica só para leitura, a menos que o carro permita.</p>
+      </div>
+      <div class="phone">
+        <img src="../img/phone-pt.webp" width="750" height="1624" loading="lazy" alt="QS Companion num celular: o card de mídia com controles e volumes, e o card de navegação">
       </div>
     </div>
   </section>
@@ -178,7 +202,9 @@
       <h2>Dúvidas</h2>
       <details><summary>Quais navegadores funcionam?</summary><p>Chrome, Edge ou outro navegador Chromium com WebUSB, no Windows, macOS, Linux ou ChromeOS. O Chrome de um celular Android também serve, com um adaptador USB-OTG. Firefox e Safari não têm WebUSB.</p></details>
       <details><summary>A conexão falha ou o carro não aparece na lista</summary><p>Use um cabo de dados, não um só de carga. Se você tem as ferramentas do Android instaladas, provavelmente outro adb está segurando a porta: rode <code>adb kill-server</code> e tente de novo. No Windows a central pode precisar do driver USB do Google.</p></details>
-      <details><summary>O que esta página roda no meu carro?</summary><p>Para instalar, ela copia o APK e um script curto (<a href="../car-setup.sh">car-setup.sh</a>) para <code>/data/local/tmp</code> e roda o script, que instala o APK com o <code>pm</code>, abre o app e apaga os dois arquivos. O ADB do carro recusa qualquer comando com a palavra "install", por isso a instalação roda num script. Fora isso, só os comandos mostrados em "Comando manual" de cada item, mais verificações de leitura (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Nada é enviado a lugar nenhum além do carro, pelo cabo.</p></details>
+      <details><summary>O que esta página roda no meu carro?</summary><p>Para instalar, ela copia o APK e um script curto (<a href="../car-setup.sh">car-setup.sh</a>) para <code>/data/local/tmp</code> e roda o script, que instala o APK por uma sessão do instalador de pacotes do Android (o carro recusa o <code>pm install</code> comum), abre o app e apaga os dois arquivos. O ADB do carro recusa qualquer comando com a palavra "install", por isso a instalação roda num script. Fora isso, só os comandos mostrados em "Comando manual" de cada item, mais verificações de leitura (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Nada é enviado a lugar nenhum além do carro, pelo cabo.</p></details>
+      <details><summary>A gaveta não abre com o meu gesto</summary><p>Ligue Configurações → Deslizar dois dedos para baixo e o QuickSettings responde direto ao gesto do próprio carro, sem app de gestos no meio. Mantenha os dois dedos juntos e comece a mover logo: o carro entende uma mudança na distância entre eles como pinça, e uma pausa como toque longo. A seção da gaveta no registro de depuração da tela de ajustes lista cada gesto que o carro informou e cada toque na alça e na faixa superior.</p></details>
+      <details><summary>O controle pelo celular é seguro?</summary><p>Fica desligado até você ligar, só responde a celulares na rede do próprio carro e só a celulares que alguém na central permitiu. Cada um pode ser removido na hora. Toda mudança passa pelas mesmas regras da gaveta, incluindo o segundo toque antes de desligar uma função de segurança.</p></details>
       <details><summary>Preciso fazer isso de novo?</summary><p>Não. As permissões continuam depois de reiniciar e de atualizar o app. Desinstalar o app as remove.</p></details>
       <details><summary>Prefiro digitar os comandos</summary><p>Todos os comandos estão no <a href="https://github.com/carlosrpg/QuickSettings#install-on-the-car">README</a>, e a tela de ajustes do app mostra cada um que falta.</p></details>
     </div>

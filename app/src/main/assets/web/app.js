@@ -2,7 +2,8 @@
 // API: docs/companion-api.md. The car decides everything; this page only shows and asks.
 "use strict";
 
-const pt = (navigator.language || "").toLowerCase().startsWith("pt");
+// ?lang=en or ?lang=pt overrides the phone's language.
+const pt = (new URLSearchParams(location.search).get("lang") || navigator.language || "").toLowerCase().startsWith("pt");
 const T = pt ? {
   wifi: "Conectado · Wi-Fi", internet: "Conectado · Internet", carOffline: "Carro offline", lastSeen: "visto há %s",
   offline: "Sem conexão com o carro", seen: "atualizado há %s",

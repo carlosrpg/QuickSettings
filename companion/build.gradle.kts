@@ -22,8 +22,11 @@ android {
         applicationId = "com.carlosrpg.cherry.companion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // Released with the car app, under the same version (CI passes -PappVersionName).
+        val appVersionName = (findProperty("appVersionName") as String?) ?: "0.1.0"
+        val (major, minor, patch) = appVersionName.substringBefore('-').split('.').map(String::toInt)
+        versionCode = major * 1_000_000 + minor * 1_000 + patch
+        versionName = appVersionName
         // Same relay as the car build; empty = Wi-Fi only.
         buildConfigField("String", "RELAY_URL", "\"${prop("qs.relayUrl").orEmpty()}\"")
     }

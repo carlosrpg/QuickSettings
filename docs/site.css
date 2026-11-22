@@ -157,3 +157,16 @@ footer { border-top: 1px solid var(--hair); padding: 32px 0 48px; color: var(--d
 footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
 
 @media (prefers-reduced-motion: reduce) { html, .track { scroll-behavior: auto; } }
+
+/* Phone control: steps and download beside a phone screenshot. */
+.phone-section .wrap { display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; align-items: center; }
+@media (max-width: 900px) { .phone-section .wrap { grid-template-columns: 1fr; } }
+.phone-section ol.steps { grid-template-columns: 1fr 1fr; margin-bottom: 24px; }
+@media (max-width: 560px) { .phone-section ol.steps { grid-template-columns: 1fr; } }
+.phone-section .note { color: var(--muted); font-size: 14px; margin-top: 16px; max-width: 40em; }
+.phone {
+  justify-self: center; width: min(100%, 300px); padding: 10px; border-radius: 40px;
+  background: linear-gradient(160deg, #222a36, #0c1018); border: 1px solid var(--hair);
+  box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.6) inset;
+}
+.phone img { border-radius: 30px; width: 100%; height: auto; display: block; }

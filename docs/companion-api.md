@@ -252,5 +252,8 @@ move one target.
   A code takes one attempt, right or wrong, so the PIN can't be guessed by trying.
 - **Discovery** is the last address, then a scan of the phone's Wi-Fi and hotspot /24 networks
   (`GET /api/ping`, 64 at a time), then the relay. No mDNS.
+- **Releases built by CI are LAN-only**: they carry no relay address or key. The phone app ships
+  with every release and on the Pages site (`latest/QSCompanion.apk`).
+- **Page language** follows the phone; `?lang=en` or `?lang=pt` overrides it.
 - **The app keeps the token** (`window.QsApp.getToken/setToken`) since the page's origin changes
   between the LAN address and the relay; a browser keeps it in `localStorage`.
