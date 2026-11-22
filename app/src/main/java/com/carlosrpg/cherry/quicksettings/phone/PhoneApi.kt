@@ -9,7 +9,10 @@ interface PhoneBackend {
     /** The state document of docs/companion-api.md, without `path`, `asOfMs` and `permissions`. */
     fun state(): JSONObject
 
-    /** Runs one command; `{ok: true}` or `{ok: false, blocked: <reason>}`. [remote]: it came through the relay. */
+    /**
+     * Runs one command; `{ok: true}` or `{ok: false, blocked: <reason>}`. [remote]: it came through
+     * the relay and the car doesn't allow driver assist from there.
+     */
     suspend fun command(action: String, args: JSONObject, remote: Boolean): JSONObject
 
     /** PNG bytes of an image the state referred to as `/img/<key>`, or null. */
@@ -29,6 +32,8 @@ class PhoneApi(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Called when a phone starts watching after none did: the car's polling must wake up. */
     private val onWatch: () -> Unit = {},
+    /** Settings → Phones → driver assist over the internet (off by default). */
+    private val remoteAssist: () -> Boolean = { false },
 ) {
     /** [clock] time of the last state request; the overlay keeps polling the car while it is recent. */
     @Volatile var lastStateAt = 0L
@@ -38,23 +43,26 @@ class PhoneApi(
 
     private val rate = HashMap<String, Pair<Long, Int>>()
 
-    fun handle(req: HttpRequest): HttpResponse = when {
+    /** [remote]: the request came through the relay, not from the car's own network. */
+    fun handle(req: HttpRequest, remote: Boolean = false): HttpResponse = when {
         req.path == "/api/ping" -> json(200, JSONObject().put("carId", registry.carId).put("online", true)
-            .put("lastSeenMs", clock()).put("path", "lan"))
+            .put("lastSeenMs", clock()).put("path", if (remote) "relay" else "lan"))
+        // Pairing needs someone at the car anyway, so it stays on the car's network.
+        req.path == "/api/pair" && remote -> json(403, JSONObject().put("error", "LAN_ONLY"))
         req.path == "/api/pair" && req.method == "POST" -> pair(req)
         req.path == "/api/state" -> authed(req) { _ ->
             val first = !watching()
             lastStateAt = clock()
             if (first) onWatch()
-            json(200, backend.state().put("path", "lan").put("asOfMs", clock())
-                .put("permissions", JSONObject().put("assist", true)))
+            json(200, backend.state().put("path", if (remote) "relay" else "lan").put("asOfMs", clock())
+                .put("permissions", JSONObject().put("assist", !remote || remoteAssist())))
         }
         req.path == "/api/cmd" && req.method == "POST" -> authed(req) { phone ->
             if (!allow(phone.id)) return@authed json(429, JSONObject().put("ok", false).put("blocked", "RATE_LIMIT"))
             val body = parse(req.body) ?: return@authed json(400, JSONObject().put("error", "BAD_JSON"))
             val action = body.optString("action")
             val args = body.optJSONObject("args") ?: JSONObject()
-            json(200, runBlocking(commandContext) { backend.command(action, args, remote = false) })
+            json(200, runBlocking(commandContext) { backend.command(action, args, remote = remote && !remoteAssist()) })
         }
         req.path.startsWith("/img/") -> authed(req) { _ ->
             backend.image(req.path.removePrefix("/img/"))

@@ -83,7 +83,12 @@ private const val HVAC = VDEventCarInfo.MODULE_HVAC
  * after each write. Writes happen only from explicit user actions. Ids and encodings all come from
  * jconfig-carbus.
  */
-class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) {
+class CarRepository(
+    private val bus: CarBus,
+    private val scope: CoroutineScope,
+    /** Hides the car's climate panel at once, before the close request below reaches the car. */
+    private val hideClimatePanel: () -> Unit = {},
+) {
     private val _state = MutableStateFlow(CarState())
     val state: StateFlow<CarState> = _state.asStateFlow()
 
@@ -415,6 +420,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
                     last = now
                 }
                 if (!ClimatePanelSpec.isShowing(before) && ClimatePanelSpec.isShowing(now)) {
+                    hideClimatePanel()
                     try {
                         bus.sendItemValue(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE, ClimatePanelSpec.COMMAND_CLOSE)
                     } catch (e: LinkageError) {
@@ -438,8 +444,9 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         /** Gap between two single-step climate commands. */
         const val CLIMATE_STEP_MS = 100L
         // About two seconds: long enough to see the car react, short enough between two writes.
-        private const val PANEL_WATCH_POLLS = 14
-        private const val PANEL_WATCH_POLL_MS = 150L
+        private const val PANEL_WATCH_POLLS = 30
+        // Short polls: the sooner the panel is seen, the shorter its flash.
+        private const val PANEL_WATCH_POLL_MS = 70L
 
         /** How long the car's panel item is watched after a climate write. */
         const val CLIMATE_WRITE_MS = PANEL_WATCH_POLLS * PANEL_WATCH_POLL_MS

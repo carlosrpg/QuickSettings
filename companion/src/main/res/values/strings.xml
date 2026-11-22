@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">QS Companion</string>
+    <string name="searching_title">Looking for the car…</string>
+    <string name="searching_text">Connect this phone to the car\'s Wi-Fi (or the car to this phone\'s hotspot) and turn on Settings → Phones → Phone control on the car. Once paired, the car can also be reached over the internet when it is online.</string>
+</resources>

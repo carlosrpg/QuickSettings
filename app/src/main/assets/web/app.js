@@ -4,9 +4,11 @@
 
 const pt = (navigator.language || "").toLowerCase().startsWith("pt");
 const T = pt ? {
-  wifi: "Conectado · Wi-Fi", offline: "Sem conexão com o carro", seen: "atualizado há %s",
+  wifi: "Conectado · Wi-Fi", internet: "Conectado · Internet", carOffline: "Carro offline", lastSeen: "visto há %s",
+  offline: "Sem conexão com o carro", seen: "atualizado há %s",
+  pinHint: "Código de 6 dígitos mostrado no carro", lanOnly: "Para parear, conecte este celular ao Wi-Fi do carro.",
   notPaired: "Este celular não está pareado", removed: "Este celular foi removido do carro",
-  howPair: "No carro: QuickSettings → Configurações → Celulares → Adicionar celular, e leia o código com a câmera.",
+  howPair: "No carro: QuickSettings → Configurações → Celulares → Adicionar celular. Leia o QR com a câmera ou digite o código abaixo.",
   nameTitle: "Parear com o carro", nameHint: "Nome deste celular", pair: "Parear", waiting: "Aguardando alguém no carro tocar em Permitir…",
   denied: "O carro recusou este celular.", badCode: "Código vencido ou já usado. Gere outro no carro.", timeout: "Ninguém respondeu no carro.",
   media: "Mídia", climate: "Clima", carMode: "Modo do carro", autonomy: "Autonomia", nav: "Navegação", assist: "Assistência", weather: "Tempo",
@@ -21,9 +23,11 @@ const T = pt ? {
   blocked: { IGNITION_OFF: "Ligue a ignição", TOO_FAST: "Só abaixo de 10 km/h", UNAVAILABLE: "Indisponível agora", NOT_SPLIT: "Zonas sincronizadas",
     NOT_CONNECTED: "Carro sem dados", REMOTE_DISABLED: "Só no Wi-Fi do carro", RATE_LIMIT: "Devagar", BAD_ARGS: "Valor inválido" },
 } : {
-  wifi: "Connected · Wi-Fi", offline: "No connection to the car", seen: "updated %s ago",
+  wifi: "Connected · Wi-Fi", internet: "Connected · Internet", carOffline: "Car offline", lastSeen: "last seen %s ago",
+  offline: "No connection to the car", seen: "updated %s ago",
+  pinHint: "6-digit code shown on the car", lanOnly: "To pair, connect this phone to the car's Wi-Fi.",
   notPaired: "This phone isn't paired", removed: "This phone was removed from the car",
-  howPair: "On the car: QuickSettings → Settings → Phones → Add phone, then scan the code with the camera.",
+  howPair: "On the car: QuickSettings → Settings → Phones → Add phone. Scan the QR code with the camera, or type the code below.",
   nameTitle: "Pair with the car", nameHint: "This phone's name", pair: "Pair", waiting: "Waiting for someone in the car to tap Allow…",
   denied: "The car refused this phone.", badCode: "The code expired or was used. Make a new one on the car.", timeout: "Nobody answered in the car.",
   media: "Media", climate: "Climate", carMode: "Car mode", autonomy: "Range", nav: "Navigation", assist: "Assist", weather: "Weather",
@@ -42,39 +46,54 @@ const T = pt ? {
 const main = document.getElementById("main");
 const statusBar = document.getElementById("status");
 const statusText = document.getElementById("status-text");
-let token = localStorage.getItem("qs.token");
-let state = null, lastOk = 0, timer = null, busyUntil = 0, armed = null, notice = {};
+// The companion app keeps the token itself (the page's address changes between Wi-Fi and the relay).
+const store = window.QsApp
+  ? { get: () => window.QsApp.getToken() || null, set: t => window.QsApp.setToken(t || "") }
+  : { get: () => localStorage.getItem("qs.token"), set: t => t ? localStorage.setItem("qs.token", t) : localStorage.removeItem("qs.token") };
+// Relative to the page: "/" on the car, "/c/<carId>/" through the relay.
+const BASE = location.pathname.replace(/[^/]*$/, "");
+const viaRelay = BASE.startsWith("/c/");
+let token = store.get();
+let state = null, lastOk = 0, timer = null, busyUntil = 0, armed = null, notice = {}, carOffline = null;
 const local = {}; // targets of taps not yet reflected by the car: key -> {value, at}
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const img = p => p ? `${esc(p)}?t=${encodeURIComponent(token)}` : "";
+const img = p => p ? `${esc(BASE + p.replace(/^\//, ""))}?t=${encodeURIComponent(token)}` : "";
 const ago = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`; };
 
 async function api(path, body) {
-  const res = await fetch(path, {
+  const res = await fetch(BASE + path.replace(/^\//, ""), {
     method: body ? "POST" : "GET",
     headers: Object.assign({ "Content-Type": "application/json" }, token ? { Authorization: `Bearer ${token}` } : {}),
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
   });
-  if (res.status === 401) { localStorage.removeItem("qs.token"); token = null; showUnpaired(true); throw new Error("unpaired"); }
+  if (res.status === 401) { store.set(null); token = null; showUnpaired(true); throw new Error("unpaired"); }
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
 
 // --- pairing -------------------------------------------------------------------------
 
 function showUnpaired(removed) {
-  stop();
-  setStatus(null);
-  main.className = "";
-  main.innerHTML = `<section class="notice wide"><h1>${esc(removed ? T.removed : T.notPaired)}</h1><p class="soft">${esc(T.howPair)}</p></section>`;
+  if (viaRelay) {
+    stop();
+    setStatus(null);
+    main.className = "";
+    main.innerHTML = `<section class="notice wide"><h1>${esc(removed ? T.removed : T.notPaired)}</h1><p class="soft">${esc(T.lanOnly)}</p></section>`;
+    return;
+  }
+  showPairForm(null, removed ? T.removed : T.notPaired);
 }
 
-function showPairForm(code) {
+// [code] from the QR link; without one the phone types the six-digit PIN the car shows.
+function showPairForm(code, heading) {
   stop();
-  const guess = /iphone|ipad/i.test(navigator.userAgent) ? "iPhone" : /android/i.test(navigator.userAgent) ? "Android" : "Phone";
+  setStatus(null);
+  const guess = window.QsApp && window.QsApp.deviceName ? window.QsApp.deviceName() || "Android" : /iphone|ipad/i.test(navigator.userAgent) ? "iPhone" : /android/i.test(navigator.userAgent) ? "Android" : "Phone";
   main.className = "";
-  main.innerHTML = `<section class="notice wide"><h1>${esc(T.nameTitle)}</h1>
+  main.innerHTML = `<section class="notice wide"><h1>${esc(heading || T.nameTitle)}</h1>
+    ${code ? "" : `<p class="soft">${esc(T.howPair)}</p>
+    <input type="text" id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="${esc(T.pinHint)}" aria-label="${esc(T.pinHint)}">`}
     <input type="text" id="name" maxlength="40" value="${esc(guess)}" aria-label="${esc(T.nameHint)}">
     <button id="pair" class="on">${esc(T.pair)}</button><p id="pair-msg" class="soft"></p></section>`;
   document.getElementById("pair").onclick = async () => {
@@ -82,10 +101,11 @@ function showPairForm(code) {
     document.getElementById("pair").disabled = true;
     msg.textContent = T.waiting;
     try {
-      const r = await api("/api/pair", { code, name: document.getElementById("name").value });
+      const typed = code || document.getElementById("pin").value.replace(/\D/g, "");
+      const r = await api("/api/pair", { code: typed, name: document.getElementById("name").value });
       if (r.status === 200) {
         token = r.json.token;
-        localStorage.setItem("qs.token", token);
+        store.set(token);
         history.replaceState(null, "", location.pathname);
         start();
         return;
@@ -110,7 +130,8 @@ async function poll() {
   clearTimeout(timer);
   try {
     const r = await api("/api/state");
-    if (r.status === 200) { state = r.json; lastOk = Date.now(); }
+    if (r.status === 200) { state = r.json; lastOk = Date.now(); carOffline = null; }
+    else if (r.json && r.json.blocked === "CAR_OFFLINE") carOffline = r.json.lastSeenMs || 0;
   } catch (e) {
     if (!token) return;
   }
@@ -122,7 +143,10 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && to
 
 function setStatus(ok) {
   statusBar.className = "status" + (ok === true ? " ok" : ok === false ? " bad" : "");
-  statusText.textContent = ok === true ? T.wifi : ok === false ? `${T.offline}${lastOk ? " · " + T.seen.replace("%s", ago(Date.now() - lastOk)) : ""}` : "";
+  const since = lastOk ? " · " + T.seen.replace("%s", ago(Date.now() - lastOk)) : "";
+  statusText.textContent = ok === true ? (state && state.path === "relay" ? T.internet : T.wifi)
+    : ok === false ? (carOffline != null ? `${T.carOffline}${carOffline ? " · " + T.lastSeen.replace("%s", ago(Date.now() - carOffline)) : ""}` : `${T.offline}${since}`)
+    : "";
 }
 
 // --- rendering -----------------------------------------------------------------------

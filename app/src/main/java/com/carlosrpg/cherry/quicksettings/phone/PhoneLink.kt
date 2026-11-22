@@ -1,6 +1,9 @@
 package com.carlosrpg.cherry.quicksettings.phone
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import com.carlosrpg.cherry.quicksettings.BuildConfig
 import android.os.SystemClock
 import com.carlosrpg.cherry.quicksettings.app
 import com.carlosrpg.cherry.quicksettings.media.VolumeChannel
@@ -9,7 +12,9 @@ import com.carlosrpg.cherry.quicksettings.ui.DrawerActions
 import com.carlosrpg.cherry.quicksettings.util.AppInfo
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,21 +77,53 @@ class PhoneLink(private val context: Context, drawer: DrawerActions, onWatch: ()
         asset = { name -> runCatching { context.assets.open(name).use { it.readBytes() } }.getOrNull() },
         commandContext = Dispatchers.Main.immediate,
         onWatch = onWatch,
+        remoteAssist = { app.settings.config.value.remoteAssist },
     )
 
     private var server: PhoneServer? = null
+    private var relay: RelayClient? = null
+    private var relayWatch: kotlinx.coroutines.Job? = null
+    private val scope = CoroutineScope(Dispatchers.Main.immediate)
+    private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    private val networkBack = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) { relay?.wake() }
+    }
 
     fun setEnabled(on: Boolean) {
         if (on && server == null) {
-            server = PhoneServer(PhoneApi.PORT, api::handle).takeIf { it.start() }
+            server = PhoneServer(PhoneApi.PORT, { api.handle(it) }).takeIf { it.start() }
         } else if (!on) {
             server?.stop()
             server = null
         }
         _running.value = server != null
+        setRelay(on && relayConfigured)
+    }
+
+    private fun setRelay(on: Boolean) {
+        if (on && relay == null) {
+            val client = RelayClient(BuildConfig.RELAY_URL, BuildConfig.RELAY_KEY, app.phones.carId) { api.handle(it, remote = true) }
+            relay = client
+            client.start()
+            relayWatch = scope.launch { client.connected.collect { _relayConnected.value = it } }
+            runCatching { connectivity?.registerDefaultNetworkCallback(networkBack) }
+        } else if (!on && relay != null) {
+            relay?.stop()
+            relay = null
+            relayWatch?.cancel()
+            _relayConnected.value = false
+            runCatching { connectivity?.unregisterNetworkCallback(networkBack) }
+        }
     }
 
     companion object {
+        /** This build carries a relay address and key (local.properties on the owner's machine). */
+        val relayConfigured = BuildConfig.RELAY_URL.isNotEmpty() && BuildConfig.RELAY_KEY.isNotEmpty()
+
+        private val _relayConnected = MutableStateFlow(false)
+        /** The car's connection to the relay is up: phones can reach it over the internet. */
+        val relayConnected: StateFlow<Boolean> = _relayConnected.asStateFlow()
+
         private val _running = MutableStateFlow(false)
         /** The server has its port open; the settings screen shows the address only then. */
         val running: StateFlow<Boolean> = _running.asStateFlow()

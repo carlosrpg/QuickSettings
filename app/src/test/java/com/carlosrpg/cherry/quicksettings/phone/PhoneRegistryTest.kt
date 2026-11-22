@@ -63,4 +63,18 @@ class PhoneRegistryTest {
         assertThat(restarted.phoneFor(keep.token)).isNotNull()
         assertThat(restarted.phoneFor(drop.token)).isNull()
     }
+
+    @Test
+    fun `the six-digit pin pairs like the QR code, and a wrong guess burns the code`() {
+        val r = registry()
+        val code = r.newCode()
+        assertThat(code.pin).matches("[0-9]{6}")
+        assertThat(pair(r, allow = true, code = code.pin)).isInstanceOf(PairResult.Paired::class.java)
+
+        val next = r.newCode()
+        val wrong = if (next.pin == "000000") "000001" else "000000"
+        assertThat(pair(r, allow = null, code = wrong)).isEqualTo(PairResult.Refused("BAD_CODE"))
+        assertThat(pair(r, allow = null, code = next.pin)).isEqualTo(PairResult.Refused("BAD_CODE"))
+        assertThat(r.phones.value).hasSize(1)
+    }
 }

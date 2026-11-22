@@ -68,7 +68,12 @@ listener was handed. A navigation app that is guiding and has no line there is n
 drawer as a web page served by the car at `http://<car>:8080`. **Add phone** shows a QR code;
 the phone that scans it is added once someone at the head unit taps **Allow**, and **Remove**
 takes it off at once. A phone can do what the drawer does, with the same gates (driver-assist
-rules, a second tap before a safety function goes off). Design and API:
+rules, a second tap before a safety function goes off). The **QS Companion** app (`companion/`)
+wraps that page: it finds the car on the Wi-Fi by itself, pairs with the six-digit code shown
+under the QR code, and falls back to the internet relay (`relay/`, a Cloudflare Worker) when the
+phone isn't on the car's Wi-Fi. The relay only exists in builds made with `qs.relayUrl` and
+`qs.relayKey` in `local.properties`; over it, driver assist is read-only unless Settings →
+Phones → **Driver assist over the internet** is on (it asks first). Design and API:
 [docs/companion-api.md](docs/companion-api.md).
 
 Nothing writes to the car on its own. Every write comes from a tap, a slider release or a

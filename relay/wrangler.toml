@@ -1,0 +1,15 @@
+name = "qs-relay"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "CARS"
+class_name = "Car"
+
+# SQLite-backed objects are the ones the Free plan allows.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Car"]
+
+# RELAY_KEY is a secret: `wrangler secret put RELAY_KEY` (and `.dev.vars` for `wrangler dev`).

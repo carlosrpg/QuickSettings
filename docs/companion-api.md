@@ -5,8 +5,9 @@ navigation. QuickSettings on the head unit is the only thing that talks to the c
 only thing that decides who may use it. Phones reach it directly on the same Wi-Fi, or through
 a small relay on the internet when they can't.
 
-Status: steps 1 and 2 of section 8 are built (LAN only: server, pairing, Settings → Phones, the
-page). The relay, the internet assist setting and the Android wrapper are not.
+Status: all four steps of section 8 are built: the car's server and page, the relay
+(`relay/`), the car's relay connection with the internet assist setting, and the Android app
+(`companion/`). Where the build differs from the draft below, section 9 says how.
 
 ## 1. Pieces
 
@@ -230,3 +231,26 @@ move one target.
 2. The page in `assets/web/`, including the status bar of section 2.
 3. The relay (`relay/`), the car's relay connection, the assist toggle and its confirmation.
 4. The Android WebView wrapper with LAN discovery. (iOS: not planned for now.)
+
+## 9. As built (differences from the draft)
+
+- **The relay forwards every request to the car** instead of keeping a copy of the state: the
+  Durable Object sends each phone request (`{id, method, path, query, authorization, body}`)
+  down the car's WebSocket and returns the car's answer (`{id, status, type, cache, body}`,
+  body base64). The page, `/img` and the API all come from the car, so there is one copy of the
+  page. A request waits at most 15 s; with no car connected the relay answers
+  `503 {blocked: "CAR_OFFLINE", lastSeenMs}` at once. `api/ping` is answered by the relay.
+- **Relay address and key are build-time**, from `qs.relayUrl` / `qs.relayKey` in
+  `local.properties` (or `-P`), not typed into Settings. The key is the Worker secret
+  `RELAY_KEY`; a build without them is LAN-only.
+- **The car's WebSocket client** is a small RFC 6455 client on `SSLSocket` (`RelayClient`), with
+  the host name checked explicitly. It pings with the text `ping` every 30 s (the object's
+  auto-response answers `pong` without waking up) and treats 75 s of silence as a dead link.
+- **Pairing is LAN-only.** Through the relay `/api/pair` answers `403 LAN_ONLY`. The QR code
+  keeps the LAN form `http://<ip>:8080/#pair=<code>`; under it the car shows a **six-digit PIN**
+  for the same pairing, which the app (or a browser on the car's page) types instead of scanning.
+  A code takes one attempt, right or wrong, so the PIN can't be guessed by trying.
+- **Discovery** is the last address, then a scan of the phone's Wi-Fi and hotspot /24 networks
+  (`GET /api/ping`, 64 at a time), then the relay. No mDNS.
+- **The app keeps the token** (`window.QsApp.getToken/setToken`) since the page's origin changes
+  between the LAN address and the relay; a browser keeps it in `localStorage`.

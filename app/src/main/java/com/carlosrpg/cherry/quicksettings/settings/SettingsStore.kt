@@ -24,6 +24,8 @@ enum class Side { LEFT, RIGHT }
  *   the screen, under the car's own clock and icons; display only (the car takes those touches).
  * @property phoneControl paired phones on the car's Wi-Fi can see and use the drawer. Off by
  *   default: it opens a port on the car's network.
+ * @property remoteAssist phones reaching the car through the relay may change driver assist.
+ *   Off by default; turning it on asks for confirmation (docs/companion-api.md section 4).
  */
 data class QsConfig(
     val side: Side = Side.LEFT,
@@ -35,6 +37,7 @@ data class QsConfig(
     val topBar: Boolean = true,
     val clusterMediaSync: Boolean = true,
     val phoneControl: Boolean = false,
+    val remoteAssist: Boolean = false,
     val semiOrder: List<WidgetType> = withHidden(semi),
     val openOrder: List<WidgetType> = withHidden(open),
 )
@@ -76,6 +79,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_TOP_BAR, next.topBar)
             .putBoolean(KEY_CLUSTER_MEDIA, next.clusterMediaSync)
             .putBoolean(KEY_PHONE_CONTROL, next.phoneControl)
+            .putBoolean(KEY_REMOTE_ASSIST, next.remoteAssist)
             .putString(KEY_SEMI_ORDER, encode(next.semiOrder))
             .putString(KEY_OPEN_ORDER, encode(next.openOrder))
             .apply()
@@ -97,6 +101,7 @@ class SettingsStore(context: Context) {
             topBar = prefs.getBoolean(KEY_TOP_BAR, true),
             clusterMediaSync = prefs.getBoolean(KEY_CLUSTER_MEDIA, true),
             phoneControl = prefs.getBoolean(KEY_PHONE_CONTROL, false),
+            remoteAssist = prefs.getBoolean(KEY_REMOTE_ASSIST, false),
             // A saved order may predate a widget; withHidden appends whatever it lacks.
             semiOrder = withHidden(decode(prefs.getString(KEY_SEMI_ORDER, null)) ?: semi),
             openOrder = withHidden(savedOpenOrder?.let(::addWeatherBesideRange) ?: open),
@@ -113,6 +118,7 @@ class SettingsStore(context: Context) {
         private const val KEY_SIDE_HANDLE = "side_handle"
         private const val KEY_CLUSTER_MEDIA = "cluster_media_sync"
         private const val KEY_PHONE_CONTROL = "phone_control"
+        private const val KEY_REMOTE_ASSIST = "remote_assist"
         private const val KEY_SEMI_ORDER = "semi_order"
         private const val KEY_OPEN_ORDER = "open_order"
 

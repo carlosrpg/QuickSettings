@@ -15,7 +15,8 @@ import org.json.JSONObject
 data class Phone(val id: String, val name: String, val tokenHash: String, val addedAt: Long, val lastUsedAt: Long)
 
 /** The QR code's one-time code, valid until [expiresAt] and for one pairing attempt. */
-data class PairingCode(val code: String, val expiresAt: Long)
+/** [code] goes in the QR; [pin] is the same code typed in the companion app. */
+data class PairingCode(val code: String, val pin: String, val expiresAt: Long)
 
 /** A phone asking to pair, waiting for someone in the car to answer on the head unit. */
 class PairRequest(val name: String) {
@@ -57,7 +58,8 @@ class PhoneRegistry(
     }
 
     /** A fresh code for the QR; any earlier one stops working. */
-    fun newCode(): PairingCode = PairingCode(randomId(16), clock() + CODE_VALID_MS).also { _code.value = it }
+    fun newCode(): PairingCode =
+        PairingCode(randomId(16), "%06d".format(random.nextInt(1_000_000)), clock() + CODE_VALID_MS).also { _code.value = it }
 
     fun cancelCode() {
         _code.value = null
@@ -70,9 +72,11 @@ class PhoneRegistry(
     suspend fun pair(code: String, name: String, timeoutMs: Long = ANSWER_TIMEOUT_MS): PairResult {
         val expected = _code.value
         val valid = expected != null && clock() < expected.expiresAt &&
-            MessageDigest.isEqual(expected.code.toByteArray(), code.toByteArray())
+            (MessageDigest.isEqual(expected.code.toByteArray(), code.toByteArray()) ||
+                MessageDigest.isEqual(expected.pin.toByteArray(), code.toByteArray()))
+        // One attempt per code, right or wrong: the six-digit PIN can't be guessed by trying.
+        if (expected != null) _code.compareAndSet(expected, null)
         if (!valid) return PairResult.Refused("BAD_CODE")
-        _code.value = null
         val request = PairRequest(name.trim().take(MAX_NAME).ifEmpty { "Phone" })
         _request.value = request
         val allowed = try {

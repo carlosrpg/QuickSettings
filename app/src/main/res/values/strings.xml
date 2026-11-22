@@ -280,4 +280,12 @@
     <string name="phone_allow_text">This phone will be able to change climate, energy, driver assist and media over the car\'s Wi-Fi until you remove it here.</string>
     <string name="phone_allow">Allow</string>
     <string name="phone_deny">Deny</string>
+    <string name="phone_pin">Or type this code in the QuickSettings Companion app:</string>
+    <string name="phones_internet_on">Internet: connected. Paired phones can reach the car from anywhere.</string>
+    <string name="phones_internet_off">Internet: not connected. Phones reach the car on its Wi-Fi only.</string>
+    <string name="remote_assist">Driver assist over the internet</string>
+    <string name="remote_assist_hint">Paired phones can change driver assist from outside the car\'s Wi-Fi.</string>
+    <string name="remote_assist_title">Allow driver assist from anywhere?</string>
+    <string name="remote_assist_text">Paired phones will be able to switch emergency braking, lane keeping, auto hold and collision warning from outside the car, over the internet, while someone else is driving. The car still refuses emergency braking above 10 km/h and still asks before a safety function goes off, but the person changing it may not see the road or know the car is moving. Anyone holding a paired phone can do this.</string>
+    <string name="remote_assist_allow">Allow</string>
 </resources>

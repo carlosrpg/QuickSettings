@@ -415,6 +415,34 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** The relay's status and the driver-assist-over-the-internet switch (off by default, confirmed on). */
+    @Composable
+    private fun InternetRows(config: QsConfig) {
+        val online by PhoneLink.relayConnected.collectAsState()
+        Text(
+            stringResource(if (online) R.string.phones_internet_on else R.string.phones_internet_off),
+            color = if (online) Qs.TextSoft else Qs.Muted, fontSize = 14.sp,
+        )
+        var asking by remember { mutableStateOf(false) }
+        SwitchRow(R.string.remote_assist, R.string.remote_assist_hint, config.remoteAssist) {
+            if (config.remoteAssist) app.settings.update { it.copy(remoteAssist = false) } else asking = true
+        }
+        if (asking) {
+            AlertDialog(
+                onDismissRequest = { asking = false },
+                title = { Text(stringResource(R.string.remote_assist_title)) },
+                text = { Text(stringResource(R.string.remote_assist_text)) },
+                confirmButton = {
+                    TextButton({
+                        asking = false
+                        app.settings.update { it.copy(remoteAssist = true) }
+                    }) { Text(stringResource(R.string.remote_assist_allow)) }
+                },
+                dismissButton = { TextButton({ asking = false }) { Text(stringResource(R.string.phone_cancel)) } },
+            )
+        }
+    }
+
     /**
      * Phone control: the switch, the car's address, the paired phones with Remove, and Add phone,
      * which shows a QR code for one phone. A phone that scans it is added only once someone here
@@ -475,6 +503,8 @@ class SettingsActivity : ComponentActivity() {
                 QrImage("$address/#pair=${pairing.code}")
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.phone_scan), color = Qs.TextSoft, fontSize = 14.sp)
+                    Text(stringResource(R.string.phone_pin), color = Qs.Muted, fontSize = 13.sp)
+                    QsText(pairing.pin.chunked(3).joinToString(" "), 34.sp, weight = FontWeight.SemiBold)
                     val cancel = stringResource(R.string.phone_cancel)
                     GlassButton(null, cancel, registry::cancelCode, label = cancel)
                 }
@@ -483,6 +513,7 @@ class SettingsActivity : ComponentActivity() {
             val add = stringResource(R.string.phone_add)
             GlassButton(Icons.Plus, add, { registry.newCode() }, label = add)
         }
+        if (PhoneLink.relayConfigured) InternetRows(config)
         request?.let { asking ->
             AlertDialog(
                 onDismissRequest = {},

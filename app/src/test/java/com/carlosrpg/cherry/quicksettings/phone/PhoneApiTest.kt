@@ -53,7 +53,8 @@ class PhoneApiTest {
         override suspend fun command(action: String, args: JSONObject, remote: Boolean) = commands.run(action, args, remote)
         override fun image(key: String): ByteArray? = null
     }
-    private val api = PhoneApi(registry, backend, asset = { if (it == "web/index.html") "<html>".toByteArray() else null }, Dispatchers.Unconfined)
+    private var remoteAssist = false
+    private val api = PhoneApi(registry, backend, asset = { if (it == "web/index.html") "<html>".toByteArray() else null }, Dispatchers.Unconfined, remoteAssist = { remoteAssist })
     private val server = PhoneServer(0, api::handle).also { check(it.start()) }
 
     @AfterEach
@@ -163,5 +164,25 @@ class PhoneApiTest {
         val statuses = (1..12).map { cmd(token, "media.next").status }
         assertThat(statuses).contains(429)
         assertThat(statuses.count { it == 200 }).isAtMost(PhoneApi.MAX_COMMANDS_PER_SECOND)
+    }
+
+    @Test
+    fun `through the relay, pairing is refused and assist follows the car's setting`() {
+        val token = pairedToken()
+        fun relay(path: String, body: JSONObject? = null) = api.handle(
+            HttpRequest(if (body == null) "GET" else "POST", path, emptyMap(), mapOf("authorization" to "Bearer $token"), body?.toString().orEmpty()),
+            remote = true,
+        ).let { Reply(it.status, String(it.body)) }
+        val aeb = JSONObject().put("action", "assist.toggle").put("args", JSONObject().put("assist", "AUTO_HOLD"))
+
+        assertThat(relay("/api/pair", JSONObject().put("code", registry.newCode().pin)).json.getString("error")).isEqualTo("LAN_ONLY")
+        val state = relay("/api/state").json
+        assertThat(state.getString("path")).isEqualTo("relay")
+        assertThat(state.getJSONObject("permissions").getBoolean("assist")).isFalse()
+        assertThat(relay("/api/cmd", aeb).json.getString("blocked")).isEqualTo("REMOTE_DISABLED")
+
+        remoteAssist = true
+        assertThat(relay("/api/state").json.getJSONObject("permissions").getBoolean("assist")).isTrue()
+        assertThat(relay("/api/cmd", aeb).json.optString("blocked")).isNotEqualTo("REMOTE_DISABLED")
     }
 }

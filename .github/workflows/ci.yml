@@ -98,7 +98,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Unit tests and lint
-        run: ./gradlew app:testDebugUnitTest app:lintDebug --stacktrace
+        run: ./gradlew app:testDebugUnitTest app:lintDebug companion:testDebugUnitTest companion:lintDebug --stacktrace
 
       # Release talks to the head unit's CarInfo proxy; debug keeps the emulator mock.
       - name: Build signed release APK

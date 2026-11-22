@@ -135,10 +135,12 @@ class PhoneServer(private val port: Int, private val handle: (HttpRequest) -> Ht
                 got += n
             }
             val target = parts[1]
-            val query = target.substringAfter('?', "").split('&').filter { '=' in it }.associate {
-                decode(it.substringBefore('=')) to decode(it.substringAfter('='))
-            }
-            return HttpRequest(parts[0].uppercase(), decode(target.substringBefore('?')), query, headers, String(body, Charsets.UTF_8))
+            return HttpRequest(parts[0].uppercase(), decode(target.substringBefore('?')), query(target.substringAfter('?', "")), headers, String(body, Charsets.UTF_8))
+        }
+
+        /** `a=1&b=2` to a map, decoded. */
+        internal fun query(s: String): Map<String, String> = s.split('&').filter { '=' in it }.associate {
+            decode(it.substringBefore('=')) to decode(it.substringAfter('='))
         }
 
         private fun decode(s: String) = runCatching { java.net.URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
@@ -150,6 +152,7 @@ class PhoneServer(private val port: Int, private val handle: (HttpRequest) -> Ht
             403 -> "Forbidden"
             404 -> "Not Found"
             429 -> "Too Many Requests"
+            503 -> "Service Unavailable"
             else -> "Error"
         }
     }

@@ -269,4 +269,12 @@
     <string name="phone_allow_text">Este celular poderá mudar clima, energia, assistência ao motorista e mídia pelo Wi-Fi do carro até você removê-lo aqui.</string>
     <string name="phone_allow">Permitir</string>
     <string name="phone_deny">Recusar</string>
+    <string name="phone_pin">Ou digite este código no app QuickSettings Companion:</string>
+    <string name="phones_internet_on">Internet: conectado. Celulares pareados acessam o carro de qualquer lugar.</string>
+    <string name="phones_internet_off">Internet: sem conexão. Os celulares acessam o carro só pelo Wi-Fi dele.</string>
+    <string name="remote_assist">Assistência à condução pela internet</string>
+    <string name="remote_assist_hint">Celulares pareados podem alterar a assistência fora do Wi-Fi do carro.</string>
+    <string name="remote_assist_title">Permitir assistência de qualquer lugar?</string>
+    <string name="remote_assist_text">Celulares pareados poderão ligar e desligar a frenagem de emergência, a manutenção de faixa, o auto hold e o alerta de colisão de fora do carro, pela internet, enquanto outra pessoa dirige. O carro continua recusando a frenagem de emergência acima de 10 km/h e continua pedindo confirmação antes de desligar uma função de segurança, mas quem altera pode não ver a estrada nem saber que o carro está em movimento. Qualquer pessoa com um celular pareado pode fazer isso.</string>
+    <string name="remote_assist_allow">Permitir</string>
 </resources>
