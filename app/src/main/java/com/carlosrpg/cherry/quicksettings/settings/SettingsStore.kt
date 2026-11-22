@@ -22,7 +22,7 @@ enum class Side { LEFT, RIGHT }
  *   swipe-down zone then is the one way in.
  * @property topBar keep a strip of car and media info in the status bar's area at the top of
  *   the screen, under the car's own clock and icons; display only (the car takes those touches).
- * @property carGesture the car's own two-finger swipe down opens the full drawer (QuickSettings
+ * @property carGesture the car's own two-finger swipe down opens the full drawer. Off by default (QuickSettings
  *   listens for the car's gesture broadcast itself, no gesture app needed).
  * @property phoneControl paired phones on the car's Wi-Fi can see and use the drawer. Off by
  *   default: it opens a port on the car's network.
@@ -38,7 +38,7 @@ data class QsConfig(
     val sideHandle: Boolean = false,
     val topBar: Boolean = true,
     val clusterMediaSync: Boolean = true,
-    val carGesture: Boolean = true,
+    val carGesture: Boolean = false,
     val phoneControl: Boolean = false,
     val remoteAssist: Boolean = false,
     val semiOrder: List<WidgetType> = withHidden(semi),
@@ -105,7 +105,7 @@ class SettingsStore(context: Context) {
             topBar = prefs.getBoolean(KEY_TOP_BAR, true),
             clusterMediaSync = prefs.getBoolean(KEY_CLUSTER_MEDIA, true),
             phoneControl = prefs.getBoolean(KEY_PHONE_CONTROL, false),
-            carGesture = prefs.getBoolean(KEY_CAR_GESTURE, true),
+            carGesture = prefs.getBoolean(KEY_CAR_GESTURE, false),
             remoteAssist = prefs.getBoolean(KEY_REMOTE_ASSIST, false),
             // A saved order may predate a widget; withHidden appends whatever it lacks.
             semiOrder = withHidden(decode(prefs.getString(KEY_SEMI_ORDER, null)) ?: semi),
