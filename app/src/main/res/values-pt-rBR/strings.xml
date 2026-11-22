@@ -277,4 +277,6 @@
     <string name="remote_assist_title">Permitir assistência de qualquer lugar?</string>
     <string name="remote_assist_text">Celulares pareados poderão ligar e desligar a frenagem de emergência, a manutenção de faixa, o auto hold e o alerta de colisão de fora do carro, pela internet, enquanto outra pessoa dirige. O carro continua recusando a frenagem de emergência acima de 10 km/h e continua pedindo confirmação antes de desligar uma função de segurança, mas quem altera pode não ver a estrada nem saber que o carro está em movimento. Qualquer pessoa com um celular pareado pode fazer isso.</string>
     <string name="remote_assist_allow">Permitir</string>
+    <string name="car_gesture">Deslizar dois dedos para baixo</string>
+    <string name="car_gesture_hint">O gesto de dois dedos para baixo do próprio carro abre a gaveta completa, sem app de gestos. Mantenha os dedos juntos e comece a mover logo: o carro entende uma mudança na distância entre eles como pinça, e uma pausa como toque longo.</string>
 </resources>

@@ -288,4 +288,6 @@
     <string name="remote_assist_title">Allow driver assist from anywhere?</string>
     <string name="remote_assist_text">Paired phones will be able to switch emergency braking, lane keeping, auto hold and collision warning from outside the car, over the internet, while someone else is driving. The car still refuses emergency braking above 10 km/h and still asks before a safety function goes off, but the person changing it may not see the road or know the car is moving. Anyone holding a paired phone can do this.</string>
     <string name="remote_assist_allow">Allow</string>
+    <string name="car_gesture">Two-finger swipe down</string>
+    <string name="car_gesture_hint">The car\'s own two-finger swipe down opens the full drawer, with no gesture app. Keep the fingers together and start moving at once: the car reads a change in their spread as a pinch, and a pause as a long press.</string>
 </resources>

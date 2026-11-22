@@ -4,7 +4,9 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.IntentFilter
 import android.content.Intent
 import android.content.res.Configuration
 import android.database.ContentObserver
@@ -127,6 +129,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         config = app.settings.config.value
         fullScreen = FullScreenDetector(this)
         event("service started (overlay allowed=${canDraw(this)}, tap relay=${TapRelayService.bound.value})")
+        event("car gestures: ${CarGesture.describeSettings(contentResolver)}")
+        registerReceiver(carGestures, IntentFilter(CarGesture.ACTION))
         addEdge()
         updateTopBar()
         lifecycleScope.launch {
@@ -171,6 +175,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     override fun onDestroy() {
         event("service stopped")
+        runCatching { unregisterReceiver(carGestures) }
         handler.removeCallbacksAndMessages(null)
         contentResolver.unregisterContentObserver(navStateObserver)
         phones.setEnabled(false)
@@ -291,12 +296,29 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         updateTopZone()
     }
 
+    /**
+     * The car's own multi-finger gestures, broadcast by the system for every app. Each one is
+     * logged by name (a swipe the car read as a pinch or a long press shows up as such), and a
+     * two-finger swipe down opens the full drawer while the setting is on.
+     */
+    private val carGestures = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val code = intent.getIntExtra("gesture", -1)
+            val opens = code == CarGesture.TWO_FINGER_SWIPE_DOWN && config.carGesture
+            event("car gesture: ${CarGesture.name(code)}${if (code == CarGesture.TWO_FINGER_SWIPE_DOWN && !config.carGesture) " (setting off)" else ""}")
+            if (opens) openFull("car gesture")
+        }
+    }
+
+    /** The full drawer, also from semi-open or while it is still sliding shut. */
+    private fun openFull(how: String) {
+        if (mode == DrawerMode.OPEN && !closing) event("$how: drawer already open") else openFromTop(how)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Sent by OpenDrawerActivity (a gesture app launching QuickSettings): the full drawer,
         // also from semi-open or while it is still sliding shut.
-        if (intent?.action == ACTION_OPEN_TOP) handler.post {
-            if (mode == DrawerMode.OPEN && !closing) event("gesture: drawer already open") else openFromTop("gesture")
-        }
+        if (intent?.action == ACTION_OPEN_TOP) handler.post { openFull("app launch (gesture app)") }
         return super.onStartCommand(intent, flags, startId)
     }
 

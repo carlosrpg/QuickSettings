@@ -304,6 +304,14 @@ class SettingsActivity : ComponentActivity() {
             }
             Toggle(config.topBar, topBarLabel) { store.update { it.copy(topBar = !it.topBar) } }
         }
+        val gestureLabel = stringResource(R.string.car_gesture)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                QsText(gestureLabel, 16.sp, weight = FontWeight.SemiBold)
+                Text(stringResource(R.string.car_gesture_hint), color = Qs.Muted, fontSize = 13.sp)
+            }
+            Toggle(config.carGesture, gestureLabel) { store.update { it.copy(carGesture = !it.carGesture) } }
+        }
     }
 
     /**
