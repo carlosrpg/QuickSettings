@@ -22,8 +22,10 @@ import kotlin.math.hypot
 @SuppressLint("ViewConstructor")
 class TopSwipeView(
     context: Context,
-    private val onOpen: () -> Unit,
+    /** Called with how it opened ("top pull", "top hint tap"). */
+    private val onOpen: (how: String) -> Unit,
     private val onPass: (x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long) -> Unit,
+    private val log: (String) -> Unit = {},
 ) : View(context) {
 
     private val density = resources.displayMetrics.density
@@ -60,20 +62,22 @@ class TopSwipeView(
                 val down = event.rawY - downY
                 if (down > openDistance && down > abs(event.rawX - downX)) {
                     opened = true
-                    onOpen()
+                    onOpen("top pull")
                 }
             }
             MotionEvent.ACTION_UP -> if (!opened) {
                 val still = hypot(event.rawX - downX, event.rawY - downY) < touchSlop
                 val held = event.eventTime - event.downTime
                 if (still && held < ViewConfiguration.getLongPressTimeout() && abs(event.x - width / 2f) <= HINT_TAP_HALF_WIDTH_DP * density) {
-                    onOpen()
+                    onOpen("top hint tap")
                 } else if (still) {
                     onPass(downX, downY, downX, downY, held)
                 } else {
+                    log("top: swipe passed on to the app (not a pull down)")
                     onPass(downX, downY, event.rawX, event.rawY, held)
                 }
             }
+            MotionEvent.ACTION_CANCEL -> if (!opened) log("top touch taken by the system before it opened")
         }
         return true
     }

@@ -18,3 +18,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "QuickSettings"
 include(":app")
+include(":companion")

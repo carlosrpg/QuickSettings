@@ -7,6 +7,18 @@
 <meta name="description" content="A widget drawer that floats over every app on the Jaecoo 7 head unit. Set it up from your browser over USB.">
 <meta name="theme-color" content="#0b0e14">
 <link rel="alternate" hreflang="pt-BR" href="pt/">
+<script>
+// A browser set to Portuguese (pt, pt-BR, pt-PT) goes to the Portuguese page, unless the visitor
+// picked English with the language link. Section links keep their place on the other page.
+(function () {
+  var choice = null;
+  try { choice = localStorage.getItem("qs.lang"); } catch (e) {}
+  var lang = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+  if (choice === "en" || (choice !== "pt" && !/^pt(-|$)/i.test(lang))) return;
+  var ids = { "#screens": "#telas", "#features": "#recursos", "#how": "#como", "#phone": "#celular" };
+  location.replace("pt/" + location.search + (ids[location.hash] || location.hash));
+})();
+</script>
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
@@ -16,9 +28,10 @@
     <nav>
       <a href="#screens">Screens</a>
       <a href="#features">Features</a>
+      <a href="#phone">Phone</a>
       <a href="#faq">FAQ</a>
       <a class="cta" href="#setup-section">Set up</a>
-      <a class="lang" href="pt/" hreflang="pt-BR" lang="pt-BR">PT</a>
+      <a class="lang" href="pt/" hreflang="pt-BR" lang="pt-BR" onclick="try{localStorage.setItem('qs.lang','pt')}catch(e){}">PT</a>
     </nav>
   </div>
 </header>
@@ -60,7 +73,7 @@
           </article>
           <article class="slide">
             <figure><img src="img/settings-en.webp" width="800" height="1174" loading="lazy" alt="Settings screen with drawer position, handle options and the widget list"></figure>
-            <div><div class="kicker">Settings</div><h3>Make it yours</h3><p>Pick the side and the height of the handle, choose between touch and swipe, turn the info bar on or off, and reorder or hide widgets separately for the half-open and open drawer. A Status panel shows the car link, media and notification access live.</p></div>
+            <div><div class="kicker">Settings</div><h3>Make it yours</h3><p>Pick the side and the height of the handle, choose between touch and swipe, turn the info bar on or off, and reorder or hide widgets separately for the half-open and open drawer, and, if you like, open it with the car's own two-finger swipe down. A Status panel shows the car link, media and notification access live.</p></div>
           </article>
           <article class="slide">
             <figure><img src="img/semi-en.webp" width="800" height="1174" loading="lazy" alt="Half-open drawer on the left edge with small widget tiles"></figure>
@@ -97,7 +110,7 @@
         <article class="card">
           <div class="icon" style="background:rgba(255,122,46,.15);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg></div>
           <h3>Climate</h3>
-          <p>A temperature × fan quadrant: drag the marker and it's set on release. Climate on/off, auto, zone sync and recirculation follow the car's state.</p>
+          <p>Temperature and fan sliders set on release, a passenger temperature while the zones are split, and a temperature × fan quadrant on the half-open tile. Climate on/off, A/C, auto, zone sync and recirculation follow the car's state.</p>
         </article>
         <article class="card">
           <div class="icon" style="background:rgba(61,220,151,.15);color:var(--energy)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
@@ -130,7 +143,30 @@
       <div class="facts">
         <div class="fact"><h3>Nothing writes on its own</h3><p>Every change to the car comes from your tap, slider release or drag release. Safety functions keep the stock gates.</p></div>
         <div class="fact" style="border-color:var(--energy)"><h3>Always there</h3><p>The drawer runs as a foreground service from boot, and the notification listener brings it back if the system kills it.</p></div>
-        <div class="fact" style="border-color:var(--warm)"><h3>Live values</h3><p>The car has no change notifications for apps, so the drawer polls every 1.5 s while it's on screen, and right after each change.</p></div>
+        <div class="fact" style="border-color:var(--warm)"><h3>Live values</h3><p>The car has no change notifications for apps, so values are read every 2 s while the drawer or a paired phone shows them, every 5 s for the info bar alone, and right after each change.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="phone" class="phone-section">
+    <div class="wrap">
+      <div>
+        <h2>Control it from your phone</h2>
+        <p class="sub">Everyone in the car can use the drawer from their own phone: climate, car mode, media, navigation and driver assist, with the same rules as on the head unit.</p>
+        <ol class="steps">
+          <li><strong>Turn it on</strong>On the car: QuickSettings → Settings → Phones → Phone control. It is off by default.</li>
+          <li><strong>Install QS Companion</strong>Download it below on your Android phone. On an iPhone, scan the QR code the car shows and use the page in Safari.</li>
+          <li><strong>Pair</strong>Join the car's Wi-Fi (or connect the car to your phone's hotspot), tap Add phone on the car and type the six-digit code in the app.</li>
+          <li><strong>Allow</strong>Someone at the head unit taps Allow. Remove the phone there at any time.</li>
+        </ol>
+        <div class="actions">
+          <a class="btn primary" href="latest/QSCompanion.apk" download>Download QS Companion for Android</a>
+          <a class="btn" href="https://github.com/carlosrpg/QuickSettings/releases/latest">All releases</a>
+        </div>
+        <p class="note">Android 8 or newer. When Android asks, allow your browser to install apps. The app finds the car on the Wi-Fi by itself and shows whether it is connected. Reaching the car over the internet needs a relay of your own, built into your own APKs (see the <a href="https://github.com/carlosrpg/QuickSettings#phone-control">README</a>); there, driver assist stays read-only unless the car allows it.</p>
+      </div>
+      <div class="phone">
+        <img src="img/phone-en.webp" width="750" height="1624" loading="lazy" alt="QS Companion on a phone: the media card with transport and volume sliders, and the navigation card">
       </div>
     </div>
   </section>
@@ -178,7 +214,9 @@
       <h2>Questions</h2>
       <details><summary>Which browsers work?</summary><p>Chrome, Edge or another Chromium browser with WebUSB, on Windows, macOS, Linux or ChromeOS. Chrome on an Android phone works too, with a USB-OTG adapter. Firefox and Safari have no WebUSB.</p></details>
       <details><summary>The connection fails or the car isn't listed</summary><p>Use a data cable, not a charge-only one. If you have the Android tools installed, another adb is probably holding the port: run <code>adb kill-server</code> and try again. On Windows the head unit may need the Google USB driver.</p></details>
-      <details><summary>What does this page run on my car?</summary><p>To install, it copies the APK and a short script (<a href="car-setup.sh">car-setup.sh</a>) to <code>/data/local/tmp</code> and runs the script, which installs the APK with <code>pm</code>, opens the app and deletes both files. The car's ADB refuses any command containing the word "install", which is why that runs from a script. Otherwise it runs only the commands shown under "Manual command" for each item, plus read-only checks (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Nothing is sent anywhere but to the car over the cable.</p></details>
+      <details><summary>What does this page run on my car?</summary><p>To install, it copies the APK and a short script (<a href="car-setup.sh">car-setup.sh</a>) to <code>/data/local/tmp</code> and runs the script, which installs the APK through an Android package-installer session (the car refuses a plain <code>pm install</code>), opens the app and deletes both files. The car's ADB refuses any command containing the word "install", which is why that runs from a script. Otherwise it runs only the commands shown under "Manual command" for each item, plus read-only checks (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). Nothing is sent anywhere but to the car over the cable.</p></details>
+      <details><summary>The drawer doesn't open with my gesture</summary><p>Turn on Settings → Two-finger swipe down and QuickSettings answers the car's own gesture directly, with no gesture app in between. Keep the two fingers together and start moving straight away: the car reads a change in their spread as a pinch, and a pause as a long press. The drawer section of the settings screen's debug log lists every gesture the car reported and every touch on the handle and the top strip.</p></details>
+      <details><summary>Is phone control safe?</summary><p>It is off until you turn it on, it answers only phones on the car's own network, and only phones someone at the head unit allowed. Each one can be removed at once. Every change goes through the same rules as the drawer, including the second tap before a safety function goes off.</p></details>
       <details><summary>Do I have to do this again?</summary><p>No. The grants survive reboots and app updates. Uninstalling the app removes them.</p></details>
       <details><summary>I'd rather type the commands</summary><p>Every command is in the <a href="https://github.com/carlosrpg/QuickSettings#install-on-the-car">README</a>, and the app's settings screen shows each missing one.</p></details>
     </div>

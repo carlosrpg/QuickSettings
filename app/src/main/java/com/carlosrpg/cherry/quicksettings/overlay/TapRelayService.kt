@@ -6,6 +6,8 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * swallow taps. Optional: without it, a tap inside the narrow zone is lost.
  *
  * Also answers whether the car's status bar is in the window list, which it leaves while a
- * full-screen app (Android Auto, video) hides it; [FullScreenDetector] polls that.
+ * full-screen app (Android Auto, video) hides it; [FullScreenDetector] reads that on each
+ * window change ([windowEvents]).
  */
 class TapRelayService : AccessibilityService() {
 
@@ -32,7 +35,10 @@ class TapRelayService : AccessibilityService() {
         super.onDestroy()
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    // Window changes are when a full-screen app comes or goes: the overlay re-checks then.
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        windowEvents.tryEmit(Unit)
+    }
 
     /**
      * Whether the status bar is in the window list: a system window flush with the top, as wide
@@ -84,5 +90,8 @@ class TapRelayService : AccessibilityService() {
 
         /** Whether taps can be passed through; until then the top strip would swallow them. */
         val bound: StateFlow<Boolean> = _bound.asStateFlow()
+
+        /** A window appeared, left or changed state (throttled by the service's notification timeout). */
+        val windowEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     }
 }

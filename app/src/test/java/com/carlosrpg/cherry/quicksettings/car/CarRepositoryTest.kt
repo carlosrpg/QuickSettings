@@ -4,6 +4,8 @@ import app.jconfig.carbus.carinfo.BatteryMode
 import app.jconfig.carbus.carinfo.CabinTempSpec
 import app.jconfig.carbus.carinfo.CarBus
 import app.jconfig.carbus.carinfo.RegenLevel
+import app.jconfig.carbus.carinfo.TelemetryIds
+import app.jconfig.carbus.carinfo.VDEventCarInfo
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +43,33 @@ class CarRepositoryTest {
         repo.refresh()
         assertThat(repo.state.value.cabinTempC).isEqualTo(26)
         assertThat(repo.state.value.fanLevel).isEqualTo(7)
+    }
+
+    @Test
+    fun `the passenger zone moves on its own item and leaves the driver's alone`() = runBlocking {
+        val repo = CarRepository(seededMockBus(), scope)
+        repo.refresh()
+        val driver = repo.state.value.cabinTempC
+        assertThat(repo.state.value.sync).isFalse()
+        repo.setPassengerTemp(19)
+        awaitMoveDone(repo)
+        repo.refresh()
+        assertThat(repo.state.value.passengerTempC).isEqualTo(19)
+        assertThat(repo.state.value.cabinTempC).isEqualTo(driver)
+    }
+
+    @Test
+    fun `a partial read follows climate and keeps the slow items from the last full read`() = runBlocking {
+        val bus = seededMockBus()
+        val repo = CarRepository(bus, scope)
+        repo.refresh()
+        bus.sendItemValue(VDEventCarInfo.MODULE_NEW_ENERGY, TelemetryIds.ITEM_BATTERY_SOC, 40)
+        bus.sendItemValue(VDEventCarInfo.MODULE_HVAC, CabinTempSpec.ITEM_WRITE, CabinTempSpec.toRaw(27))
+        repo.refresh(full = false)
+        assertThat(repo.state.value.cabinTempC).isEqualTo(27)
+        assertThat(repo.state.value.batterySoc).isEqualTo(72)
+        repo.refresh()
+        assertThat(repo.state.value.batterySoc).isEqualTo(40)
     }
 
     @Test
@@ -108,7 +137,7 @@ class CarRepositoryTest {
     private suspend fun awaitMoveDone(repo: CarRepository) {
         delay(CarRepository.CLIMATE_DEBOUNCE_MS)
         val deadline = System.currentTimeMillis() + 10_000
-        while (repo.cabinTempTarget.value != null || repo.fanTarget.value != null) {
+        while (repo.cabinTempTarget.value != null || repo.fanTarget.value != null || repo.passengerTempTarget.value != null) {
             check(System.currentTimeMillis() < deadline) { "climate move did not finish within 10 s" }
             delay(50)
         }

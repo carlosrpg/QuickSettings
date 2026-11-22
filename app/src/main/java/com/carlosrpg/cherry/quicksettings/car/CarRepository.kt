@@ -17,7 +17,6 @@ import app.jconfig.carbus.carinfo.TelemetryIds
 import app.jconfig.carbus.carinfo.VDEventCarInfo
 import android.os.SystemClock
 import android.util.Log
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -27,7 +26,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,6 +36,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 data class CarState(
     val speedKmh: Int? = null,
     val cabinTempC: Int? = null,
+    /** The passenger zone's set temperature; it differs from [cabinTempC] only while [sync] is off. */
+    val passengerTempC: Int? = null,
     val fanLevel: Int? = null,
     val outsideTempC: Int? = null,
     val batteryMode: BatteryMode? = null,
@@ -79,16 +79,20 @@ private const val HVAC = VDEventCarInfo.MODULE_HVAC
 
 /**
  * Reads the car by polling: CarInfo has no subscribe, and values change from other places
- * (stock settings, voice, physical buttons), so every read is repeated on a timer and after
- * each write. Writes happen only from explicit user actions. Ids and encodings all come from
+ * (stock settings, voice, physical buttons), so [refresh] runs on the overlay's heartbeat and
+ * after each write. Writes happen only from explicit user actions. Ids and encodings all come from
  * jconfig-carbus.
  */
-class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) {
+class CarRepository(
+    private val bus: CarBus,
+    private val scope: CoroutineScope,
+    /** Hides the car's climate panel at once, before the close request below reaches the car. */
+    private val hideClimatePanel: () -> Unit = {},
+) {
     private val _state = MutableStateFlow(CarState())
     val state: StateFlow<CarState> = _state.asStateFlow()
 
     private val mutex = Mutex()
-    private var pollJob: Job? = null
     /** A read that timed out may still be blocked in the car's service: wait on it, don't stack more. */
     private var inFlight: Deferred<CarState>? = null
 
@@ -106,42 +110,19 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         "evKm" to bus.getItemValues(ENERGY, NewEnergyIds.ITEM_ELECTRIC_RANGE),
     ).joinToString("  ") { (name, raw) -> "$name=${raw.toList()}" }
 
-    /** Polls while something is on screen; call [stopPolling] when the drawer closes. */
-    fun startPolling(intervalMs: Long = POLL_MS) {
-        if (pollJob?.isActive == true) return
-        pollJob = scope.launch(Dispatchers.IO) {
-            while (isActive) {
-                // One bad read must not end the loop: with the top bar up nothing restarts it.
-                try {
-                    refresh()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.w(TAG, "car read failed", e)
-                }
-                delay(intervalMs)
-            }
-        }
-    }
-
-    fun restartPolling() {
-        stopPolling()
-        startPolling()
-    }
-
-    fun stopPolling() {
-        pollJob?.cancel()
-        pollJob = null
-    }
-
-    suspend fun refresh() = mutex.withLock {
+    /**
+     * Reads the car. [full] reads every item; otherwise only what changes quickly or what the
+     * drawer's controls follow (speed, climate) is read and the rest is kept from the last full
+     * read. The heartbeat makes every few beats full; every write ends with a full read.
+     */
+    suspend fun refresh(full: Boolean = true) = mutex.withLock {
         // Before the vendor proxy connects every read returns 0, and 0 is a valid status for
         // several items (regen 0 = high, battery mode 0 = initial): show nothing rather than that.
         if (!bus.isServiceConnected()) return@withLock
         // A binder call that never returns cannot be cancelled, so the read runs on its own
         // and is abandoned after a while instead of holding the loop (and the lock) for good.
         val previous = _state.value
-        val pending = inFlight?.takeIf { it.isActive } ?: scope.async(Dispatchers.IO) { read(previous) }.also { inFlight = it }
+        val pending = inFlight?.takeIf { it.isActive } ?: scope.async(Dispatchers.IO) { read(previous, full) }.also { inFlight = it }
         val next = withTimeoutOrNull(READ_TIMEOUT_MS) { pending.await() }
         if (next == null) {
             Log.w(TAG, "car read timed out")
@@ -151,16 +132,26 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         lastReadAt = SystemClock.elapsedRealtime()
     }
 
-    internal fun read(previous: CarState): CarState {
+    internal fun read(previous: CarState, full: Boolean = true): CarState {
         fun int(module: Int, id: Int): Int? = bus.getItemValueOrNull(module, id)
         fun percent(module: Int, id: Int): Int? = int(module, id)?.takeIf { it in 0..100 }
         fun assist(id: Int) = AssistIds.isOn(id, int(AssistIds.MODULE, id))
         fun climate(switch: ClimateSwitch) = switch.isOn(int(HVAC, switch.item))
-        return CarState(
+        val fast = previous.copy(
             speedKmh = int(READONLY, TelemetryIds.ITEM_CAR_SPEED),
             cabinTempC = int(HVAC, CabinTempSpec.ITEM_READ)
                 ?.let(CabinTempSpec::toCelsius)?.takeIf(CabinTempSpec::isValid),
+            passengerTempC = int(HVAC, CabinTempSpec.ITEM_PASSENGER_READ)
+                ?.let(CabinTempSpec::toCelsius)?.takeIf(CabinTempSpec::isValid),
             fanLevel = int(HVAC, FanSpec.ITEM_READ)?.takeIf { it in 0..FanSpec.MAX },
+            climateOn = climate(ClimateSwitch.POWER),
+            acOn = climate(ClimateSwitch.AC),
+            autoClimate = climate(ClimateSwitch.AUTO),
+            recirculation = climate(ClimateSwitch.RECIRCULATION),
+            sync = climate(ClimateSwitch.SYNC),
+        )
+        if (!full) return fast
+        return fast.copy(
             outsideTempC = int(HVAC, OutsideTempSpec.ITEM_ID)?.takeIf { it > 0 }
                 ?.let(OutsideTempSpec::toCelsius),
             // Unavailable / ignored statuses keep the last known value, as the stock UI does.
@@ -183,11 +174,6 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
             autoHold = assist(AssistIds.ITEM_AUTO_HOLD),
             laneKeep = assist(AssistIds.ITEM_LANE_DEPARTURE_PREVENTION),
             collisionWarning = FcwLevel.of(bus.getItemValues(AssistIds.MODULE, FcwLevel.ITEM)),
-            climateOn = climate(ClimateSwitch.POWER),
-            acOn = climate(ClimateSwitch.AC),
-            autoClimate = climate(ClimateSwitch.AUTO),
-            recirculation = climate(ClimateSwitch.RECIRCULATION),
-            sync = climate(ClimateSwitch.SYNC),
         )
     }
 
@@ -213,14 +199,19 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
 
     fun setFan(level: Int) = fan.moveTo(level.coerceIn(FanSpec.MIN, FanSpec.MAX))
 
+    /** The passenger zone, stepped like the driver's. Only offered while the zones are split. */
+    fun setPassengerTemp(celsius: Int) = passengerTemperature.moveTo(celsius.coerceIn(CabinTempSpec.MIN, CabinTempSpec.MAX))
+
     /**
      * The temperature and fan level being applied, null once the car has been stepped there and
      * read back. Controls show these meanwhile, so they don't snap back to the old reading.
      */
     val cabinTempTarget: StateFlow<Int?> get() = temperature.applying
     val fanTarget: StateFlow<Int?> get() = fan.applying
+    val passengerTempTarget: StateFlow<Int?> get() = passengerTemperature.applying
 
     private val temperature = ClimateStepper(CabinTempSpec.ITEM_WRITE, { it.cabinTempC }, CabinTempSpec::toRaw)
+    private val passengerTemperature = ClimateStepper(CabinTempSpec.ITEM_PASSENGER_WRITE, { it.passengerTempC }, CabinTempSpec::toRaw)
     // The fan's set item, not the one it is read from: a write there raises the car's panel.
     private val fan = ClimateStepper(FanSpec.ITEM_WRITE, { it.fanLevel }, { it })
 
@@ -429,6 +420,7 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
                     last = now
                 }
                 if (!ClimatePanelSpec.isShowing(before) && ClimatePanelSpec.isShowing(now)) {
+                    hideClimatePanel()
                     try {
                         bus.sendItemValue(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE, ClimatePanelSpec.COMMAND_CLOSE)
                     } catch (e: LinkageError) {
@@ -442,7 +434,6 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
     private fun panelItem(): Int? = bus.getItemValueOrNull(HVAC, ClimatePanelSpec.ITEM_DISPLAY_ACTIVE)
 
     companion object {
-        const val POLL_MS = 1_500L
         private const val READ_TIMEOUT_MS = 5_000L
         private const val TAG = "QsCar"
         const val WRITE_SETTLE_MS = 400L
@@ -453,8 +444,9 @@ class CarRepository(private val bus: CarBus, private val scope: CoroutineScope) 
         /** Gap between two single-step climate commands. */
         const val CLIMATE_STEP_MS = 100L
         // About two seconds: long enough to see the car react, short enough between two writes.
-        private const val PANEL_WATCH_POLLS = 14
-        private const val PANEL_WATCH_POLL_MS = 150L
+        private const val PANEL_WATCH_POLLS = 30
+        // Short polls: the sooner the panel is seen, the shorter its flash.
+        private const val PANEL_WATCH_POLL_MS = 70L
 
         /** How long the car's panel item is watched after a climate write. */
         const val CLIMATE_WRITE_MS = PANEL_WATCH_POLLS * PANEL_WATCH_POLL_MS

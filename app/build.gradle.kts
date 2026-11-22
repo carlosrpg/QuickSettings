@@ -50,6 +50,10 @@ android {
         versionCode = major * 1_000_000 + minor * 1_000 + patch
         versionName = appVersionName
         buildConfigField("boolean", "USE_MOCK", useMock.toString())
+        // Phone relay (relay/): set in local.properties on the owner's machine. Without them the
+        // build stays LAN-only, so CI and anyone else's build never touch that relay.
+        buildConfigField("String", "RELAY_URL", "\"${signingProp("qs.relayUrl").orEmpty()}\"")
+        buildConfigField("String", "RELAY_KEY", "\"${signingProp("qs.relayKey").orEmpty()}\"")
     }
     signingConfigs {
         create("release") {

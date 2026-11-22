@@ -77,6 +77,7 @@ import com.carlosrpg.cherry.quicksettings.util.AppInfo
 import com.carlosrpg.cherry.quicksettings.voice.VoiceInput
 import kotlin.math.abs
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.roundToInt
 import kotlin.math.sign
 
@@ -96,6 +97,8 @@ class DrawerActions(
     val toSemi: () -> Unit,
     val toOpen: () -> Unit,
     val close: () -> Unit,
+    /** Counts the overlay's heartbeats: a control that reads a value itself re-reads it on each. */
+    val ticks: StateFlow<Long>,
     val openSettings: () -> Unit,
 ) {
     fun openMediaApp() {
@@ -671,6 +674,6 @@ private fun OpenDrawer(
                 }
             }
         }
-        VolumeSliders(actions)
+        VolumeSliders(car, actions)
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +49,6 @@ import app.jconfig.carbus.carinfo.FanSpec
 import com.carlosrpg.cherry.quicksettings.R
 import com.carlosrpg.cherry.quicksettings.car.CarState
 import com.carlosrpg.cherry.quicksettings.media.VolumeChannel
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /** Width of one side slider in the open drawer. */
@@ -227,12 +227,14 @@ fun ClimateSliders(car: CarState, actions: DrawerActions, modifier: Modifier = M
 /**
  * The passenger side of the open drawer: media volume, and behind a button the navigation
  * voice. Both step the car's level to the slider once it holds still (debounced, one step per
- * command) and re-read it every second while untouched.
+ * command) and re-read it on every poll while untouched. While the climate zones are split
+ * (sync off) the passenger's temperature takes the top half, over the volume.
  */
 @Composable
-fun VolumeSliders(actions: DrawerActions, modifier: Modifier = Modifier) {
+fun VolumeSliders(car: CarState, actions: DrawerActions, modifier: Modifier = Modifier) {
     var navOpen by remember { mutableStateOf(false) }
-    Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier.fillMaxHeight(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (car.sync == false) PassengerTempSlider(car, actions, Modifier.weight(1f))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(SliderGap)) {
             AnimatedVisibility(navOpen) {
                 ChannelSlider(VolumeChannel.NAVIGATION, Icons.Voice, stringResource(R.string.slider_nav_voice), Qs.Route, actions)
@@ -253,15 +255,29 @@ fun VolumeSliders(actions: DrawerActions, modifier: Modifier = Modifier) {
     }
 }
 
+/** The passenger zone's temperature, sent on release like the driver's. */
+@Composable
+private fun PassengerTempSlider(car: CarState, actions: DrawerActions, modifier: Modifier) {
+    var temp by remember { mutableStateOf<Int?>(null) }
+    val target by actions.car.passengerTempTarget.collectAsState()
+    val shown = temp ?: target ?: car.passengerTempC
+    VerticalSlider(
+        shown, CabinTempSpec.MIN..CabinTempSpec.MAX, Icons.Thermometer,
+        shown?.let { "$it°" } ?: "--", stringResource(R.string.slider_passenger_temperature),
+        Brush.verticalGradient(listOf(Qs.tempColor(shown), Qs.tempColor(shown).copy(alpha = 0.55f))),
+        onChange = { temp = it },
+        onFinished = { temp?.let(actions.car::setPassengerTemp); temp = null },
+        modifier = modifier,
+    )
+}
+
 @Composable
 private fun ChannelSlider(channel: VolumeChannel, icon: String, description: String, accent: Color, actions: DrawerActions) {
     var level by remember { mutableStateOf(actions.media.level(channel)) }
     var dragging by remember { mutableStateOf(false) }
-    LaunchedEffect(channel) {
-        while (true) {
-            delay(VOLUME_POLL_MS)
-            if (!dragging && !actions.media.moving(channel)) level = actions.media.level(channel)
-        }
+    val tick by actions.ticks.collectAsState()
+    LaunchedEffect(tick) {
+        if (!dragging && !actions.media.moving(channel)) level = actions.media.level(channel)
     }
     VerticalSlider(
         level.value, 0..level.max.coerceAtLeast(1), icon, level.value.toString(), description,
@@ -277,5 +293,3 @@ private fun ChannelSlider(channel: VolumeChannel, icon: String, description: Str
         modifier = Modifier.fillMaxHeight(),
     )
 }
-
-private const val VOLUME_POLL_MS = 1_000L

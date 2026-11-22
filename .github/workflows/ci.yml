@@ -98,14 +98,15 @@ jobs:
         run: chmod +x gradlew
 
       - name: Unit tests and lint
-        run: ./gradlew app:testDebugUnitTest app:lintDebug --stacktrace
+        run: ./gradlew app:testDebugUnitTest app:lintDebug companion:testDebugUnitTest companion:lintDebug --stacktrace
 
       # Release talks to the head unit's CarInfo proxy; debug keeps the emulator mock.
       - name: Build signed release APK
         run: |
-          ./gradlew app:assembleRelease -Pqs.mock=false --stacktrace
+          ./gradlew app:assembleRelease -Pqs.mock=false companion:assembleRelease --stacktrace
           mkdir -p release-apks
           cp app/build/renamedApks/release/*.apk release-apks/
+          cp companion/build/outputs/apk/release/companion-release.apk "release-apks/QSCompanion-$APP_VERSION.apk"
 
       - name: Package first-install kit
         run: (cd install && zip -r ../release-apks/QuickSettings-FirstInstall.zip .)
@@ -138,7 +139,7 @@ jobs:
           --title "QuickSettings $RELEASE_TAG"
           --generate-notes
 
-  # The setup site (docs/) plus the APK just released, under latest/. The page installs from there
+  # The setup site (docs/) plus the APKs just released (car app and phone app), under latest/. The page installs from there
   # because GitHub's release download links send no CORS headers. Needs Settings > Pages > Source:
   # GitHub Actions.
   pages:
@@ -170,6 +171,9 @@ jobs:
           apk="$(ls release-apks/QuickSettings-*.apk | head -n 1)"
           test -f "$apk"
           cp "$apk" _site/latest/QuickSettings.apk
+          companion="$(ls release-apks/QSCompanion-*.apk | head -n 1)"
+          test -f "$companion"
+          cp "$companion" _site/latest/QSCompanion.apk
           version="$(basename "$apk" .apk)"
           printf '{"version":"%s"}\n' "${version#QuickSettings-}" > _site/latest/version.json
           cat _site/latest/version.json

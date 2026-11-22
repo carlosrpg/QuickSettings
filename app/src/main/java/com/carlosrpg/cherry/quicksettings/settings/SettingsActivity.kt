@@ -84,6 +84,13 @@ import com.carlosrpg.cherry.quicksettings.nav.NavStore
 import com.carlosrpg.cherry.quicksettings.nav.QsNotificationListener
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
 import com.carlosrpg.cherry.quicksettings.overlay.TapRelayService
+import com.carlosrpg.cherry.quicksettings.phone.PhoneApi
+import com.carlosrpg.cherry.quicksettings.phone.PhoneLink
+import com.carlosrpg.cherry.quicksettings.phone.QrImage
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import java.text.DateFormat
+import java.util.Date
 import com.carlosrpg.cherry.quicksettings.ui.ArtPlaceholder
 import com.carlosrpg.cherry.quicksettings.ui.CardLabel
 import com.carlosrpg.cherry.quicksettings.ui.GlassButton
@@ -165,6 +172,7 @@ class SettingsActivity : ComponentActivity() {
                 WidgetsPanel(config)
             }
             ClusterPanel(config)
+            PhonesPanel(config)
             // Wi-Fi and adb change elsewhere: their state is re-read every tick. Not keyed, so the
             // password field and switches keep their state (and focus) across ticks.
             AutomationPanels(refresh)
@@ -249,32 +257,36 @@ class SettingsActivity : ComponentActivity() {
         val store = app.settings
         CardLabel(stringResource(R.string.drawer_position))
         var position by remember(config.edgePosition) { mutableFloatStateOf(config.edgePosition) }
-        ScreenPreview(config.side, position)
-        QsText(stringResource(R.string.side), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
-        Segmented(
-            Side.entries, config.side,
-            { stringResource(if (it == Side.LEFT) R.string.side_left else R.string.side_right) },
-            Qs.Text, { side -> store.update { it.copy(side = side) } },
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            QsText(stringResource(R.string.position_on_edge), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
-            QsText(stringResource(positionLabel(position)), 14.sp, Qs.Muted)
-        }
-        val sliderDescription = stringResource(R.string.position_on_edge)
-        QsSlider(
-            value = position,
-            range = 0f..1f,
-            description = sliderDescription,
-            onChange = { position = it },
-            onFinished = { store.update { it.copy(edgePosition = position) } },
-        )
-        val tapLabel = stringResource(R.string.tap_to_open)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                QsText(tapLabel, 16.sp, weight = FontWeight.SemiBold)
-                Text(stringResource(R.string.tap_to_open_hint), color = Qs.Muted, fontSize = 13.sp)
+        // The handle shows when it is switched on, or when the top bar is off (then it is the only
+        // way in). Without it, its side, place and tap setting change nothing, so they go away.
+        if (handleShown(config)) {
+            ScreenPreview(config.side, position)
+            QsText(stringResource(R.string.side), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
+            Segmented(
+                Side.entries, config.side,
+                { stringResource(if (it == Side.LEFT) R.string.side_left else R.string.side_right) },
+                Qs.Text, { side -> store.update { it.copy(side = side) } },
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                QsText(stringResource(R.string.position_on_edge), 14.sp, Qs.TextSoft, FontWeight.SemiBold)
+                QsText(stringResource(positionLabel(position)), 14.sp, Qs.Muted)
             }
-            Toggle(config.tapToOpen, tapLabel) { store.update { it.copy(tapToOpen = !it.tapToOpen) } }
+            val sliderDescription = stringResource(R.string.position_on_edge)
+            QsSlider(
+                value = position,
+                range = 0f..1f,
+                description = sliderDescription,
+                onChange = { position = it },
+                onFinished = { store.update { it.copy(edgePosition = position) } },
+            )
+            val tapLabel = stringResource(R.string.tap_to_open)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    QsText(tapLabel, 16.sp, weight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.tap_to_open_hint), color = Qs.Muted, fontSize = 13.sp)
+                }
+                Toggle(config.tapToOpen, tapLabel) { store.update { it.copy(tapToOpen = !it.tapToOpen) } }
+            }
         }
         val handleLabel = stringResource(R.string.side_handle)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -291,6 +303,14 @@ class SettingsActivity : ComponentActivity() {
                 Text(stringResource(R.string.top_bar_hint), color = Qs.Muted, fontSize = 13.sp)
             }
             Toggle(config.topBar, topBarLabel) { store.update { it.copy(topBar = !it.topBar) } }
+        }
+        val gestureLabel = stringResource(R.string.car_gesture)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                QsText(gestureLabel, 16.sp, weight = FontWeight.SemiBold)
+                Text(stringResource(R.string.car_gesture_hint), color = Qs.Muted, fontSize = 13.sp)
+            }
+            Toggle(config.carGesture, gestureLabel) { store.update { it.copy(carGesture = !it.carGesture) } }
         }
     }
 
@@ -407,6 +427,116 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** The relay's status and the driver-assist-over-the-internet switch (off by default, confirmed on). */
+    @Composable
+    private fun InternetRows(config: QsConfig) {
+        val online by PhoneLink.relayConnected.collectAsState()
+        Text(
+            stringResource(if (online) R.string.phones_internet_on else R.string.phones_internet_off),
+            color = if (online) Qs.TextSoft else Qs.Muted, fontSize = 14.sp,
+        )
+        var asking by remember { mutableStateOf(false) }
+        SwitchRow(R.string.remote_assist, R.string.remote_assist_hint, config.remoteAssist) {
+            if (config.remoteAssist) app.settings.update { it.copy(remoteAssist = false) } else asking = true
+        }
+        if (asking) {
+            AlertDialog(
+                onDismissRequest = { asking = false },
+                title = { Text(stringResource(R.string.remote_assist_title)) },
+                text = { Text(stringResource(R.string.remote_assist_text)) },
+                confirmButton = {
+                    TextButton({
+                        asking = false
+                        app.settings.update { it.copy(remoteAssist = true) }
+                    }) { Text(stringResource(R.string.remote_assist_allow)) }
+                },
+                dismissButton = { TextButton({ asking = false }) { Text(stringResource(R.string.phone_cancel)) } },
+            )
+        }
+    }
+
+    /**
+     * Phone control: the switch, the car's address, the paired phones with Remove, and Add phone,
+     * which shows a QR code for one phone. A phone that scans it is added only once someone here
+     * taps Allow.
+     */
+    @Composable
+    private fun PhonesPanel(config: QsConfig) = Panel {
+        CardLabel(stringResource(R.string.phones_panel))
+        SwitchRow(R.string.phone_control, R.string.phone_control_hint, config.phoneControl) {
+            app.settings.update { it.copy(phoneControl = !it.phoneControl) }
+        }
+        if (!config.phoneControl) return@Panel
+        val registry = app.phones
+        val running by PhoneLink.running.collectAsState()
+        val phones by registry.phones.collectAsState()
+        val code by registry.code.collectAsState()
+        val request by registry.request.collectAsState()
+        // Re-read with the screen's own refresh: the car may join or leave a Wi-Fi meanwhile.
+        var addresses by remember { mutableStateOf(PhoneLink.lanAddresses()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(STATUS_REFRESH_MS * 4)
+                addresses = withContext(Dispatchers.IO) { PhoneLink.lanAddresses() }
+            }
+        }
+        val address = addresses.firstOrNull()?.let { "http://$it:${PhoneApi.PORT}" }
+        Text(
+            when {
+                !running -> stringResource(R.string.phones_port_busy)
+                address == null -> stringResource(R.string.phones_no_network)
+                else -> stringResource(R.string.phones_address, address)
+            },
+            color = if (running && address != null) Qs.TextSoft else Qs.Warm, fontSize = 14.sp,
+        )
+        val dates = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
+        if (phones.isEmpty()) Text(stringResource(R.string.phones_none), color = Qs.Muted, fontSize = 13.sp)
+        phones.forEach { phone ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    QsText(phone.name, 16.sp, weight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(R.string.phone_used, dates.format(Date(phone.addedAt)), dates.format(Date(phone.lastUsedAt))),
+                        color = Qs.Muted, fontSize = 13.sp,
+                    )
+                }
+                val remove = stringResource(R.string.phone_remove)
+                GlassButton(null, remove, { registry.remove(phone.id) }, label = remove)
+            }
+        }
+        val pairing = code
+        if (pairing != null && address != null && running) {
+            // The code dies after five minutes; take the QR away then.
+            LaunchedEffect(pairing) {
+                delay((pairing.expiresAt - System.currentTimeMillis()).coerceAtLeast(0))
+                if (registry.code.value == pairing) registry.cancelCode()
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                QrImage("$address/#pair=${pairing.code}")
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.phone_scan), color = Qs.TextSoft, fontSize = 14.sp)
+                    Text(stringResource(R.string.phone_pin), color = Qs.Muted, fontSize = 13.sp)
+                    QsText(pairing.pin.chunked(3).joinToString(" "), 34.sp, weight = FontWeight.SemiBold)
+                    val cancel = stringResource(R.string.phone_cancel)
+                    GlassButton(null, cancel, registry::cancelCode, label = cancel)
+                }
+            }
+        } else if (running && address != null) {
+            val add = stringResource(R.string.phone_add)
+            GlassButton(Icons.Plus, add, { registry.newCode() }, label = add)
+        }
+        if (PhoneLink.relayConfigured) InternetRows(config)
+        request?.let { asking ->
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(stringResource(R.string.phone_allow_title, asking.name)) },
+                text = { Text(stringResource(R.string.phone_allow_text)) },
+                confirmButton = { TextButton({ registry.answer(true) }) { Text(stringResource(R.string.phone_allow)) } },
+                dismissButton = { TextButton({ registry.answer(false) }) { Text(stringResource(R.string.phone_deny)) } },
+            )
+        }
+    }
+
     /** The screen in miniature with the drawer where it will sit, as in the styleguide. */
     @Composable
     private fun ColumnScope.ScreenPreview(side: Side, position: Float) {
@@ -438,13 +568,18 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun WidgetsPanel(config: QsConfig) = Panel {
         val store = app.settings
-        var tab by remember { mutableIntStateOf(0) }
+        var chosen by remember { mutableIntStateOf(0) }
+        // Semi-open is reached only from the side handle: without it, only the open order matters.
+        val semiReachable = handleShown(config)
+        val tab = if (semiReachable) chosen else 1
         Row(verticalAlignment = Alignment.CenterVertically) {
             CardLabel(stringResource(R.string.widgets), Modifier.weight(1f))
-            Segmented(
-                listOf(0, 1), tab, { stringResource(if (it == 0) R.string.state_semi else R.string.state_open) },
-                Qs.Text, { tab = it }, Modifier.width(340.dp),
-            )
+            if (semiReachable) {
+                Segmented(
+                    listOf(0, 1), tab, { stringResource(if (it == 0) R.string.state_semi else R.string.state_open) },
+                    Qs.Text, { chosen = it }, Modifier.width(340.dp),
+                )
+            }
         }
         QsText(stringResource(R.string.widgets_hint), 13.sp, Qs.Muted)
         val order = if (tab == 0) config.semiOrder else config.openOrder
@@ -457,6 +592,9 @@ class SettingsActivity : ComponentActivity() {
             }
         }
     }
+
+    /** Whether the side handle is on screen (the overlay's rule, less the tap relay a grant away). */
+    private fun handleShown(config: QsConfig) = config.sideHandle || !config.topBar
 
     @StringRes
     private fun positionLabel(p: Float) = when {
@@ -580,6 +718,8 @@ class SettingsActivity : ComponentActivity() {
             fun age(at: Long) = if (at == 0L) "never" else "${(now - at) / 1000} s ago"
             appendLine("feeds: car read ${age(app.car.lastReadAt)}  media read ${age(app.media.lastRefreshAt)}")
             appendLine("full screen: ${com.carlosrpg.cherry.quicksettings.overlay.FullScreenDetector.last}")
+            appendLine("--- drawer: touches, gestures and zones (newest last; a touch with no line never reached the app)")
+            OverlayService.drawerEvents.snapshot().ifEmpty { listOf("none") }.forEach { appendLine("  $it") }
             appendLine("--- cluster media (sync ${if (app.settings.config.value.clusterMediaSync) "on" else "off"})")
             appendLine("sync: ${app.clusterMedia.describe()}")
             appendLine("car media now: ${app.media.describeCar()}")

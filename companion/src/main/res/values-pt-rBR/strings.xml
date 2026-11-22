@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="searching_title">Procurando o carro…</string>
+    <string name="searching_text">Conecte este celular ao Wi-Fi do carro (ou o carro ao roteador deste celular) e ligue Configurações → Celulares → Controle pelo celular no carro. Depois de pareado, o carro também pode ser acessado pela internet quando estiver online.</string>
+</resources>

@@ -19,6 +19,7 @@ import com.carlosrpg.cherry.quicksettings.media.ClusterMediaSync
 import com.carlosrpg.cherry.quicksettings.media.LogClusterMediaSink
 import com.carlosrpg.cherry.quicksettings.media.MediaRepository
 import com.carlosrpg.cherry.quicksettings.overlay.OverlayService
+import com.carlosrpg.cherry.quicksettings.phone.PhoneRegistry
 import com.carlosrpg.cherry.quicksettings.settings.SettingsStore
 import com.carlosrpg.cherry.quicksettings.weather.WeatherRepository
 import kotlinx.coroutines.CoroutineScope
@@ -35,12 +36,33 @@ class QuickSettingsApp : Application() {
     /** Writes an app's track to the instrument cluster when the setting is on; logs it off the car. */
     lateinit var clusterMedia: ClusterMediaSync private set
     val weather by lazy { WeatherRepository(this, scope) }
+    /** The phones allowed to control the car, and the pairing in progress. */
+    val phones by lazy {
+        val prefs = getSharedPreferences("phones", MODE_PRIVATE)
+        PhoneRegistry(load = { prefs.getString("registry", null) }, save = { prefs.edit().putString("registry", it).apply() })
+    }
+
+    /**
+     * Asks the car's climate app to hide its panel now, as the car's own settings app does; the
+     * close request on HVAC item 9 that follows keeps it from coming back. Best effort: the
+     * service may refuse a third-party app.
+     */
+    private fun hideClimatePanel() {
+        try {
+            startService(
+                android.content.Intent().setClassName("com.desaysv.svhvac", "com.desaysv.svhvac.service.HvacService")
+                    .putExtra("type", "com.desaysv.svhvac.CLOSE_PANEL")
+            )
+        } catch (e: Exception) {
+            // Not exported to us, or the app is missing (emulator).
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         val bus: CarBus = if (BuildConfig.USE_MOCK) seededMockBus() else CarInfoProxy
         bus.init(this) // must run on the main thread or the proxy never connects
-        car = CarRepository(bus, scope)
+        car = CarRepository(bus, scope, hideClimatePanel = ::hideClimatePanel)
         // The head unit's own sources (Bluetooth, CarPlay, Android Auto, ...) never publish an
         // Android media session; they come from the vendor media service.
         val carMedia: CarMedia = if (BuildConfig.USE_MOCK) MockCarMedia() else VdbusCarMedia.create(this)
