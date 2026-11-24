@@ -25,7 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PointMode
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -44,12 +47,14 @@ import com.carlosrpg.cherry.quicksettings.nav.NavState
  * The info strip that lives in the status bar's area. The car draws its own icons (Bluetooth,
  * wireless, clock) over both ends of this strip, so content stays between [startInset] and
  * [endInset]. Display only: the car's status bar, a higher layer, takes the touches here.
- * No background of its own: it sits on the car's bar. While a route is active the next turn
+ * No background of its own: it sits on the car's bar, or with [glass] on a frosted strip of its
+ * own, for a full-screen app that has hidden the car's bar. While a route is active the next turn
  * joins it, and range, regeneration and climate shrink to make room.
  */
 @Composable
-fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, endInset: Dp) {
-    BoxWithConstraints(Modifier.fillMaxSize().padding(start = startInset, end = endInset)) {
+fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, endInset: Dp, glass: Boolean = false) {
+    val frame = Modifier.fillMaxSize().padding(start = startInset, end = endInset)
+    BoxWithConstraints(if (glass) frame.padding(vertical = 4.dp).frostedGlass().padding(horizontal = 14.dp) else frame) {
         if (nav == null) FullBar(car, media) else NavBar(car, media, nav, maxWidth, maxHeight)
     }
 }
@@ -210,6 +215,30 @@ private fun Stat(icon: String, tint: Color, value: String?, sub: String?) {
  * size and weight instead.
  */
 private val BarSoft = Color(0xFFD9E0E8)
+
+/**
+ * A nearly clear frosted strip, in the manner of the macOS menu bar: a faint light sheen over a
+ * slight dark tint, a fine fixed grain and a hairline rim lit from above. An app overlay cannot
+ * blur what is under it on Android 11, so the grain stands in for the frost.
+ */
+private fun Modifier.frostedGlass(): Modifier {
+    val shape = RoundedCornerShape(18.dp)
+    return clip(shape)
+        .background(Color(0x240B1018))
+        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.04f))))
+        .drawWithCache {
+            val random = java.util.Random(7) // fixed seed: the grain stays put between frames
+            val count = (size.width * size.height / 70f).toInt()
+            fun specks() = List(count) { Offset(random.nextFloat() * size.width, random.nextFloat() * size.height) }
+            val light = specks()
+            val dark = specks()
+            onDrawBehind {
+                drawPoints(light, PointMode.Points, Color.White.copy(alpha = 0.07f), strokeWidth = 1.3f)
+                drawPoints(dark, PointMode.Points, Color.Black.copy(alpha = 0.07f), strokeWidth = 1.3f)
+            }
+        }
+        .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.06f))), shape)
+}
 
 @Composable
 private fun Shadowed(content: @Composable () -> Unit) {

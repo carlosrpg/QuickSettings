@@ -203,7 +203,7 @@
     <string name="auto_wifi_on">open</string>
     <string name="auto_wifi_off">closed</string>
     <string name="auto_wifi_auto">Open automatically</string>
-    <string name="auto_wifi_auto_hint">While the phone chosen below is connected over Bluetooth and Wi-Fi is off: 10 s after startup, after the phone connects, or after Android Auto or CarPlay comes up (at most once a minute).</string>
+    <string name="auto_wifi_auto_hint">While the phone chosen below is connected over Bluetooth and Wi-Fi is off: at startup, when the phone connects, or when Android Auto or CarPlay comes up, after the wait set below (at most once a minute).</string>
     <string name="auto_wifi_now">Open Wi-Fi now</string>
     <string name="auto_wifi_device">Phone that opens Wi-Fi</string>
     <string name="auto_wifi_device_hint">One of the car\'s paired Bluetooth devices.</string>
@@ -290,4 +290,18 @@
     <string name="remote_assist_allow">Allow</string>
     <string name="car_gesture">Two-finger swipe down</string>
     <string name="car_gesture_hint">The car\'s own two-finger swipe down opens the full drawer, with no gesture app. Keep the fingers together and start moving at once: the car reads a change in their spread as a pinch, and a pause as a long press.</string>
+    <string name="open_idle">Close the open drawer after</string>
+    <string name="open_idle_hint">How long the full drawer stays open without a touch. Never: it stays until you swipe it away or the car moves off.</string>
+    <string name="never">Never</string>
+    <string name="seconds">%1$d s</string>
+    <string name="auto_wifi_delay">Wait before opening</string>
+    <string name="auto_wifi_delay_hint">Time for the phone and the car to settle after a trigger before Wi-Fi is opened.</string>
+    <string name="immediately">Immediately</string>
+    <string name="top_bar_panel">Info bar</string>
+    <string name="top_bar_full_screen">Show over full-screen apps</string>
+    <string name="top_bar_full_screen_hint">Keep the info bar, on a glass strip, when a full-screen app hides the car\'s bar, instead of stepping aside. The apps below never show it.</string>
+    <string name="top_bar_hidden_apps">Always hide in these apps</string>
+    <string name="top_bar_hidden_none">No apps</string>
+    <string name="top_bar_hidden_choose">Choose apps</string>
+    <string name="done">Done</string>
 </resources>

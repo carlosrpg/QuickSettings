@@ -3,7 +3,7 @@
 A widget drawer that floats over every app on the Jaecoo 7 head unit (Android Automotive 11).
 Closed, it is a 6 dp hint on the screen edge. Touch it to open the drawer semi-open: small
 square widgets you read at a glance. Open it fully for larger cards and full controls.
-English and Brazilian Portuguese.
+English, Brazilian Portuguese and Spanish.
 
 The car's own back gesture takes any swipe that starts within 30 px of the left or right screen
 edge, so the handle opens on touch. "Touch the edge handle to open" in settings (on by default)
@@ -89,8 +89,8 @@ devices on a local network, and only phones someone at the head unit allowed.
    phone** on the car. It shows a QR code and a six-digit code, both valid for five minutes and
    one attempt. The app finds the car by itself and asks for the code; a browser opens the QR
    code's link. Keep the settings screen open: the car asks **Allow <name>?** there.
-3. **Use it.** The page shows the drawer's cards in the open-drawer order, in English or
-   Portuguese, with a status line: connected over Wi-Fi, over the internet, car offline (last
+3. **Use it.** The page shows the drawer's cards in the open-drawer order, in English,
+   Portuguese or Spanish, with a status line: connected over Wi-Fi, over the internet, car offline (last
    seen), or no connection. **Remove** on the car takes a phone off at once.
 
 Commands go through the drawer's own calls and gates: ignition and speed rules for driver
@@ -122,7 +122,8 @@ Design, API and what differs from the first draft: [docs/companion-api.md](docs/
 
 **From the browser:** open the
 [setup page](https://carlosrpg.github.io/QuickSettings/#setup-section)
-([em português](https://carlosrpg.github.io/QuickSettings/pt/#setup-section)) in Chrome or Edge, plug the
+([em português](https://carlosrpg.github.io/QuickSettings/pt/#setup-section),
+[en español](https://carlosrpg.github.io/QuickSettings/es/#setup-section)) in Chrome or Edge, plug the
 car in with a data cable and click Connect. **Install latest** installs the newest release on the
 car: the page pushes the APK and `docs/car-setup.sh` to `/data/local/tmp` and runs the script. The
 car refuses a plain `pm install` from the adb-shell uid, so the script installs the APK through a

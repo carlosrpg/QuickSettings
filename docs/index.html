@@ -7,16 +7,21 @@
 <meta name="description" content="A widget drawer that floats over every app on the Jaecoo 7 head unit. Set it up from your browser over USB.">
 <meta name="theme-color" content="#0b0e14">
 <link rel="alternate" hreflang="pt-BR" href="pt/">
+<link rel="alternate" hreflang="es" href="es/">
 <script>
-// A browser set to Portuguese (pt, pt-BR, pt-PT) goes to the Portuguese page, unless the visitor
-// picked English with the language link. Section links keep their place on the other page.
+// A browser set to Portuguese (pt, pt-BR, pt-PT) or Spanish (es, es-*) goes to that language's page,
+// unless the visitor picked another language with the language links. Section links keep their place.
 (function () {
   var choice = null;
   try { choice = localStorage.getItem("qs.lang"); } catch (e) {}
   var lang = (navigator.languages && navigator.languages[0]) || navigator.language || "";
-  if (choice === "en" || (choice !== "pt" && !/^pt(-|$)/i.test(lang))) return;
-  var ids = { "#screens": "#telas", "#features": "#recursos", "#how": "#como", "#phone": "#celular" };
-  location.replace("pt/" + location.search + (ids[location.hash] || location.hash));
+  var to = choice === "pt" || choice === "es" ? choice
+    : choice === "en" ? null : /^pt(-|$)/i.test(lang) ? "pt" : /^es(-|$)/i.test(lang) ? "es" : null;
+  if (!to) return;
+  var ids = to === "pt"
+    ? { "#screens": "#telas", "#features": "#recursos", "#how": "#como", "#phone": "#celular" }
+    : { "#screens": "#pantallas", "#features": "#funciones", "#how": "#como", "#phone": "#celular" };
+  location.replace(to + "/" + location.search + (ids[location.hash] || location.hash));
 })();
 </script>
 <link rel="stylesheet" href="site.css">
@@ -32,6 +37,7 @@
       <a href="#faq">FAQ</a>
       <a class="cta" href="#setup-section">Set up</a>
       <a class="lang" href="pt/" hreflang="pt-BR" lang="pt-BR" onclick="try{localStorage.setItem('qs.lang','pt')}catch(e){}">PT</a>
+      <a class="lang" href="es/" hreflang="es" lang="es" onclick="try{localStorage.setItem('qs.lang','es')}catch(e){}">ES</a>
     </nav>
   </div>
 </header>
@@ -100,7 +106,7 @@
   <section id="features">
     <div class="wrap">
       <h2>Six widgets, two sizes</h2>
-      <p class="sub">Touch the edge handle to open the drawer half-way: small tiles you read at a glance, with press-and-drag shortcuts. Open it fully for large cards and every control. English and Brazilian Portuguese.</p>
+      <p class="sub">Touch the edge handle to open the drawer half-way: small tiles you read at a glance, with press-and-drag shortcuts. Open it fully for large cards and every control. English, Brazilian Portuguese and Spanish.</p>
       <div class="grid">
         <article class="card">
           <div class="icon" style="background:rgba(77,163,255,.15);color:var(--route)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>

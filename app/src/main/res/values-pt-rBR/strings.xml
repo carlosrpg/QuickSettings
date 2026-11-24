@@ -192,7 +192,7 @@
     <string name="auto_wifi_on">aberto</string>
     <string name="auto_wifi_off">fechado</string>
     <string name="auto_wifi_auto">Abrir automaticamente</string>
-    <string name="auto_wifi_auto_hint">Enquanto o celular escolhido abaixo estiver conectado por Bluetooth e o Wi-Fi desligado: 10 s depois da partida, depois que o celular conectar ou depois que o Android Auto ou o CarPlay abrir (no máximo uma vez por minuto).</string>
+    <string name="auto_wifi_auto_hint">Enquanto o celular escolhido abaixo estiver conectado por Bluetooth e o Wi-Fi desligado: na partida, quando o celular conectar ou quando o Android Auto ou o CarPlay abrir, após a espera definida abaixo (no máximo uma vez por minuto).</string>
     <string name="auto_wifi_now">Abrir o Wi-Fi agora</string>
     <string name="auto_wifi_device">Celular que abre o Wi-Fi</string>
     <string name="auto_wifi_device_hint">Um dos dispositivos Bluetooth pareados com o carro.</string>
@@ -279,4 +279,18 @@
     <string name="remote_assist_allow">Permitir</string>
     <string name="car_gesture">Deslizar dois dedos para baixo</string>
     <string name="car_gesture_hint">O gesto de dois dedos para baixo do próprio carro abre a gaveta completa, sem app de gestos. Mantenha os dedos juntos e comece a mover logo: o carro entende uma mudança na distância entre eles como pinça, e uma pausa como toque longo.</string>
+    <string name="open_idle">Fechar a gaveta aberta após</string>
+    <string name="open_idle_hint">Quanto tempo a gaveta completa fica aberta sem um toque. Nunca: fica até você deslizá-la para fora ou o carro começar a andar.</string>
+    <string name="never">Nunca</string>
+    <string name="seconds">%1$d s</string>
+    <string name="auto_wifi_delay">Esperar antes de abrir</string>
+    <string name="auto_wifi_delay_hint">Tempo para o celular e o carro se acomodarem depois de um gatilho, antes de abrir o Wi-Fi.</string>
+    <string name="immediately">Imediatamente</string>
+    <string name="top_bar_panel">Barra de informações</string>
+    <string name="top_bar_full_screen">Mostrar sobre apps em tela cheia</string>
+    <string name="top_bar_full_screen_hint">Mantém a barra de informações, sobre uma faixa de vidro, quando um app em tela cheia esconde a barra do carro, em vez de sumir. Os apps abaixo nunca a mostram.</string>
+    <string name="top_bar_hidden_apps">Sempre esconder nestes apps</string>
+    <string name="top_bar_hidden_none">Nenhum app</string>
+    <string name="top_bar_hidden_choose">Escolher apps</string>
+    <string name="done">Concluído</string>
 </resources>

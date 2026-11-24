@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -100,6 +101,7 @@ import com.carlosrpg.cherry.quicksettings.ui.QsIcon
 import com.carlosrpg.cherry.quicksettings.ui.QsSlider
 import com.carlosrpg.cherry.quicksettings.ui.QsText
 import com.carlosrpg.cherry.quicksettings.ui.Segmented
+import com.carlosrpg.cherry.quicksettings.util.AppInfo
 import android.content.pm.PackageInstaller
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -171,6 +173,7 @@ class SettingsActivity : ComponentActivity() {
                 PositionPanel(config)
                 WidgetsPanel(config)
             }
+            if (config.topBar) TopBarPanel(config)
             ClusterPanel(config)
             PhonesPanel(config)
             // Wi-Fi and adb change elsewhere: their state is re-read every tick. Not keyed, so the
@@ -312,6 +315,76 @@ class SettingsActivity : ComponentActivity() {
             }
             Toggle(config.carGesture, gestureLabel) { store.update { it.copy(carGesture = !it.carGesture) } }
         }
+        SecondsSlider(R.string.open_idle, R.string.open_idle_hint, R.string.never, config.openIdleSeconds) { s ->
+            store.update { it.copy(openIdleSeconds = s) }
+        }
+    }
+
+    /** A 0 to [MAX_SECONDS] slider in whole seconds; 0 reads as [zero] ("never", "immediately"). */
+    @Composable
+    private fun SecondsSlider(@StringRes title: Int, @StringRes hint: Int, @StringRes zero: Int, saved: Int, onSave: (Int) -> Unit) {
+        var value by remember(saved) { mutableFloatStateOf(saved.toFloat()) }
+        val label = stringResource(title)
+        val seconds = value.roundToInt()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            QsText(label, 16.sp, weight = FontWeight.SemiBold)
+            QsText(if (seconds == 0) stringResource(zero) else stringResource(R.string.seconds, seconds), 14.sp, Qs.Muted)
+        }
+        Text(stringResource(hint), color = Qs.Muted, fontSize = 13.sp)
+        QsSlider(value, 0f..MAX_SECONDS, label, { value = it }, { onSave(value.roundToInt()) }, step = 1f)
+    }
+
+    /**
+     * The top bar over full-screen apps: kept on glass or stepping aside, and the apps where it
+     * never shows (Android Auto and CarPlay at first).
+     */
+    @Composable
+    private fun TopBarPanel(config: QsConfig) = Panel {
+        CardLabel(stringResource(R.string.top_bar_panel))
+        SwitchRow(R.string.top_bar_full_screen, R.string.top_bar_full_screen_hint, config.topBarOverFullScreen) {
+            app.settings.update { it.copy(topBarOverFullScreen = !it.topBarOverFullScreen) }
+        }
+        QsText(stringResource(R.string.top_bar_hidden_apps), 16.sp, weight = FontWeight.SemiBold)
+        val names = config.topBarHiddenApps.map { AppInfo.label(this@SettingsActivity, it) ?: it }.sortedBy { it.lowercase() }
+        Text(names.ifEmpty { listOf(stringResource(R.string.top_bar_hidden_none)) }.joinToString(", "), color = Qs.Muted, fontSize = 13.sp)
+        var picking by remember { mutableStateOf(false) }
+        val choose = stringResource(R.string.top_bar_hidden_choose)
+        GlassButton(null, choose, { picking = true }, label = choose)
+        if (picking) HiddenAppsDialog(config.topBarHiddenApps) { picking = false }
+    }
+
+    /** Every app with a launcher entry, plus the chosen ones (Android Auto's receiver has none). */
+    @Composable
+    private fun HiddenAppsDialog(hidden: Set<String>, onDone: () -> Unit) {
+        val apps = remember {
+            val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            (packageManager.queryIntentActivities(launcher, 0).map { it.activityInfo.packageName } + hidden)
+                .distinct().filter { it != packageName }
+                .map { it to (AppInfo.label(this, it) ?: it) }
+                .sortedBy { it.second.lowercase() }
+        }
+        AlertDialog(
+            onDismissRequest = onDone,
+            title = { Text(stringResource(R.string.top_bar_hidden_apps)) },
+            text = {
+                Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+                    apps.forEach { (pkg, name) ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                Text(name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text(pkg, fontSize = 12.sp, color = Qs.Dim)
+                            }
+                            Toggle(pkg in hidden, name) {
+                                app.settings.update { c ->
+                                    c.copy(topBarHiddenApps = if (pkg in c.topBarHiddenApps) c.topBarHiddenApps - pkg else c.topBarHiddenApps + pkg)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onDone) { Text(stringResource(R.string.done)) } },
+        )
     }
 
     /**
@@ -328,13 +401,20 @@ class SettingsActivity : ComponentActivity() {
         val adbOn = remember(refresh) { EngModeService.adbOn(this) }
         var auto by remember { mutableStateOf(store.autoWifi) }
         var startup by remember { mutableStateOf(store.adbOnStartup) }
+        var wifiDelay by remember { mutableIntStateOf(store.wifiDelaySeconds) }
         Panel {
             val on = wifiOn
             CardLabel(stringResource(R.string.auto_wifi_title))
             StatusRow(R.string.auto_wifi_title, on, stringResource(if (on) R.string.auto_wifi_on else R.string.auto_wifi_off))
             QsText(stringResource(R.string.auto_wifi_why), 13.sp, Qs.Muted)
             SwitchRow(R.string.auto_wifi_auto, R.string.auto_wifi_auto_hint, auto) { auto = !auto; store.autoWifi = auto }
-            if (auto) WifiDevicePicker(store, refresh)
+            if (auto) {
+                WifiDevicePicker(store, refresh)
+                SecondsSlider(R.string.auto_wifi_delay, R.string.auto_wifi_delay_hint, R.string.immediately, wifiDelay) {
+                    wifiDelay = it
+                    store.wifiDelaySeconds = it
+                }
+            }
             GlassButton(
                 Icons.Wifi, stringResource(R.string.auto_wifi_now),
                 { EngModeService.instance?.runNow(EngModeService.Flow.WIFI) ?: AutomationStore.enableService(this@SettingsActivity) },
@@ -918,6 +998,9 @@ fun WidgetType.subtitleRes(): Int = when (this) {
 }
 
 private const val STATUS_REFRESH_MS = 1_500L
+
+/** The top of the drawer-close and Wi-Fi-wait sliders. */
+private const val MAX_SECONDS = 20f
 
 /** Lets the app switch its Wi-Fi and adb automation service on by itself. */
 const val ADB_SECURE_SETTINGS =

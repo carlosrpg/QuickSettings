@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="searching_title">Buscando el auto…</string>
+    <string name="searching_text">Conecta este teléfono al Wi-Fi del auto (o el auto al hotspot de este teléfono) y activa Configuración → Teléfonos → Control desde el teléfono en el auto. Una vez vinculado, también se puede llegar al auto por internet cuando esté en línea.</string>
+</resources>

@@ -36,6 +36,9 @@ class FullScreenDetector(private val context: Context) {
             get() = navBarHidden == true || foreground in FULL_SCREEN_ACTIVITIES || statusBarListed == false
     }
 
+    /** Package of the last resumed activity; null without usage access. */
+    val foregroundPackage: String? get() = foreground?.substringBefore('/')
+
     fun poll(): Boolean {
         val signals = Signals(navBarHidden(), readForeground(), TapRelayService.instance?.statusBarListed())
         if (signals != lastSignals) {

@@ -56,8 +56,33 @@ const STRINGS = {
     cant: (m) => `Não foi possível conectar: ${m}`, disconnected: "Desconectado.",
     noUsb: "Este navegador não tem WebUSB. Abra esta página no Chrome ou Edge num computador, ou no Chrome de um celular Android.",
   },
+  es: {
+    overlay: ["Mostrar sobre otras apps", "El propio cajón, que flota sobre todas las apps."],
+    listener: ["Acceso a las notificaciones", "Medios de las apps instaladas en la unidad principal y navegación paso a paso."],
+    usage: ["App en primer plano", "Permite que la barra de información se quite del camino cuando hay una app a pantalla completa abierta, como Android Auto."],
+    taprelay: ["Paso de toques", "Manija solo por deslizamiento y la zona para deslizar hacia abajo de la barra de información. Los servicios de accesibilidad del propio auto siguen activos."],
+    securesettings: ["Automatización de Wi-Fi y ADB", "Permite que la app vuelva a activar sus propios servicios de accesibilidad después de una detención forzada, para los botones de Wi-Fi y ADB."],
+    required: "Obligatorio", optional: "Opcional", manual: "Comando manual", grant: "Conceder", granted: "Concedido",
+    notConnected: "Sin conexión.", pick: "Elige la unidad principal en la ventana USB del navegador…", noDevice: "No se eligió ningún dispositivo.",
+    connected: "Conectado por USB. Si el auto pide permitir la depuración USB, acéptala.",
+    notInstalled: "Conectado, pero QuickSettings todavía no está en el auto. Instálalo arriba; los permisos aparecen aquí después.",
+    onCar: (v) => `En el auto: ${v}`, notOnCar: "Todavía no está en el auto", latest: (v) => `Más reciente: ${v}`, noLatest: "Más reciente: no publicada en este sitio",
+    downloading: "Descargando el APK más reciente…", sending: "Enviando el APK al auto…", installing: "Instalando en el auto…",
+    installed: "Instalado, y QuickSettings se está abriendo en el auto.",
+    copied: "El auto rechazó la instalación por ADB. El APK ahora está en la carpeta Download del auto: ábrelo ahí con un administrador de archivos.",
+    installFailed: "La instalación falló. El registro de abajo tiene los detalles.",
+    noDownload: "Este sitio todavía no tiene el APK para descargar. Descárgalo de la página de versiones y usa Elegir archivo APK.",
+    allSet: "Todo listo. Abre QuickSettings en el auto; su panel Estado debería mostrar todo activo.",
+    missing: (n) => `Falta${n > 1 ? "n" : ""} ${n} permiso${n > 1 ? "s obligatorios" : " obligatorio"}.`,
+    reqDone: "El permiso obligatorio está concedido. Los opcionales están abajo.",
+    failed: "Un comando falló. El registro de abajo tiene los detalles.",
+    busy: "Otro programa está ocupando el puerto USB. En una PC con las herramientas de Android, ejecuta  adb kill-server  e intenta de nuevo.",
+    cant: (m) => `No se pudo conectar: ${m}`, disconnected: "Desconectado.",
+    noUsb: "Este navegador no tiene WebUSB. Abre esta página en Chrome o Edge en una computadora, o en Chrome en un celular Android.",
+  },
 };
-const T = STRINGS[document.documentElement.lang.startsWith("pt") ? "pt" : "en"];
+const LANG = document.documentElement.lang;
+const T = STRINGS[LANG.startsWith("pt") ? "pt" : LANG.startsWith("es") ? "es" : "en"];
 
 // Appends our service to the colon-separated list, keeping the car's own services.
 export function withService(current, component) {

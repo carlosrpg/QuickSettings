@@ -96,8 +96,10 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private var lagChecks = 0
     /** The open drawer came down from the top bar, so it slides on the vertical axis. */
     private var fromTop by mutableStateOf(false)
-    /** A full-screen app (Android Auto, video) has hidden the status bar: the top bar steps aside. */
+    /** The top bar steps aside: an app on the always-hide list, or full screen with the bar not kept over it. */
     private var fullScreenApp by mutableStateOf(false)
+    /** A full-screen app has hidden the status bar and the bar stays: it draws on its own glass. */
+    private var glassBar by mutableStateOf(false)
     private var mode by mutableStateOf<DrawerMode?>(null)
     private var closing by mutableStateOf(false)
     private var config by mutableStateOf(QsConfig())
@@ -141,6 +143,8 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 kick.trySend(Unit)
                 updateEdge()
                 updateTopBar()
+                checkFullScreen()
+                if (mode == DrawerMode.OPEN) scheduleAutoClose()
                 drawerView?.let { view -> wm.updateViewLayout(view, drawerParams()) }
             }
         }
@@ -336,7 +340,7 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                         val car by app.car.state.collectAsState()
                         val media by app.media.state.collectAsState()
                         val nav by NavStore.state.collectAsState()
-                        if (!fullScreenApp) TopBar(car, media, nav, TOP_BAR_START_DP.dp, TOP_BAR_END_DP.dp)
+                        if (!fullScreenApp) TopBar(car, media, nav, TOP_BAR_START_DP.dp, TOP_BAR_END_DP.dp, glassBar)
                         SideEffect {
                             drawnCar = car
                             drawnMedia = media
@@ -402,12 +406,19 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         }
     }
 
-    /** Hides the top bar while a full-screen app (Android Auto, video) has the screen. */
+    /**
+     * Hides the top bar while an app on the always-hide list is in front, and while a full-screen
+     * app (video) has the screen unless the bar is set to stay; then it gets a glass backdrop,
+     * since the car's own bar is gone from under it. Without usage access the app in front is
+     * unknown, so the list cannot match.
+     */
     private fun checkFullScreen() {
         if (topBarView == null) return
         val full = fullScreen.poll()
-        if (full != fullScreenApp) {
-            fullScreenApp = full
+        val hide = fullScreen.foregroundPackage in config.topBarHiddenApps || (full && !config.topBarOverFullScreen)
+        glassBar = full && !hide
+        if (hide != fullScreenApp) {
+            fullScreenApp = hide
             updateTopZone()
         }
     }
@@ -590,8 +601,9 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
     private fun scheduleAutoClose() {
         handler.removeCallbacks(autoClose)
-        val delay = if (mode == DrawerMode.OPEN) OPEN_IDLE_MS else SEMI_IDLE_MS
-        handler.postDelayed(autoClose, delay)
+        val delay = if (mode == DrawerMode.OPEN) config.openIdleSeconds * 1000L else SEMI_IDLE_MS
+        // 0 s for the open drawer: it stays until swiped away (or the car moves off).
+        if (delay > 0) handler.postDelayed(autoClose, delay)
     }
 
     private fun drawerParams(): WindowManager.LayoutParams {
@@ -681,7 +693,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         private const val TAG = "QsTopBar"
         private const val SEMI_MAX_FRACTION = 0.8f
         private const val SEMI_IDLE_MS = 8_000L
-        private const val OPEN_IDLE_MS = 20_000L
         private const val RELAY_DELAY_MS = 60L
         private const val TAP_RELAY_MS = 40L
         private const val RELAY_TIMEOUT_MS = 1_500L

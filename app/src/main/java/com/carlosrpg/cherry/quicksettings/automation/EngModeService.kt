@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Runs when asked from settings, and on its own when the owner switched it on there: adb once
  * after each boot; Wi-Fi on startup, when the Bluetooth device chosen in settings connects, or
  * when Android Auto or CarPlay comes to the front. Each trigger does nothing while Wi-Fi is on or
- * the chosen device is not connected; otherwise one run [WIFI_DELAY_MS] later, if Wi-Fi is still
+ * the chosen device is not connected; otherwise one run the delay chosen in settings later, if Wi-Fi is still
  * off then (Android Auto and CarPlay at most once a minute).
  */
 class EngModeService : AccessibilityService() {
@@ -88,7 +88,7 @@ class EngModeService : AccessibilityService() {
         // The owner picked another phone (or none) in settings while this was pending.
         if (AutomationStore(this).wifiDevice != wifiArmedFor) {
             Log.i(TAG, "chosen device changed: Wi-Fi attempt dropped")
-        } else autoWifi("after ${WIFI_DELAY_MS / 1000} s", returnTo = wifiReturnTo.also { wifiReturnTo = null })
+        } else autoWifi("after the delay", returnTo = wifiReturnTo.also { wifiReturnTo = null })
     }
 
     override fun onServiceConnected() {
@@ -128,7 +128,7 @@ class EngModeService : AccessibilityService() {
 
     /**
      * A Wi-Fi trigger: nothing while Wi-Fi is on or the chosen device is not connected; otherwise
-     * one attempt [WIFI_DELAY_MS] from now, replacing any pending one. True when armed.
+     * one attempt [AutomationStore.wifiDelaySeconds] from now, replacing any pending one. True when armed.
      */
     private fun armWifi(reason: String, connected: Boolean, returnTo: String? = null): Boolean {
         val skip = when {
@@ -141,12 +141,13 @@ class EngModeService : AccessibilityService() {
             Log.i(TAG, "$reason: $skip")
             return false
         }
-        Log.i(TAG, "$reason: Wi-Fi attempt in ${WIFI_DELAY_MS / 1000} s")
+        val delayS = AutomationStore(this).wifiDelaySeconds
+        Log.i(TAG, "$reason: Wi-Fi attempt in $delayS s")
         // A Bluetooth reconnect while an Android Auto attempt waits keeps the way back to it.
         wifiReturnTo = returnTo ?: wifiReturnTo
         wifiArmedFor = AutomationStore(this).wifiDevice
         handler.removeCallbacks(wifiAttempt)
-        handler.postDelayed(wifiAttempt, WIFI_DELAY_MS)
+        handler.postDelayed(wifiAttempt, delayS * 1000L)
         return true
     }
 
@@ -447,8 +448,6 @@ class EngModeService : AccessibilityService() {
         /** The head unit's engineering app. */
         const val ENGMODE_PKG = "com.desaysv.engmode"
 
-        /** From a Wi-Fi trigger to its one attempt (the phone and the car settle first). */
-        const val WIFI_DELAY_MS = 10_000L
         private const val PROJECTION_COOLDOWN_MS = 60_000L
         private const val WIFI_COOLDOWN_MS = 60_000L
         private const val RETURN_OVERLAY_MS = 800L
@@ -506,6 +505,11 @@ class EngModeService : AccessibilityService() {
         /** `BluetoothDevice.isConnected()`: hidden on Android 11, read by reflection; false where blocked. */
         fun isConnected(device: BluetoothDevice): Boolean =
             runCatching { BluetoothDevice::class.java.getMethod("isConnected").invoke(device) as Boolean }.getOrDefault(false)
+
+        /** The Wi-Fi client is joined to a network (the drawer's Wi-Fi button turns blue). */
+        @Suppress("DEPRECATION") // connectionInfo is the Android 11 way, the car's version
+        fun wifiConnected(context: Context): Boolean =
+            context.applicationContext.getSystemService(WifiManager::class.java)?.connectionInfo?.networkId?.let { it != -1 } == true
 
         fun adbOn(context: Context): Boolean =
             Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
