@@ -28,6 +28,10 @@ enum class Side { LEFT, RIGHT }
  *   default: it opens a port on the car's network.
  * @property remoteAssist phones reaching the car through the relay may change driver assist.
  *   Off by default; turning it on asks for confirmation (docs/companion-api.md section 4).
+ * @property openIdleSeconds the fully open drawer closes after this long untouched; 0 = never.
+ * @property topBarOverFullScreen keep the top bar, on a glass backdrop, over full-screen apps
+ *   instead of stepping aside.
+ * @property topBarHiddenApps packages whose screen never shows the top bar, full screen or not.
  */
 data class QsConfig(
     val side: Side = Side.LEFT,
@@ -41,6 +45,9 @@ data class QsConfig(
     val carGesture: Boolean = false,
     val phoneControl: Boolean = false,
     val remoteAssist: Boolean = false,
+    val openIdleSeconds: Int = 20,
+    val topBarOverFullScreen: Boolean = false,
+    val topBarHiddenApps: Set<String> = DEFAULT_HIDDEN_APPS,
     val semiOrder: List<WidgetType> = withHidden(semi),
     val openOrder: List<WidgetType> = withHidden(open),
 )
@@ -57,6 +64,9 @@ fun addWeatherBesideRange(list: List<WidgetType>): List<WidgetType> {
     if (at < 0 || WidgetType.WEATHER in list) return list
     return list.toMutableList().apply { add(at + 1, WidgetType.WEATHER) }
 }
+
+/** Android Auto's receiver and the CarPlay app on the J7 head unit. */
+val DEFAULT_HIDDEN_APPS = setOf("com.google.android.projection.sink", "com.desaysv.vehicle.carplayapp")
 
 /** The approved open layout: media + nav + assist, then climate + car mode + range + weather. */
 val DEFAULT_OPEN = listOf(
@@ -84,6 +94,9 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_PHONE_CONTROL, next.phoneControl)
             .putBoolean(KEY_CAR_GESTURE, next.carGesture)
             .putBoolean(KEY_REMOTE_ASSIST, next.remoteAssist)
+            .putInt(KEY_OPEN_IDLE, next.openIdleSeconds)
+            .putBoolean(KEY_TOP_BAR_FULL, next.topBarOverFullScreen)
+            .putStringSet(KEY_TOP_BAR_HIDDEN, next.topBarHiddenApps)
             .putString(KEY_SEMI_ORDER, encode(next.semiOrder))
             .putString(KEY_OPEN_ORDER, encode(next.openOrder))
             .apply()
@@ -107,6 +120,10 @@ class SettingsStore(context: Context) {
             phoneControl = prefs.getBoolean(KEY_PHONE_CONTROL, false),
             carGesture = prefs.getBoolean(KEY_CAR_GESTURE, false),
             remoteAssist = prefs.getBoolean(KEY_REMOTE_ASSIST, false),
+            openIdleSeconds = prefs.getInt(KEY_OPEN_IDLE, 20),
+            topBarOverFullScreen = prefs.getBoolean(KEY_TOP_BAR_FULL, false),
+            // Copied: the set getStringSet returns must not be kept or changed.
+            topBarHiddenApps = prefs.getStringSet(KEY_TOP_BAR_HIDDEN, null)?.toSet() ?: DEFAULT_HIDDEN_APPS,
             // A saved order may predate a widget; withHidden appends whatever it lacks.
             semiOrder = withHidden(decode(prefs.getString(KEY_SEMI_ORDER, null)) ?: semi),
             openOrder = withHidden(savedOpenOrder?.let(::addWeatherBesideRange) ?: open),
@@ -125,6 +142,9 @@ class SettingsStore(context: Context) {
         private const val KEY_PHONE_CONTROL = "phone_control"
         private const val KEY_CAR_GESTURE = "car_gesture"
         private const val KEY_REMOTE_ASSIST = "remote_assist"
+        private const val KEY_OPEN_IDLE = "open_idle_seconds"
+        private const val KEY_TOP_BAR_FULL = "top_bar_over_full_screen"
+        private const val KEY_TOP_BAR_HIDDEN = "top_bar_hidden_apps"
         private const val KEY_SEMI_ORDER = "semi_order"
         private const val KEY_OPEN_ORDER = "open_order"
 

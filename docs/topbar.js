@@ -2,8 +2,11 @@
 // sizes, so the site shows it without the emulator's own status bar mixed in. 1px = 1dp.
 // Values are the app's mock car (the emulator build). Fill <div class="topbar" data-variant="full|nav">.
 const PT = document.documentElement.lang.startsWith("pt");
+const ES = document.documentElement.lang.startsWith("es");
 const L = PT
   ? { regen: "Recuperação de energia", out: "ext.", title: "Night Drive", artist: "The Mock Band", dist: "300 m", street: "Av. Paulista", eta: "12:58 · 8 km", level: "Médio" }
+  : ES
+  ? { regen: "Regeneración", out: "ext.", title: "Night Drive", artist: "The Mock Band", dist: "300 m", street: "Av. Reforma", eta: "12:58 · 8 km", level: "Media" }
   : { regen: "Regeneration", out: "out", title: "Night Drive", artist: "The Mock Band", dist: "300 m", street: "Main Street", eta: "12:58 · 5 mi", level: "Medium" };
 
 const C = { text: "#EEF2F7", soft: "#C6D0DC", muted: "#9AA6B6", dim: "#6B7686", cool: "#2F6BFF", warm: "#FF7A2E", energy: "#3DDC97", fuel: "#F2B84B", route: "#4DA3FF", mode: "#3DDC97" };

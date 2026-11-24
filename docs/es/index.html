@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickSettings para Jaecoo 7</title>
+<meta name="description" content="Un cajón de widgets que flota sobre todas las apps de la unidad principal del Jaecoo 7. Configúralo desde el navegador, con un cable USB.">
+<meta name="theme-color" content="#0b0e14">
+<link rel="alternate" hreflang="en" href="../">
+<link rel="alternate" hreflang="pt-BR" href="../pt/">
+<link rel="stylesheet" href="../site.css">
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><i aria-hidden="true"></i>QuickSettings</a>
+    <nav>
+      <a href="#pantallas">Pantallas</a>
+      <a href="#funciones">Funciones</a>
+      <a href="#celular">Celular</a>
+      <a href="#faq">Preguntas</a>
+      <a class="cta" href="#setup-section">Configurar</a>
+      <a class="lang" href="../" hreflang="en" lang="en" onclick="try{localStorage.setItem('qs.lang','en')}catch(e){}">EN</a>
+      <a class="lang" href="../pt/" hreflang="pt-BR" lang="pt-BR" onclick="try{localStorage.setItem('qs.lang','pt')}catch(e){}">PT</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero glow">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow">Jaecoo 7 · Android Automotive 11</div>
+        <h1>Tu auto, a un <em>deslizamiento</em>.</h1>
+        <p class="lead">Un cajón de vidrio que flota sobre todas las apps de la unidad principal: medios, climatización, modo de batería, autonomía, navegación y asistencia al conductor, para leer de un vistazo y controlar con un dedo.</p>
+        <div class="actions">
+          <a class="btn primary" href="#setup-section">Configurar desde esta página</a>
+          <a class="btn" href="https://github.com/carlosrpg/QuickSettings/releases/latest">Descargar el APK</a>
+        </div>
+      </div>
+      <div class="device">
+        <img src="../img/full-en.webp" width="800" height="1174" alt="QuickSettings totalmente abierto sobre la pantalla de inicio: tarjetas de medios, navegación, asistencia, climatización, modo de batería, autonomía y clima">
+      </div>
+    </div>
+  </section>
+
+  <section id="pantallas">
+    <div class="wrap">
+      <h2>Míralo en la unidad principal</h2>
+      <p class="sub">Pantallas reales de la app, en un emulador de Android Automotive 11 (los valores del auto son simulados).</p>
+      <div class="carousel" aria-roledescription="carrusel">
+        <div class="track" tabindex="0">
+          <article class="slide">
+            <figure><div class="bars" role="img" aria-label="Barra de información con medios, batería, combustible, regeneración y climatización; con una ruta, la próxima maniobra y un anillo de autonomía">
+              <span>Sin ruta</span><div class="topbar" data-variant="full"></div>
+              <span>Con ruta</span><div class="topbar" data-variant="nav"></div>
+            </div></figure>
+            <div><div class="kicker">Barra superior</div><h3>Información junto al reloj</h3><p>Medios, batería y combustible con la autonomía de cada uno, regeneración y climatización viven en la propia barra superior del auto. Con una ruta, la próxima maniobra se suma y la autonomía se convierte en un anillo. Se quita del camino mientras una app a pantalla completa, como Android Auto, oculta esa barra.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="../img/full-en.webp" width="800" height="1174" loading="lazy" alt="Cajón totalmente abierto con tarjetas grandes"></figure>
+            <div><div class="kicker">Cajón completo</div><h3>Todos los controles en un deslizamiento</h3><p>Desliza hacia abajo justo debajo de la barra superior, incluso sobre una app a pantalla completa, para ver las tarjetas grandes: medios con controles de reproducción y volumen, navegación, asistencia con los bloqueos originales, el asiento de la climatización, modo de batería y regeneración, autonomía y clima. Los controles de temperatura y ventilador están a los lados.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="../img/settings-en.webp" width="800" height="1174" loading="lazy" alt="Pantalla de ajustes con la posición del cajón, las opciones de la manija y la lista de widgets"></figure>
+            <div><div class="kicker">Ajustes</div><h3>A tu manera</h3><p>Elige el lado y la altura de la manija, toca o desliza para abrir, activa o desactiva la barra de información, y reordena u oculta widgets por separado para el cajón a medias y el cajón abierto y, si quieres, ábrelo con el propio gesto del auto de deslizar dos dedos hacia abajo. El panel Estado muestra en vivo la conexión con el auto, los medios y el acceso a las notificaciones.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="../img/semi-en.webp" width="800" height="1174" loading="lazy" alt="Cajón a medias en el borde izquierdo con bloques pequeños"></figure>
+            <div><div class="kicker">Barra lateral</div><h3>Cajón a medias, de un vistazo</h3><p>Toca la manija en el borde de la pantalla y entra una columna de bloques pequeños: portada del álbum, el cuadrante de la climatización, modo de batería y regeneración, anillos de autonomía, próxima maniobra, asistencia y clima. Mantén presionado y arrastra un bloque para cambiarlo sin abrir nada.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="../img/wifi-en.webp" width="752" height="267" loading="lazy" alt="Sección Wi-Fi con Abrir automáticamente activado y la elección del celular"></figure>
+            <div><div class="kicker">Automatización del Wi-Fi</div><h3>Wi-Fi abierto para Android Auto y CarPlay inalámbricos</h3><p>El auto apaga el Wi-Fi por su cuenta. Elige tu celular y QuickSettings abre el Wi-Fi mientras esté conectado por Bluetooth: 10 s después del arranque, cuando el celular se conecta o cuando se abre Android Auto o CarPlay, como máximo una vez por minuto.</p></div>
+          </article>
+          <article class="slide">
+            <figure><img src="../img/adb-en.webp" width="752" height="315" loading="lazy" alt="Sección ADB con Activar al arrancar y el campo de la contraseña del menú de ingeniería"></figure>
+            <div><div class="kicker">Automatización del ADB</div><h3>ADB activado, sin pasar por los menús</h3><p>Guarda una vez la contraseña del menú de ingeniería (se guarda cifrada en la unidad principal) y la app activa la depuración USB por ti, cuando lo pidas o una vez en cada arranque del auto. Te avisa cuando Wi-Fi y ADB están ambos en automático.</p></div>
+          </article>
+        </div>
+        <div class="carousel-nav">
+          <button class="btn round prev" aria-label="Pantalla anterior">‹</button>
+          <div class="dots"></div>
+          <button class="btn round next" aria-label="Pantalla siguiente">›</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="funciones">
+    <div class="wrap">
+      <h2>Seis widgets, dos tamaños</h2>
+      <p class="sub">Toca la manija del borde para abrir el cajón a medias: bloques pequeños para leer de un vistazo, con atajos de mantener presionado y arrastrar. Ábrelo por completo para ver las tarjetas grandes y todos los controles. En inglés, portugués de Brasil y español.</p>
+      <div class="grid">
+        <article class="card">
+          <div class="icon" style="background:rgba(77,163,255,.15);color:var(--route)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+          <h3>Medios</h3>
+          <p>Apps de la unidad principal y las fuentes propias del auto: Bluetooth, USB, CarPlay, Android Auto. Arrastra para el volumen y las pistas; búsqueda por voz enviada a la app que está sonando.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(255,122,46,.15);color:var(--warm)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg></div>
+          <h3>Climatización</h3>
+          <p>Controles deslizantes de temperatura y ventilador que se aplican al soltar, temperatura del pasajero con las zonas separadas y un cuadrante temperatura × ventilador en el cajón a medias. Encendido/apagado, A/C, automático, sincronización de zonas y recirculación siguen el estado del auto.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(61,220,151,.15);color:var(--energy)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+          <h3>Modo del auto</h3>
+          <p>Modo de batería (Inicial, Inteligente, Forzado con meta de carga) y regeneración Baja, Media, Alta, un toque cada uno.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(242,184,75,.15);color:var(--fuel)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg></div>
+          <h3>Autonomía</h3>
+          <p>Anillos de batería y combustible, autonomía eléctrica y de combustión en km y %, y el total.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(138,123,191,.18);color:var(--mid)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m3 11 19-9-9 19-2-8-8-2z"/></svg></div>
+          <h3>Navegación</h3>
+          <p>Próxima maniobra, calle y hora de llegada de tu app de navegación; destino por voz sin ruta; envía el mapa al tablero de instrumentos y tráelo de vuelta.</p>
+        </article>
+        <article class="card">
+          <div class="icon" style="background:rgba(255,90,95,.14);color:var(--red)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <h3>Asistencia</h3>
+          <p>Frenado de emergencia, auto hold, prevención de salida de carril y alerta de colisión, con las reglas de la pantalla original y un segundo toque para desactivar una función de seguridad.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="como">
+    <div class="wrap">
+      <h2>Cómo funciona</h2>
+      <p class="sub">QuickSettings se comunica con el auto a través de los servicios de la propia unidad principal, los mismos que usan las apps originales, mediante la biblioteca de código abierto <a href="https://github.com/carlosrpg/jconfig-carbus">jconfig-carbus</a>.</p>
+      <div class="facts">
+        <div class="fact"><h3>Nada cambia solo</h3><p>Todo cambio en el auto viene de un toque tuyo, de soltar un control deslizante o de soltar un arrastre. Las funciones de seguridad mantienen los bloqueos originales.</p></div>
+        <div class="fact" style="border-color:var(--energy)"><h3>Siempre ahí</h3><p>El cajón se ejecuta como servicio en primer plano desde el arranque, y el acceso a las notificaciones lo trae de vuelta si el sistema lo cierra.</p></div>
+        <div class="fact" style="border-color:var(--warm)"><h3>Valores en vivo</h3><p>El auto no avisa a las apps cuando algo cambia, así que los valores se leen cada 2 s mientras el cajón o un celular vinculado los muestra, cada 5 s solo para la barra de información, y justo después de cada cambio.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="celular" class="phone-section">
+    <div class="wrap">
+      <div>
+        <h2>Contrólalo desde tu celular</h2>
+        <p class="sub">Todos en el auto pueden usar el cajón desde su propio celular: climatización, modo del auto, medios, navegación y asistencia al conductor, con las mismas reglas que en la unidad principal.</p>
+        <ol class="steps">
+          <li><strong>Actívalo</strong>En el auto: QuickSettings → Configuración → Teléfonos → Control desde el teléfono. Viene desactivado.</li>
+          <li><strong>Instala QS Companion</strong>Descárgalo abajo en tu Android. En un iPhone, escanea el código QR que muestra el auto y usa la página en Safari.</li>
+          <li><strong>Vincula</strong>Conéctate al Wi-Fi del auto (o conecta el auto al hotspot de tu celular), toca Agregar teléfono en el auto y escribe el código de seis dígitos en la app.</li>
+          <li><strong>Permite</strong>Alguien en la unidad principal toca Permitir. Quita el celular ahí cuando quieras.</li>
+        </ol>
+        <div class="actions">
+          <a class="btn primary" href="../latest/QSCompanion.apk" download>Descargar QS Companion para Android</a>
+          <a class="btn" href="https://github.com/carlosrpg/QuickSettings/releases/latest">Todas las versiones</a>
+        </div>
+        <p class="note">Android 8 o más reciente. Cuando Android lo pida, permite que el navegador instale apps. La app encuentra el auto en el Wi-Fi por sí sola y muestra si está conectada. Acceder al auto por internet requiere un relay propio, integrado en tus propios APK (consulta el <a href="https://github.com/carlosrpg/QuickSettings#phone-control">README</a>); por esa vía, la asistencia al conductor queda solo de lectura, a menos que el auto lo permita.</p>
+      </div>
+      <div class="phone">
+        <img src="../img/phone-en.webp" width="750" height="1624" loading="lazy" alt="QS Companion en un celular: la tarjeta de medios con controles de reproducción y volumen, y la tarjeta de navegación">
+      </div>
+    </div>
+  </section>
+
+  <section id="setup-section">
+    <div class="wrap">
+      <h2>Configura desde el navegador</h2>
+      <p class="sub">La unidad principal no tiene pantalla de ajustes para mostrar sobre otras apps ni para el acceso a las notificaciones, así que esos permisos se conceden por ADB. Esta página instala la app y concede los permisos por ti con un cable USB, sin instalar nada en tu computadora.</p>
+      <ol class="steps">
+        <li><strong>Activa la depuración USB</strong>En el menú de ingeniería del auto; luego conecta un cable de datos de esta computadora al auto.</li>
+        <li><strong>Conecta</strong>Aquí abajo, en Chrome o Edge, y elige la unidad principal.</li>
+        <li><strong>Instala</strong>Instalar la más reciente descarga la última versión y la instala en el auto. O elige un APK que ya tengas.</li>
+        <li><strong>Concede</strong>Concede lo que falte. El micrófono (búsqueda por voz) se concede en la propia app.</li>
+      </ol>
+
+      <div id="setup" aria-live="polite">
+        <div class="setup-head">
+          <div><strong>Unidad principal</strong> <span id="device"></span></div>
+          <div>
+            <button id="connect" class="btn primary">Conectar</button>
+            <button id="disconnect" class="btn" hidden>Desconectar</button>
+          </div>
+        </div>
+        <div id="setup-status">Cargando…</div>
+        <div id="app-row" class="grant app-row" data-state="unknown">
+          <span class="grant-dot" aria-hidden="true"></span>
+          <div class="grant-body"><div class="grant-title">App QuickSettings</div><p id="app-version"></p></div>
+          <div class="app-actions">
+            <button id="install-latest" class="btn small primary" disabled>Instalar la más reciente</button>
+            <button id="choose-apk" class="btn small" disabled>Elegir archivo APK…</button>
+            <input id="apk-file" type="file" accept=".apk,application/vnd.android.package-archive" hidden>
+          </div>
+        </div>
+        <ul id="grant-list"></ul>
+        <div class="setup-foot">
+          <button id="grant-all" class="btn primary" disabled>Conceder todo lo que falta</button>
+        </div>
+        <pre id="setup-log" hidden></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" class="faq">
+    <div class="wrap">
+      <h2>Preguntas</h2>
+      <details><summary>¿Qué navegadores funcionan?</summary><p>Chrome, Edge u otro navegador Chromium con WebUSB, en Windows, macOS, Linux o ChromeOS. Chrome en un celular Android también sirve, con un adaptador USB-OTG. Firefox y Safari no tienen WebUSB.</p></details>
+      <details><summary>La conexión falla o el auto no aparece en la lista</summary><p>Usa un cable de datos, no uno solo de carga. Si tienes instaladas las herramientas de Android, probablemente otro adb está ocupando el puerto: ejecuta <code>adb kill-server</code> e intenta de nuevo. En Windows la unidad principal puede necesitar el controlador USB de Google.</p></details>
+      <details><summary>¿Qué ejecuta esta página en mi auto?</summary><p>Para instalar, copia el APK y un script corto (<a href="../car-setup.sh">car-setup.sh</a>) a <code>/data/local/tmp</code> y ejecuta el script, que instala el APK mediante una sesión del instalador de paquetes de Android (el auto rechaza el <code>pm install</code> común), abre la app y borra los dos archivos. El ADB del auto rechaza cualquier comando con la palabra "install", por eso la instalación se ejecuta desde un script. Aparte de eso, solo ejecuta los comandos que aparecen en "Comando manual" de cada elemento, más verificaciones de solo lectura (<code>pm list packages</code>, <code>appops get</code>, <code>settings get</code>, <code>dumpsys package</code>). No se envía nada a ningún lugar más que al auto, por el cable.</p></details>
+      <details><summary>El cajón no se abre con mi gesto</summary><p>Activa Configuración → Deslizar dos dedos hacia abajo y QuickSettings responde directamente al gesto del propio auto, sin una app de gestos de por medio. Mantén los dos dedos juntos y empieza a moverlos enseguida: el auto interpreta un cambio en la distancia entre ellos como un pellizco, y una pausa como una pulsación larga. La sección del cajón en el registro de depuración de la pantalla de ajustes lista cada gesto que informó el auto y cada toque en la manija y en la franja superior.</p></details>
+      <details><summary>¿Es seguro el control desde el celular?</summary><p>Está desactivado hasta que lo actives, solo responde a celulares en la red del propio auto y solo a celulares que alguien en la unidad principal permitió. Cada uno se puede quitar al instante. Todo cambio pasa por las mismas reglas que el cajón, incluido el segundo toque antes de desactivar una función de seguridad.</p></details>
+      <details><summary>¿Tengo que hacer esto de nuevo?</summary><p>No. Los permisos se mantienen después de reiniciar y de actualizar la app. Desinstalar la app los quita.</p></details>
+      <details><summary>Prefiero escribir los comandos</summary><p>Todos los comandos están en el <a href="https://github.com/carlosrpg/QuickSettings#install-on-the-car">README</a>, y la pantalla de ajustes de la app muestra cada uno que falta.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>QuickSettings es un proyecto independiente, sin relación con Jaecoo, Chery ni Desay SV.</span>
+    <a href="https://github.com/carlosrpg/QuickSettings">Código en GitHub</a>
+  </div>
+</footer>
+
+<script src="../topbar.js" defer></script>
+<script src="../carousel.js" defer></script>
+<script type="module" src="../setup.js"></script>
+</body>
+</html>

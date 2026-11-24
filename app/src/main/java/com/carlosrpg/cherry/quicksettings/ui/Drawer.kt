@@ -136,6 +136,8 @@ class DrawerActions(
         service.runNow(EngModeService.Flow.WIFI)
     }
 
+    fun wifiConnected() = EngModeService.wifiConnected(context)
+
     val cluster get() = context.app.cluster
     val weather get() = context.app.weather
 
@@ -646,9 +648,10 @@ private fun OpenDrawer(
                     GlassButton(Icons.DoubleLeft.mirrorFor(config.side), stringResource(R.string.action_back_semi), actions.toSemi)
                     Spacer(Modifier.size(10.dp))
                 }
-                // Dimmed while the automation service is off, as in settings.
-                val automation by EngModeService.running.collectAsState()
-                GlassButton(Icons.Wifi, stringResource(R.string.auto_wifi_now), actions::openWifi, tint = if (automation) Qs.Text else Qs.Dim)
+                // Blue while the car's Wi-Fi is joined to a network, grey otherwise; re-read every beat.
+                val tick by actions.ticks.collectAsState()
+                val wifi = remember(tick) { actions.wifiConnected() }
+                GlassButton(Icons.Wifi, stringResource(R.string.auto_wifi_now), actions::openWifi, tint = if (wifi) Qs.Route else Qs.Dim)
                 Spacer(Modifier.size(10.dp))
                 // No close button: a swipe back closes the open drawer. Settings twice as wide.
                 GlassButton(Icons.Tune, stringResource(R.string.action_settings), actions.openSettings, Modifier.width(Qs.TouchMin * 2))

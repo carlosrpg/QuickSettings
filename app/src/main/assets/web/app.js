@@ -2,9 +2,9 @@
 // API: docs/companion-api.md. The car decides everything; this page only shows and asks.
 "use strict";
 
-// ?lang=en or ?lang=pt overrides the phone's language.
-const pt = (new URLSearchParams(location.search).get("lang") || navigator.language || "").toLowerCase().startsWith("pt");
-const T = pt ? {
+// ?lang=en, ?lang=pt or ?lang=es overrides the phone's language.
+const lang = (new URLSearchParams(location.search).get("lang") || navigator.language || "").toLowerCase().slice(0, 2);
+const T = lang === "pt" ? {
   wifi: "Conectado · Wi-Fi", internet: "Conectado · Internet", carOffline: "Carro offline", lastSeen: "visto há %s",
   offline: "Sem conexão com o carro", seen: "atualizado há %s",
   pinHint: "Código de 6 dígitos mostrado no carro", lanOnly: "Para parear, conecte este celular ao Wi-Fi do carro.",
@@ -23,6 +23,25 @@ const T = pt ? {
   mediaVol: "Volume da mídia", navVol: "Voz da navegação", mute: "Mudo",
   blocked: { IGNITION_OFF: "Ligue a ignição", TOO_FAST: "Só abaixo de 10 km/h", UNAVAILABLE: "Indisponível agora", NOT_SPLIT: "Zonas sincronizadas",
     NOT_CONNECTED: "Carro sem dados", REMOTE_DISABLED: "Só no Wi-Fi do carro", RATE_LIMIT: "Devagar", BAD_ARGS: "Valor inválido" },
+} : lang === "es" ? {
+  wifi: "Conectado · Wi-Fi", internet: "Conectado · Internet", carOffline: "Auto sin conexión", lastSeen: "visto hace %s",
+  offline: "Sin conexión con el auto", seen: "actualizado hace %s",
+  pinHint: "Código de 6 dígitos que muestra el auto", lanOnly: "Para vincular, conecta este celular al Wi-Fi del auto.",
+  notPaired: "Este celular no está vinculado", removed: "Este celular se quitó del auto",
+  howPair: "En el auto: QuickSettings → Settings → Phones → Add phone. Escanea el QR con la cámara o escribe el código abajo.",
+  nameTitle: "Vincular con el auto", nameHint: "Nombre de este celular", pair: "Vincular", waiting: "Esperando a que alguien en el auto toque Allow…",
+  denied: "El auto rechazó este celular.", badCode: "El código venció o ya se usó. Genera otro en el auto.", timeout: "Nadie respondió en el auto.",
+  media: "Medios", climate: "Climatización", carMode: "Modo del auto", autonomy: "Autonomía", nav: "Navegación", assist: "Asistencia", weather: "Clima",
+  nothing: "No se reproduce nada", driver: "Conductor", passenger: "Pasajero", fan: "Ventilador", outside: "Exterior",
+  power: "Encender", ac: "A/C", auto: "Auto", recirc: "Recircular", sync: "Sincronizar",
+  regen: "Regeneración", low: "Baja", medium: "Media", high: "Alta", battery: "Batería", initial: "Inicial", smart: "Inteligente", forced: "Forzado",
+  hold: "Mantener carga en", electric: "Eléctrica", fuel: "Combustible", total: "Total",
+  searchMedia: "Buscar música…", searchNav: "Buscar destino…", go: "Ir", openCar: "Abrir en el auto", cluster: "En el tablero", noRoute: "Sin ruta",
+  aeb: "Frenado de emergencia", autoHold: "Auto hold", lane: "Prevención de salida de carril", fcw: "Alerta de colisión",
+  on: "Activado", off: "Desactivado", near: "Cerca", standard: "Estándar", far: "Lejos", confirmOff: "Toca de nuevo para desactivar",
+  mediaVol: "Volumen de medios", navVol: "Voz de navegación", mute: "Silencio",
+  blocked: { IGNITION_OFF: "Activa el encendido", TOO_FAST: "Solo por debajo de 10 km/h", UNAVAILABLE: "No disponible ahora", NOT_SPLIT: "Zonas sincronizadas",
+    NOT_CONNECTED: "Sin datos del auto", REMOTE_DISABLED: "Solo en el Wi-Fi del auto", RATE_LIMIT: "Más despacio", BAD_ARGS: "Valor no válido" },
 } : {
   wifi: "Connected · Wi-Fi", internet: "Connected · Internet", carOffline: "Car offline", lastSeen: "last seen %s ago",
   offline: "No connection to the car", seen: "updated %s ago",

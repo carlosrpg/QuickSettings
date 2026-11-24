@@ -13,7 +13,7 @@ import com.carlosrpg.cherry.quicksettings.overlay.TapRelayService
 class AutomationStore(private val context: Context) {
     private val prefs = prefs(context)
 
-    /** Open Wi-Fi 10 s after startup, [wifiDevice] connecting, or Android Auto / CarPlay, while that device is connected and Wi-Fi is off. */
+    /** Open Wi-Fi [wifiDelaySeconds] after startup, [wifiDevice] connecting, or Android Auto / CarPlay, while that device is connected and Wi-Fi is off. */
     var autoWifi: Boolean
         get() = prefs.getBoolean(KEY_AUTO_WIFI, false)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_WIFI, value).apply()
@@ -22,6 +22,11 @@ class AutomationStore(private val context: Context) {
     var wifiDevice: String?
         get() = prefs.getString(KEY_WIFI_DEVICE, null)
         set(value) = prefs.edit().putString(KEY_WIFI_DEVICE, value).apply()
+
+    /** From a Wi-Fi trigger to its one attempt (the phone and the car settle first); 0 = at once. */
+    var wifiDelaySeconds: Int
+        get() = prefs.getInt(KEY_WIFI_DELAY, 10)
+        set(value) = prefs.edit().putInt(KEY_WIFI_DELAY, value).apply()
 
     /** Enable adb once after every boot. */
     var adbOnStartup: Boolean
@@ -47,6 +52,7 @@ class AutomationStore(private val context: Context) {
     companion object {
         private const val KEY_AUTO_WIFI = "auto_wifi"
         private const val KEY_WIFI_DEVICE = "wifi_bt_device"
+        private const val KEY_WIFI_DELAY = "wifi_delay_seconds"
         private const val KEY_ADB_ON_STARTUP = "adb_on_startup"
         private const val KEY_BOOT_PENDING = "boot_pending"
         private const val RELIST_STEP_MS = 1_000L
