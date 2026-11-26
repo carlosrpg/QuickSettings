@@ -542,12 +542,9 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.CenterStart) {
             // The text needs the width more than the arrow does: nav apps put the distance and
             // the street in one title ("0 ft - toward Main St"), so it gets two lines.
-            // Lanes (only some apps send them) take a strip under the arrow row, so the arrow shrinks to make room.
-            val lanes = nav.lanes
-            val arrow = minOf(maxHeight * (if (lanes != null) 0.52f else 0.8f), maxWidth * 0.26f).coerceIn(56.dp, 140.dp)
+            val arrow = minOf(maxHeight * 0.8f, maxWidth * 0.26f).coerceIn(56.dp, 140.dp)
             val distanceSize = (arrow.value * 0.3f).coerceIn(20f, 36f).sp
             val instructionSize = (arrow.value * 0.17f).coerceIn(14f, 24f).sp
-            Column(verticalArrangement = Arrangement.spacedBy(arrow * 0.14f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(arrow * 0.18f)) {
                 Box(
                     Modifier.size(arrow).clip(RoundedCornerShape(arrow * 0.26f)).background(Qs.Route),
@@ -563,16 +560,21 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
                     nav.text?.let {
                         Text(it, color = Qs.TextSoft, fontSize = instructionSize, lineHeight = instructionSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
+                    // Lane guidance, when the app sends it (the patched Waze does): white on transparent, set on
+                    // the card's own tile surface so it reads as part of the drawer rather than a separate banner.
+                    nav.lanes?.let { lanes ->
+                        Box(
+                            Modifier.padding(top = 4.dp).clip(RoundedCornerShape(12.dp)).background(Qs.Tile)
+                                .border(1.dp, Qs.Hairline, RoundedCornerShape(12.dp)).padding(horizontal = 6.dp, vertical = 3.dp),
+                        ) {
+                            Image(
+                                lanes.asImageBitmap(), stringResource(R.string.nav_lanes),
+                                Modifier.height(arrow * 0.36f).aspectRatio(lanes.width.toFloat() / lanes.height, matchHeightConstraintsFirst = true),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
+                    }
                 }
-            }
-            if (lanes != null) {
-                Box(
-                    Modifier.clip(RoundedCornerShape(arrow * 0.14f)).background(Qs.Route).padding(horizontal = 10.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(lanes.asImageBitmap(), stringResource(R.string.nav_lanes), Modifier.height(arrow * 0.5f).aspectRatio(lanes.width.toFloat() / lanes.height), contentScale = ContentScale.Fit)
-                }
-            }
             }
         }
         if (nav.subText != null) {
