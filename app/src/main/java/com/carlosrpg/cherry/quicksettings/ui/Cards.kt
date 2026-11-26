@@ -560,6 +560,20 @@ fun NavCard(nav: NavState?, actions: DrawerActions, listening: Boolean, modifier
                     nav.text?.let {
                         Text(it, color = Qs.TextSoft, fontSize = instructionSize, lineHeight = instructionSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
+                    // Lane guidance, when the app sends it (the patched Waze does): white on transparent, set on
+                    // the card's own tile surface so it reads as part of the drawer rather than a separate banner.
+                    nav.lanes?.let { lanes ->
+                        Box(
+                            Modifier.padding(top = 4.dp).clip(RoundedCornerShape(12.dp)).background(Qs.Tile)
+                                .border(1.dp, Qs.Hairline, RoundedCornerShape(12.dp)).padding(horizontal = 6.dp, vertical = 3.dp),
+                        ) {
+                            Image(
+                                lanes.asImageBitmap(), stringResource(R.string.nav_lanes),
+                                Modifier.height(arrow * 0.36f).aspectRatio(lanes.width.toFloat() / lanes.height, matchHeightConstraintsFirst = true),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -76,6 +76,7 @@
     <!-- Navigation -->
     <string name="navigation">Navigation</string>
     <string name="where_to">Where to?</string>
+    <string name="nav_lanes">Lanes to take</string>
     <string name="voice_destination">Voice search a destination</string>
     <string name="tap_say_destination">Tap and say a destination</string>
     <string name="listening_ellipsis">Listening…</string>

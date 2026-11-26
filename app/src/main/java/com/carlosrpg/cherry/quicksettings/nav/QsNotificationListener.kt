@@ -30,6 +30,8 @@ data class NavState(
     val subText: String?,
     /** The app's manoeuvre arrow when it sends one as the large icon. */
     val maneuver: Bitmap?,
+    /** Lane guidance as a picture (the notification's big picture), when the app sends one; most apps don't. */
+    val lanes: Bitmap? = null,
 )
 
 object NavStore {
@@ -182,6 +184,7 @@ class QsNotificationListener : NotificationListenerService() {
                 text = text,
                 subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
                 maneuver = arrow?.loadDrawable(this)?.toBitmap(MANEUVER_PX),
+                lanes = lanePicture(extras),
             )
             // An instruction needs at least two texts (distance and street); one alone is a status line.
             custom != null && custom.first.size >= 2 -> NavState(
@@ -195,6 +198,10 @@ class QsNotificationListener : NotificationListenerService() {
             else -> null
         }
     }
+
+    /** The big picture the patched Waze puts its lane strip in; null when the app sends none. */
+    private fun lanePicture(extras: android.os.Bundle): Bitmap? =
+        (extras.get(Notification.EXTRA_PICTURE) as? Bitmap)?.takeIf { it.width > 0 && it.height > 0 }
 
     /** The visible texts, top to bottom, and the biggest image of a notification's own layout. */
     private fun customContent(n: Notification): Pair<List<String>, Bitmap?>? {

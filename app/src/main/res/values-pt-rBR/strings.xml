@@ -69,6 +69,7 @@
 
     <string name="navigation">Navegação</string>
     <string name="where_to">Para onde?</string>
+    <string name="nav_lanes">Faixas a seguir</string>
     <string name="voice_destination">Buscar destino por voz</string>
     <string name="tap_say_destination">Toque e diga um destino</string>
     <string name="listening_ellipsis">Ouvindo…</string>
