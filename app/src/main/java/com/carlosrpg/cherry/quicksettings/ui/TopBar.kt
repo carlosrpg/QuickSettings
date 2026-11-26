@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,7 +35,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -62,9 +66,10 @@ fun TopBar(car: CarState, media: MediaState, nav: NavState?, startInset: Dp, end
 @Composable
 private fun NavBar(car: CarState, media: MediaState, nav: NavState, width: Dp, height: Dp) {
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        // The next turn takes only the room its fields need (up to half), media gets the rest.
+        // The next turn takes only the room its fields need (up to half), media gets the rest. With lanes it may take
+        // all but the stats on the right (about 190 dp; Row measures it before them), so media shrinks first.
         NowPlaying(media, Modifier.weight(1f))
-        NextTurn(nav, Modifier.widthIn(max = width / 2), height)
+        NextTurn(nav, Modifier.widthIn(max = if (nav.lanes != null) width - 190.dp else width / 2), height)
         // Range: the drawer's two half rings, with the electric % over the fuel % inside.
         MirrorRing(car.batterySoc?.div(100f), car.fuelPercent?.div(100f), Qs.chargeColor(car.batterySoc), height * 0.7f, 4.dp) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -92,36 +97,87 @@ private fun NavBar(car: CarState, media: MediaState, nav: NavState, width: Dp, h
  * The next manoeuvre with everything the drawer's navigation card shows: the arrow tile, the
  * distance, the street, and the ETA line (pin icon) when the app sends one. Lines are packed
  * tight so all three fit the bar's height.
+ *
+ * With lane guidance the lanes come last, as tall as the arrow tile. When they don't fit, the turn
+ * gives way in this order: the arrow (the lanes stand in for it), then the street, then the ETA. The
+ * distance and the lanes always stay; only past that do the lanes scale down.
  */
 @Composable
 private fun NextTurn(nav: NavState, modifier: Modifier, height: Dp) {
     val tile = (height * 0.7f).coerceIn(40.dp, 56.dp)
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        // Drop shadow and dark rim, like the text halo, so the tile stands out on a light map.
-        val shape = RoundedCornerShape(tile * 0.26f)
-        Box(
-            Modifier.size(tile).shadow(4.dp, shape).border(1.dp, Color.Black.copy(alpha = 0.35f), shape).clip(shape).background(Qs.Route),
-            Alignment.Center,
-        ) {
-            if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(tile * 0.7f))
-            else QsIcon(Icons.TurnRight, Color.White, tile * 0.64f, strokeWidth = 2.6f)
+    val shape = RoundedCornerShape(tile * 0.26f)
+    val lanes = nav.lanes
+    val titleStyle = TextStyle(fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold)
+    val streetStyle = TextStyle(fontSize = 14.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+    val etaStyle = TextStyle(fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold)
+    BoxWithConstraints(modifier) {
+        var fit = LaneFit(arrow = true, street = true, eta = true, textWidth = Dp.Unspecified)
+        if (lanes != null) {
+            val measurer = rememberTextMeasurer()
+            val density = LocalDensity.current
+            fun widthOf(text: String?, style: TextStyle) =
+                if (text == null) 0.dp else with(density) { measurer.measure(text, style, maxLines = 1).size.width.toDp() + 1.dp }
+            val title = widthOf(nav.title, titleStyle)
+            val street = minOf(widthOf(nav.text, streetStyle), 140.dp) // a long street name ellipsizes
+            val eta = if (nav.subText == null) 0.dp else widthOf(nav.subText, etaStyle) + 15.dp // + pin icon
+            val lanesWidth = tile * (lanes.width.toFloat() / lanes.height) + 8.dp + 10.dp // + padding, gap
+            fit = listOf(
+                LaneFit(true, true, true, maxOf(title, street, eta)),
+                LaneFit(false, true, true, maxOf(title, street, eta)),
+                LaneFit(false, false, true, maxOf(title, eta)),
+                LaneFit(false, false, false, title),
+            ).firstOrNull { it.textWidth + lanesWidth + (if (it.arrow) tile + 10.dp else 0.dp) <= maxWidth }
+                ?: LaneFit(false, false, false, title)
         }
-        Spacer(Modifier.width(10.dp))
-        Shadowed {
-            Column {
-                nav.title?.let { Text(it, color = Qs.Text, fontSize = 18.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                nav.text?.let { Text(it, color = BarSoft, fontSize = 14.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                nav.subText?.let {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        QsIcon(Icons.Pin, BarSoft, 12.dp)
-                        Spacer(Modifier.width(3.dp))
-                        Text(it, color = BarSoft, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (fit.arrow) {
+                // Drop shadow and dark rim, like the text halo, so the tile stands out on a light map.
+                Box(
+                    Modifier.size(tile).shadow(4.dp, shape).border(1.dp, Color.Black.copy(alpha = 0.35f), shape).clip(shape).background(Qs.Route),
+                    Alignment.Center,
+                ) {
+                    if (nav.maneuver != null) Image(nav.maneuver.asImageBitmap(), null, Modifier.size(tile * 0.7f))
+                    else QsIcon(Icons.TurnRight, Color.White, tile * 0.64f, strokeWidth = 2.6f)
+                }
+                Spacer(Modifier.width(10.dp))
+            }
+            // The lanes sit left, beside the arrow or in its place; the text is always on the right. The picture is
+            // white on clear, so it gets a dark tile like the arrow's to read on a light map.
+            if (lanes != null) {
+                Box(
+                    Modifier.weight(1f, fill = false).height(tile).shadow(4.dp, shape).border(1.dp, Color.Black.copy(alpha = 0.35f), shape)
+                        .clip(shape).background(LaneTile).padding(horizontal = 4.dp),
+                    Alignment.Center,
+                ) {
+                    Image(
+                        lanes.asImageBitmap(), stringResource(R.string.nav_lanes),
+                        Modifier.aspectRatio(lanes.width.toFloat() / lanes.height, matchHeightConstraintsFirst = true),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+            }
+            Shadowed {
+                Column(if (fit.textWidth != Dp.Unspecified) Modifier.width(fit.textWidth) else Modifier) {
+                    nav.title?.let { Text(it, color = Qs.Text, style = LocalTextStyle.current.merge(titleStyle), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    if (fit.street) nav.text?.let { Text(it, color = BarSoft, style = LocalTextStyle.current.merge(streetStyle), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    if (fit.eta) nav.subText?.let {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            QsIcon(Icons.Pin, BarSoft, 12.dp)
+                            Spacer(Modifier.width(3.dp))
+                            Text(it, color = BarSoft, style = LocalTextStyle.current.merge(etaStyle), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/** What of the next turn is shown beside the lanes, and the width its text column gets. */
+private data class LaneFit(val arrow: Boolean, val street: Boolean, val eta: Boolean, val textWidth: Dp)
+
+private val LaneTile = Color(0xE01A2230)
 
 @Composable
 private fun FullBar(car: CarState, media: MediaState) {
