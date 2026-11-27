@@ -353,8 +353,8 @@ function autonomy() {
 
 function nav() {
   const n = state.nav;
-  const onCluster = state.cluster && state.cluster.navOnCluster;
-  const right = `<div class="row">${btn(ic("Cluster", 20), "nav.toggleCluster", {}, "sq" + (onCluster ? " lit" : ""), T.cluster)}${btn(ic("OpenApp", 20), "app.bringToFront", { which: "NAV" }, "sq", T.openCar)}</div>`;
+  // The send-to-cluster button is off for now (wrong display on the car), as in the drawer.
+  const right = `<div class="row">${btn(ic("OpenApp", 20), "app.bringToFront", { which: "NAV" }, "sq", T.openCar)}</div>`;
   const body = n ? `<div class="row gap"><div class="maneuver">${n.maneuver ? `<img src="${img(n.maneuver)}" alt="">` : ic("TurnRight", 40, false, 2.6)}</div>
       <div class="grow"><div class="title">${esc(n.title || "")}</div><div class="soft">${esc(n.text || "")}</div></div></div>
       ${n.subText ? `<div class="eta">${ic("Pin", 18)}<b>${esc(n.subText)}</b></div>` : ""}`
